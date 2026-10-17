@@ -2,23 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!--
-		Only the keys that cannot be expressed as INFOPLIST_KEY_* build settings live here; the
-		rest of the Info.plist is generated from the Lodestar target's build settings and merged
-		with this file. Do not add INFOPLIST_KEY_UILaunchScreen_Generation: the launch screen is
-		defined below.
-	-->
 	<key>UILaunchScreen</key>
 	<dict>
-		<!-- Pure black, so the launch screen never blinds a dark-adapted photographer. -->
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
-	<key>UIRequiredDeviceCapabilities</key>
-	<array>
-		<string>magnetometer</string>
-		<string>gyroscope</string>
-		<string>accelerometer</string>
-	</array>
 </dict>
 </plist>

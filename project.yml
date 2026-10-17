@@ -71,7 +71,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CURRENT_PROJECT_VERSION: "1"
         DEAD_CODE_STRIPPING: "YES"
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 39489Q7GDR
         ENABLE_PREVIEWS: "YES"
         GENERATE_INFOPLIST_FILE: "YES"
         INFOPLIST_FILE: Config/Info.plist
@@ -88,6 +88,7 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_UIRequiredDeviceCapabilities: magnetometer gyroscope accelerometer
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         LD_RUNPATH_SEARCH_PATHS:
           - $(inherited)
