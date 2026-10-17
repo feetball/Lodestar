@@ -17,8 +17,10 @@ final class CatalogPerformanceTests: XCTestCase {
 
     /// Seconds allowed for loading the bundled catalog (about 0.25 s optimized, 0.7 s unoptimized).
     private var loadBudget: Double { Self.optimized ? 1 : 5 }
-    /// Milliseconds allowed for one search (the design target is 5 ms).
-    private var searchBudget: Double { Self.optimized ? 5 : 15 }
+    /// Milliseconds allowed for one search (the design target is 5 ms optimized). Unoptimized builds on
+    /// shared CI machines run pathological queries in about 18 ms, so they get a guard against
+    /// algorithmic blow-ups rather than a benchmark.
+    private var searchBudget: Double { Self.optimized ? 5 : 60 }
     /// Milliseconds allowed for sorting the listed objects.
     private var sortBudget: Double { Self.optimized ? 100 : 2_000 }
 
