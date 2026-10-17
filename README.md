@@ -108,10 +108,19 @@ Key design points:
 ## Tests
 
 ```
-cd LodestarKit && swift test          # 600+ tests: worked examples from Meeus and Skyfield/JPL fixtures
+cd LodestarKit && swift test          # 700+ tests: worked examples from Meeus and Skyfield/JPL fixtures
 ```
 
 The `Lodestar` scheme's Test action runs the same package tests in Xcode.
+
+## Continuous integration and releases
+
+- **GitHub Actions** (`.github/workflows/ci.yml`) compiles the app with the newest Xcode for the
+  simulator and for devices, and runs the LodestarKit tests, on every push and pull request.
+- **Xcode Cloud** (workflow "Default") builds and archives the app on every push to `main` and
+  delivers each build to TestFlight's internal testing group. Xcode Cloud signs the builds and
+  assigns the build numbers; workflows are managed in App Store Connect under the app's
+  *Xcode Cloud* tab.
 
 ## Before relying on it — check on your device
 
