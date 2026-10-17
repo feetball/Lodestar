@@ -1,0 +1,16 @@
+{
+  "locale": "en-US",
+  "name": "Lodestar: Astro Camera Aim",
+  "subtitle": "Aim your camera at the stars",
+  "promotional_text": "Point your camera at the Milky Way, planets, nebulae and galaxies: on-screen arrows show exactly how to pan and tilt your tripod. Works offline.",
+  "keywords": "astrophotography,milky way,night sky,star finder,stargazing,tripod,planets,nebula,galaxy,telescope",
+  "description": "Lodestar turns the iPhone on your camera into a smart finder for night photography. Pick a planet, nebula, galaxy or star, and on-screen arrows tell you which way to pan and tilt the tripod head until it sits in your frame.\n\nGUIDED AIMING\n• A live finder with a virtual sky or the camera view, the target marker and an arrow pointing the shortest way\n• \"Pan right 12.6° · Tilt up 12.9°\" read-outs for pan-tilt heads, the distance to go and a clear on-target signal with haptics\n• The outline of your own camera's frame, from its sensor size and focal length\n• Optional audio ticks that speed up as you get closer, and a level gauge\n\nACCURACY BEYOND THE COMPASS\n• Star alignment: centre a bright star in your camera once and Lodestar corrects the compass and the bracket\n• Gyro Lock keeps the heading on the gyroscope, safe from the magnetism of camera bodies and tripods\n• Works with the phone mounted in portrait, in landscape, upside down or flat on top of the camera\n\nFIND YOUR TARGET\n• Search and browse 9,000+ stars, 690+ galaxies, nebulae and clusters including all 110 Messier objects, the planets, the Moon and the Milky Way core\n• Sort by name, brightness, altitude or rise time; favourites, recents and custom coordinates\n• Each object shows where it is now, when it rises and sets, an altitude chart for the night, how it fits your frame and the longest exposure before stars trail\n\nPLAN THE NIGHT\n• Tonight: sunset, twilight and darkness windows, the Moon's phase and hours, when the Milky Way core is up, the visible planets and the best targets\n• An all-sky chart with constellations and the Milky Way, with time travel\n• A polar-scope clock for aligning star trackers\n\nMADE FOR THE DARK\n• A pure red night-vision mode, automatic after sunset, with screen dimming\n• Everything works offline at remote dark-sky sites\n\nPRIVATE BY DESIGN\nNo accounts, analytics, ads or tracking. Your location and camera picture stay on your iPhone.\n\nStar data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025.",
+  "whats_new": "First release.",
+  "support_url": "https://feetball.github.io/Lodestar/support.html",
+  "marketing_url": "https://feetball.github.io/Lodestar/",
+  "privacy_policy_url": "https://feetball.github.io/Lodestar/privacy.html",
+  "primary_category": "PHOTO_AND_VIDEO",
+  "secondary_category": "REFERENCE",
+  "content_rights": "USES_THIRD_PARTY_CONTENT",
+  "price": "FREE"
+}

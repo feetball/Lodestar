@@ -1,6 +1,7 @@
 # App Store assets
 
-`Screenshots/` holds the App Store screenshots, already sized and flattened (no alpha channel) for
+`metadata-en-US.json` holds the App Store listing text (name, subtitle, description, keywords, URLs,
+categories); `Screenshots/` holds the App Store screenshots, already sized and flattened (no alpha channel) for
 App Store Connect: **iPhone 6.9-inch** (1320 × 2868, iPhone 18 Pro Max) and **iPhone 6.3-inch**
 (1206 × 2622, iPhone 18 Pro). Upload them in file-name order.
 
