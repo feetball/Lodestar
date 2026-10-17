@@ -165,7 +165,7 @@ extension SkyChartScene {
             let point = viewport.screen(pickable.point)
             let distance = hypot(point.x - location.x, point.y - location.y)
             guard distance <= tolerance else { continue }
-            let score = distance * pickable.kind.distanceBias
+            let score: CGFloat = distance * pickable.kind.distanceBias
             if let current = best, current.score <= score { continue }
             best = (pickable, score)
         }
