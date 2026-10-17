@@ -62,7 +62,7 @@ struct TonightScreen: View {
 
     /// Local noon of the date of the night under way, before the first report has arrived too.
     private var tonightStart: Date {
-        report?.tonightStart ?? TonightCalculator.localNoon(of: Date(), calendar: calendar)
+        report?.tonightStart ?? TonightCalculator.localNoon(of: app.clock.now, calendar: calendar)
     }
 
     /// Local noon of the night the selector stands on: the one asked for, else the one shown.
@@ -94,7 +94,7 @@ struct TonightScreen: View {
 
     /// Where the times are for: the site's name and its time zone.
     private var placeLine: some View {
-        let zone = TonightFormat.zoneName(context.timeZone, at: report?.nightStart ?? Date())
+        let zone = TonightFormat.zoneName(context.timeZone, at: report?.nightStart ?? app.clock.now)
         return Label("\(context.name) \u{00B7} times in \(zone)", systemImage: "mappin.and.ellipse")
             .font(.footnote)
             .foregroundStyle(palette.secondaryText)

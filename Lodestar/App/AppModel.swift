@@ -78,7 +78,30 @@ final class AppModel {
         catalog = CatalogService()
         feedback = FeedbackService()
         screen = ScreenController()
+        #if DEBUG
+        if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
+        #endif
     }
+
+    #if DEBUG
+    /// Demo site, fixed time, display mode and camera pointing for Simulator screenshots.
+    private func applyScreenshotMode(_ demo: ScreenshotMode) {
+        var settings = settingsStore.settings
+        settings.hasCompletedOnboarding = true
+        settings.cameraPreviewEnabled = false
+        settings.nightMode = demo.nightMode ? .on : .off
+        if let site = SavedSite(name: demo.siteName, latitude: demo.location.latitude,
+                                longitude: demo.location.longitude, elevation: demo.location.elevation,
+                                timeZoneIdentifier: demo.timeZoneIdentifier) {
+            settings.savedSites = [site]
+            settings.locationSource = .site(site.id)
+        }
+        settingsStore.settings = settings
+        selectedTab = demo.tab
+        clock.freeze(at: demo.date)
+        if let pointing = demo.pointing { motion.useScreenshotPointing(pointing) }
+    }
+    #endif
 
     // MARK: Derived state
 
@@ -140,6 +163,11 @@ final class AppModel {
         if target == nil, let id = settings.recentObjectIDs.first, let object = catalog.object(id: id) {
             target = object
         }
+        #if DEBUG
+        if let id = ScreenshotMode.current?.targetID, let object = catalog.object(id: id) {
+            target = object
+        }
+        #endif
         evaluateSun(force: true)
     }
 

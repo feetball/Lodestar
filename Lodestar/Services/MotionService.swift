@@ -117,8 +117,36 @@ final class MotionService {
 
     /// The newest sample, or `nil` when none has arrived yet. Callable from any thread; cheap.
     nonisolated func latestSample() -> MotionSample? {
-        pipeline.withLock { $0.latest }
+        #if DEBUG
+        if let sample = screenshotSample.withLock({ $0 }) { return sample }
+        #endif
+        return pipeline.withLock { $0.latest }
     }
+
+    #if DEBUG
+    /// A fixed sample that replaces the sensors in screenshot mode.
+    private let screenshotSample = OSAllocatedUnfairLock<MotionSample?>(initialState: nil)
+
+    private var isUsingScreenshotPointing: Bool { screenshotSample.withLock { $0 } != nil }
+
+    /// Replaces the sensors with a level, portrait back-camera pointing at `boresight` (screenshot mode).
+    func useScreenshotPointing(_ boresight: HorizontalCoordinate) {
+        let forward = boresight.unitVector
+        let up = (Vector3(0, 0, 1) - forward * forward.z).normalized
+        let back = -forward
+        let right = up.cross(back)
+        // CoreMotion's reference frame is north-west-up; its matrix rows are the device axes.
+        func northWestUp(_ v: Vector3) -> Vector3 { Vector3(v.y, -v.x, v.z) }
+        let matrix = Matrix3(rows: northWestUp(right), northWestUp(up), northWestUp(back))
+        guard let attitude = DeviceAttitude(matrix: matrix, referenceAzimuth: 0, timestamp: 1) else { return }
+        let sample = MotionSample(attitude: attitude, rawAttitude: attitude, gravity: matrix * Vector3(0, 0, -1),
+                                  angularSpeed: 0, magneticFieldMicrotesla: nil, compassQuality: .high, timestamp: 1)
+        screenshotSample.withLock { $0 = sample }
+        status = .running
+        compassQuality = .high
+        referenceDescription = "Screenshot mode"
+    }
+    #endif
 
     /// Applies the current settings. Call as often as needed: nothing restarts unless the heading source changes;
     /// a new declination takes effect on the running stream.
@@ -135,6 +163,9 @@ final class MotionService {
 
     /// Starts the sensors. Idempotent.
     func start() {
+        #if DEBUG
+        if isUsingScreenshotPointing { return }
+        #endif
         guard !isActive else { return }
         guard manager.isDeviceMotionAvailable else {
             update(\.status, to: .unavailable)
@@ -274,6 +305,9 @@ final class MotionService {
     @discardableResult
     private func publish() -> MotionSnapshot {
         let snapshot = pipeline.withLock { $0.snapshot }
+        #if DEBUG
+        if isUsingScreenshotPointing { return snapshot }
+        #endif
         update(\.compassQuality, to: snapshot.compassQuality)
         update(\.magneticDisturbance, to: snapshot.magneticDisturbance)
         update(\.frameEpoch, to: snapshot.frameEpoch)

@@ -85,7 +85,7 @@ final class AimViewModel {
     func keepSkyCurrent(_ inputs: AimSkyInputs?) async {
         guard let inputs, let catalog = app.catalog.catalog else { return }
         while !Task.isCancelled {
-            let date = Date()
+            let date = app.clock.now
             let content = await Task.detached(priority: .userInitiated) {
                 AimSkyContent.build(catalog: catalog, inputs: inputs, date: date)
             }.value
@@ -104,7 +104,7 @@ final class AimViewModel {
         }
         let observer = inputs.observer
         while !Task.isCancelled {
-            let date = Date()
+            let date = app.clock.now
             let info = await Task.detached(priority: .utility) {
                 AimRiseInfo.compute(for: target, observer: observer, from: date)
             }.value
