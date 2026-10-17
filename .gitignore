@@ -34,3 +34,9 @@ Tools/downloads/
 .vscode/
 *.swp
 *~
+
+# Secrets: never commit App Store Connect / signing keys
+*.p8
+*.p12
+*.mobileprovision
+AuthKey_*
