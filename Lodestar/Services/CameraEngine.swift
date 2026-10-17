@@ -1,0 +1,331 @@
+import AVFoundation
+import CoreGraphics
+import CoreImage
+import CoreImage.CIFilterBuiltins
+import CoreMedia
+import Foundation
+import ImageIO
+import os
+
+/// One processed camera frame, upright in portrait. `CGImage` is immutable; the wrapper keeps the hand-off
+/// independent of whether the SDK already declares it `Sendable`.
+struct CameraFrame: @unchecked Sendable {
+    let image: CGImage
+}
+
+/// Why the capture pipeline could not start.
+enum CameraEngineFailure: Error, Sendable, Equatable {
+    /// There is no back wide camera (the Simulator, for example).
+    case noCamera
+    /// The input or output could not be added to the session.
+    case configuration
+    /// `startRunning()` returned without a running session.
+    case notRunning
+}
+
+/// Why the system interrupted the capture session.
+enum CameraInterruption: Sendable, Equatable {
+    case inBackground
+    case deviceInUse
+    case multitasking
+    case systemPressure
+    case other
+}
+
+/// What the capture pipeline reports to `CameraService`, in order.
+enum CameraEngineEvent: Sendable, Equatable {
+    case started
+    case failed(CameraEngineFailure)
+    /// The optics of the frames now arriving (sent when the frame size changes and after each start).
+    case geometry(CameraGeometry)
+    case interrupted(CameraInterruption)
+    case interruptionEnded
+    case runtimeError(isRecoverable: Bool)
+}
+
+/// The capture pipeline: back wide camera, sample buffers, optional red-monochrome filter, `CGImage` frames.
+///
+/// Mutable state is confined to one queue or one lock each, which is why the class is `@unchecked Sendable`:
+/// - `sessionQueue`: `session`, `output` wiring, `camera`, `isConfigured`, `isExposureCeilingRaised`.
+///   `startRunning()` blocks, so session work never runs on the main thread.
+/// - `frameQueue` (serial, as AVFoundation requires): `redFilter`, `appliedIntensity`, `lastFrameTime`,
+///   `publishedSize`. `CMSampleBuffer`, `CVPixelBuffer` and `CIFilter` never leave it.
+/// - locks: `nightIntensity`, `frameSink`, `longSideFieldOfView`.
+final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutputSampleBufferDelegate {
+    /// Frames are skipped when closer together than this, a little under 1/30 s so a 30 fps camera passes every
+    /// frame while a faster one is thinned to about 30 fps.
+    private static let minimumFrameInterval = 0.030
+    /// Longest auto-exposure time allowed for the night preview (bounded by what the format supports).
+    private static let nightExposureCeiling = CMTime(value: 1, timescale: 4)
+
+    /// Session events in order; never finishes.
+    let events: AsyncStream<CameraEngineEvent>
+    private let eventSink: AsyncStream<CameraEngineEvent>.Continuation
+
+    private let session = AVCaptureSession()
+    private let output = AVCaptureVideoDataOutput()
+    private let sessionQueue = DispatchQueue(label: "net.kuecker.Lodestar.camera.session")
+    private let frameQueue = DispatchQueue(label: "net.kuecker.Lodestar.camera.frames", qos: .userInitiated)
+    private let context = CIContext()
+    private let redFilter = CIFilter.colorMatrix()
+    private let observations = NotificationObservations()
+
+    private let nightIntensity = OSAllocatedUnfairLock<Double?>(initialState: nil)
+    private let frameSink = OSAllocatedUnfairLock<AsyncStream<CameraFrame>.Continuation?>(initialState: nil)
+    private let longSideFieldOfView = OSAllocatedUnfairLock<Double?>(initialState: nil)
+
+    // sessionQueue only
+    private var camera: AVCaptureDevice?
+    private var isConfigured = false
+    private var isExposureCeilingRaised = false
+    // frameQueue only
+    private var appliedIntensity: Double?
+    private var lastFrameTime = -Double.infinity
+    private var publishedSize: CGSize?
+
+    override init() {
+        (events, eventSink) = AsyncStream.makeStream(of: CameraEngineEvent.self, bufferingPolicy: .unbounded)
+        super.init()
+        // Red monochrome: R' = intensity × luma(R, G, B), G' = B' = 0 (CIColorMatrix: s.r = dot(s, rVector) …).
+        redFilter.gVector = CIVector(x: 0, y: 0, z: 0, w: 0)
+        redFilter.bVector = CIVector(x: 0, y: 0, z: 0, w: 0)
+        redFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
+        redFilter.biasVector = CIVector(x: 0, y: 0, z: 0, w: 0)
+        observeSession()
+    }
+
+    /// A new stream of the newest frame only (older ones are dropped), ending when the engine stops. Call before
+    /// `start()`; a previous stream is finished.
+    func makeFrameStream() -> AsyncStream<CameraFrame> {
+        let (stream, continuation) = AsyncStream.makeStream(of: CameraFrame.self, bufferingPolicy: .bufferingNewest(1))
+        frameSink.withLock { sink in
+            sink?.finish()
+            sink = continuation
+        }
+        return stream
+    }
+
+    /// Configures the session on first use and starts it; reports `.started` or `.failed` through `events`.
+    func start() {
+        sessionQueue.async { [self] in
+            do {
+                let camera = try configuredCamera()
+                prepare(camera)
+                resetFrameState()
+                if !session.isRunning { session.startRunning() }
+                // The format a preset selects is only certain once the session runs: read the optics again.
+                if session.isRunning { settleOptics(of: camera) }
+                eventSink.yield(session.isRunning ? .started : .failed(.notRunning))
+            } catch {
+                eventSink.yield(.failed((error as? CameraEngineFailure) ?? .configuration))
+            }
+        }
+    }
+
+    /// Stops the session and ends the frame stream.
+    func stop() {
+        frameSink.withLock { sink in
+            sink?.finish()
+            sink = nil
+        }
+        sessionQueue.async { [self] in
+            if session.isRunning { session.stopRunning() }
+        }
+    }
+
+    /// Switches the red-monochrome filter (`intensity` 0…1) on or off (`nil`) for the following frames. The night
+    /// preview also raises the auto-exposure ceiling, so stars show up in the dark.
+    func setNightFilter(_ intensity: Double?) {
+        let previous = nightIntensity.withLock { current -> Double? in
+            let old = current
+            current = intensity
+            return old
+        }
+        guard (previous == nil) != (intensity == nil) else { return }
+        sessionQueue.async { [self] in
+            if let camera { applyExposureCeiling(to: camera, force: false) }
+        }
+    }
+
+    // MARK: Session (sessionQueue)
+
+    private func configuredCamera() throws -> AVCaptureDevice {
+        if isConfigured, let camera { return camera }
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            throw CameraEngineFailure.noCamera
+        }
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+        do {
+            try wirePipeline(to: device)
+        } catch {
+            session.inputs.forEach { session.removeInput($0) }
+            session.outputs.forEach { session.removeOutput($0) }
+            throw error
+        }
+        camera = device
+        isConfigured = true
+        return device
+    }
+
+    /// Adds the camera input and the video output. Rotation is fixed before the session starts because changing it
+    /// afterwards rebuilds the capture pipeline.
+    private func wirePipeline(to device: AVCaptureDevice) throws {
+        let input: AVCaptureDeviceInput
+        do {
+            input = try AVCaptureDeviceInput(device: device)
+        } catch {
+            throw CameraEngineFailure.configuration
+        }
+        if session.canSetSessionPreset(.hd1280x720) { session.sessionPreset = .hd1280x720 }
+        guard session.canAddInput(input) else { throw CameraEngineFailure.configuration }
+        session.addInput(input)
+
+        output.alwaysDiscardsLateVideoFrames = true
+        output.setSampleBufferDelegate(self, queue: frameQueue)
+        guard session.canAddOutput(output) else { throw CameraEngineFailure.configuration }
+        session.addOutput(output)
+
+        guard let connection = output.connection(with: .video) else { throw CameraEngineFailure.configuration }
+        if connection.isVideoRotationAngleSupported(90) { connection.videoRotationAngle = 90 }
+        connection.preferredVideoStabilizationMode = .off // stabilization crops the field of view and adds latency
+    }
+
+    /// Fixes the optics (zoom 1×) and records the field of view that geometry is derived from.
+    private func prepare(_ device: AVCaptureDevice) {
+        _ = recordFieldOfView(of: device)
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = 1
+            device.unlockForConfiguration()
+        }
+        applyExposureCeiling(to: device, force: true)
+    }
+
+    /// Runs once the session is running: a format change made by the session invalidates the exposure ceiling
+    /// and may change the field of view, in which case the next frame publishes its geometry again.
+    private func settleOptics(of device: AVCaptureDevice) {
+        if recordFieldOfView(of: device) { resetFrameState(keepFrameTimes: true) }
+        applyExposureCeiling(to: device, force: true)
+    }
+
+    /// Stores the field of view across the long side of the active format; `true` if it changed.
+    private func recordFieldOfView(of device: AVCaptureDevice) -> Bool {
+        let format = device.activeFormat
+        // With geometric distortion correction on (the default where supported) the corrected field of view applies.
+        let fieldOfView = device.isGeometricDistortionCorrectionEnabled
+            ? format.geometricDistortionCorrectedVideoFieldOfView
+            : format.videoFieldOfView
+        let value = fieldOfView > 0 ? Double(fieldOfView) : nil // 0 means unknown
+        return longSideFieldOfView.withLock { current in
+            defer { current = value }
+            return current != value
+        }
+    }
+
+    /// Makes the next frame publish its geometry (and, unless kept, restarts the frame-rate limiter).
+    private func resetFrameState(keepFrameTimes: Bool = false) {
+        frameQueue.async { [self] in
+            publishedSize = nil
+            if !keepFrameTimes { lastFrameTime = -Double.infinity }
+        }
+    }
+
+    /// Night: let auto-exposure integrate up to `nightExposureCeiling` (frame rate drops accordingly). Day: back
+    /// to the device default (`CMTime.invalid`). The value must lie within the format's limits or AVFoundation
+    /// raises an Objective-C exception, so it is clamped.
+    private func applyExposureCeiling(to device: AVCaptureDevice, force: Bool) {
+        let raise = nightIntensity.withLock { $0 != nil }
+        guard force || raise != isExposureCeilingRaised else { return }
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        defer { device.unlockForConfiguration() }
+        if raise {
+            let format = device.activeFormat
+            var ceiling = Self.nightExposureCeiling
+            if CMTimeCompare(ceiling, format.maxExposureDuration) > 0 { ceiling = format.maxExposureDuration }
+            if ceiling.isNumeric, CMTimeCompare(ceiling, format.minExposureDuration) >= 0 {
+                device.activeMaxExposureDuration = ceiling
+            }
+        } else {
+            device.activeMaxExposureDuration = .invalid
+        }
+        isExposureCeilingRaised = raise
+    }
+
+    // MARK: Frames (frameQueue)
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        if presentationTime.isNumeric {
+            let seconds = presentationTime.seconds
+            let elapsed = seconds - lastFrameTime
+            // A negative interval means the camera clock restarted; accept the frame.
+            if elapsed >= 0 && elapsed < Self.minimumFrameInterval { return }
+            lastFrameTime = seconds
+        }
+        guard let sink = frameSink.withLock({ $0 }),
+              let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        defer { redFilter.inputImage = nil } // release the camera buffer as soon as the frame is rendered
+
+        var image = CIImage(cvPixelBuffer: pixels)
+        // The connection rotates the buffers to portrait; if it could not, turn them here (back camera: sensor
+        // top is the phone's right side).
+        if image.extent.width > image.extent.height { image = image.oriented(.right) }
+        if let intensity = nightIntensity.withLock({ $0 }) {
+            image = redMonochrome(image, intensity: intensity)
+        }
+        publishGeometry(forFrameSize: image.extent.size)
+        guard let frame = context.createCGImage(image, from: image.extent) else { return }
+        sink.yield(CameraFrame(image: frame))
+    }
+
+    private func redMonochrome(_ image: CIImage, intensity: Double) -> CIImage {
+        if appliedIntensity != intensity {
+            let weight = CGFloat(intensity)
+            redFilter.rVector = CIVector(x: 0.2126 * weight, y: 0.7152 * weight, z: 0.0722 * weight, w: 0)
+            appliedIntensity = intensity
+        }
+        redFilter.inputImage = image
+        return redFilter.outputImage ?? image
+    }
+
+    private func publishGeometry(forFrameSize size: CGSize) {
+        guard size != publishedSize else { return }
+        publishedSize = size
+        guard let fieldOfView = longSideFieldOfView.withLock({ $0 }),
+              let geometry = CameraGeometry.portrait(longSideFieldOfView: fieldOfView,
+                                                     width: Int(size.width), height: Int(size.height)) else { return }
+        eventSink.yield(.geometry(geometry))
+    }
+
+    // MARK: Notifications
+
+    private func observeSession() {
+        observations.observe(AVCaptureSession.runtimeErrorNotification, object: session) { [weak self] notification in
+            let code = (notification.userInfo?[AVCaptureSessionErrorKey] as? NSError)?.code
+            self?.eventSink.yield(.runtimeError(isRecoverable: code == AVError.Code.mediaServicesWereReset.rawValue))
+        }
+        observations.observe(AVCaptureSession.wasInterruptedNotification, object: session) { [weak self] notification in
+            let rawReason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+            let reason = rawReason.flatMap { AVCaptureSession.InterruptionReason(rawValue: $0) }
+            self?.eventSink.yield(.interrupted(Self.interruption(for: reason)))
+        }
+        observations.observe(AVCaptureSession.interruptionEndedNotification, object: session) { [weak self] _ in
+            self?.eventSink.yield(.interruptionEnded)
+        }
+    }
+
+    private static func interruption(for reason: AVCaptureSession.InterruptionReason?) -> CameraInterruption {
+        switch reason {
+        case .videoDeviceNotAvailableInBackground?:
+            return .inBackground
+        case .audioDeviceInUseByAnotherClient?, .videoDeviceInUseByAnotherClient?:
+            return .deviceInUse
+        case .videoDeviceNotAvailableWithMultipleForegroundApps?:
+            return .multitasking
+        case .videoDeviceNotAvailableDueToSystemPressure?:
+            return .systemPressure
+        default:
+            return .other
+        }
+    }
+}

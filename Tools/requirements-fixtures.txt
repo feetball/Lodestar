@@ -1,0 +1,29 @@
+# Python dependencies for Tools/make_fixtures.py (Skyfield / JPL DE440s reference fixtures).
+# The script needs Python 3.10 or newer.
+#
+# Install into an isolated environment (hash-checking mode rejects anything that does not match):
+#
+#   python3 -m venv --system-site-packages .venv-fixtures
+#   .venv-fixtures/bin/pip install --require-hashes -r Tools/requirements-fixtures.txt
+#
+# Every distribution is pinned to an exact version and to the SHA-256 digests of its pure-Python
+# wheel and its source archive, copied from https://pypi.org/pypi/<name>/<version>/json.
+# (sgp4 also publishes compiled wheels; only the pure-Python wheel is allowed here because the
+# fixtures never propagate satellites, so the C accelerator is irrelevant.)
+#
+# numpy (required by Skyfield and jplephem; any release that Skyfield supports) is deliberately
+# not listed: its wheels are platform specific, and the fixtures do not depend on its version.
+# Install it first from the system package manager or with `pip install numpy`.
+
+skyfield==1.55 \
+    --hash=sha256:9f98964855067460c94aa81a337194136f4a97a62ba8bbbfac1b8556f2b66ad4 \
+    --hash=sha256:05dce8aafbff3f007f01cabcd2eb1858c43d7465f58c13d22c5a828a6d2fc14b
+jplephem==2.24 \
+    --hash=sha256:2de15608a0f13010a71a0a8af8765646d5884402006dac0dd7639d7db13629ac \
+    --hash=sha256:354fe1adae022264ab46f18afb6af26211277cfd7b3ef90400755fcabe93bc11
+sgp4==2.27 \
+    --hash=sha256:5f3f5716649988b638fbe7fcda592830e0956f548ca273b93cfa5f75917b9087 \
+    --hash=sha256:06d37247c6985739b707b8b39b6b83e06e8af783b2531e31965501ba983985f9
+certifi==2026.7.22 \
+    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
+    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55
