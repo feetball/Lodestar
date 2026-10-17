@@ -12,6 +12,8 @@ struct AimLabelStyle {
 struct AimLabelQueue {
     /// The most labels drawn in one frame.
     static let budget = 40
+    /// Distance in points that labels keep from the edges of the overlay.
+    static let edgeMargin: CGFloat = 4
 
     private struct Request {
         let text: String
@@ -39,12 +41,18 @@ struct AimLabelQueue {
             text.shading = .color(request.style.color)
             let measured = text.measure(in: CGSize(width: 260, height: 60))
             let size = rotation.swapsAxes ? CGSize(width: measured.height, height: measured.width) : measured
-            let box = CGRect(x: request.center.x - size.width / 2 - 3, y: request.center.y - size.height / 2 - 2,
+            var box = CGRect(x: request.center.x - size.width / 2 - 3, y: request.center.y - size.height / 2 - 2,
                              width: size.width + 6, height: size.height + 4)
+            // Slide labels near an edge inward instead of letting the edge clip them.
+            let inner = bounds.insetBy(dx: Self.edgeMargin, dy: Self.edgeMargin)
+            if box.maxX > inner.maxX { box.origin.x -= box.maxX - inner.maxX }
+            if box.minX < inner.minX { box.origin.x += inner.minX - box.minX }
+            if box.maxY > inner.maxY { box.origin.y -= box.maxY - inner.maxY }
+            if box.minY < inner.minY { box.origin.y += inner.minY - box.minY }
             guard !occupied.contains(where: { $0.intersects(box) }) else { continue }
             occupied.append(box)
             var layer = context
-            layer.translateBy(x: request.center.x, y: request.center.y)
+            layer.translateBy(x: box.midX, y: box.midY)
             if rotation != .upright { layer.rotate(by: .degrees(rotation.degrees)) }
             layer.draw(text, at: .zero, anchor: .center)
         }
