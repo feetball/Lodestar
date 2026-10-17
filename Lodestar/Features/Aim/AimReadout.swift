@@ -97,7 +97,7 @@ private struct AimMoveRow: View {
     var body: some View {
         Group {
             if summary.isOnTarget {
-                banner("Centered on the target \u{00B7} \(AimFormat.angle(summary.separation)) off",
+                banner("In your frame \u{00B7} \(AimFormat.angle(summary.separation)) from center",
                        systemImage: "checkmark.circle.fill", color: palette.positive)
             } else if summary.isNearZenith {
                 banner("Near zenith \u{2014} follow the arrow", systemImage: "arrow.up.circle", color: palette.guidance)
