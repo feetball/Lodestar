@@ -120,6 +120,7 @@ Key design points:
 
 ```
 cd LodestarKit && swift test          # 700+ tests: worked examples from Meeus and Skyfield/JPL fixtures
+cd WidgetTests && swift test          # the widgets' entries and wording (WidgetShared/Core, no Xcode needed)
 ```
 
 The `Lodestar` scheme's Test action runs the same package tests in Xcode.

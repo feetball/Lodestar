@@ -64,6 +64,9 @@ jobs:
       - name: Test LodestarKit
         run: swift test --package-path LodestarKit --skip CometsOrbitTests/testSolverIsFast
 
+      - name: Test the widgets' shared code
+        run: swift test --package-path WidgetTests
+
       # A wall-clock check of a Debug build (200 000 Kepler solutions in under 5 s) that the shared runners sometimes
       # miss by a few tenths of a second; kept as its own step so that it stays visible without failing the job.
       - name: Time the comet orbit solver (informational)
