@@ -117,7 +117,7 @@ extension SkyOverlayRenderer {
     }
 
     /// An arrow at the screen edge in the direction of a target that is not in view, with its distance.
-    private mutating func drawEdgeIndicator(toward direction: Vector3, color: Color, in context: GraphicsContext) {
+    mutating func drawEdgeIndicator(toward direction: Vector3, color: Color, in context: GraphicsContext) {
         let device = worldToDevice * direction
         var heading = CGVector(dx: device.x, dy: -device.y)
         let length = hypot(heading.dx, heading.dy)

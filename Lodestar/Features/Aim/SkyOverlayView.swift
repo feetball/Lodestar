@@ -19,6 +19,7 @@ struct SkyOverlayView: View {
             let virtualFieldOfView = model.virtualFieldOfView
             let hudRotation = model.hudRotation
             let mosaic = MosaicDisplay.current
+            let mountMarker = model.mountMarker()
             // The target ring holds still for people who asked for less motion.
             let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             let palette = palette
@@ -28,7 +29,7 @@ struct SkyOverlayView: View {
                                                         palette: palette, camera: camera,
                                                         virtualFieldOfView: virtualFieldOfView,
                                                         hudRotation: hudRotation, time: time, mosaic: mosaic,
-                                                        size: size) else { return }
+                                                        mountMarker: mountMarker, size: size) else { return }
                 renderer.draw(in: context)
             }
         }

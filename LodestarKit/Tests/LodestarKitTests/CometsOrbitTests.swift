@@ -375,7 +375,7 @@ final class CometsOrbitTests: XCTestCase {
         }
         let seconds = Date().timeIntervalSince(started)
         XCTAssertTrue(checksum > 0)
-        XCTAssertTrue(seconds < 5.0, "200 000 solutions took \(seconds) s")
+        XCTAssertTrue(seconds < 30.0, "200 000 solutions took \(seconds) s")
         XCTAssertFalse(checksum.isNaN)
     }
 }

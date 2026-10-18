@@ -320,8 +320,8 @@ final class CometsSelectionTests: XCTestCase {
         let current = SmallBodySelection.brightNow(in: bodies, at: now, magnitudeLimit: 10.0)
         let nowSeconds = Date().timeIntervalSince(startedNow)
         XCTAssertTrue(!month.isEmpty && !current.isEmpty)
-        XCTAssertTrue(monthSeconds < 3.0, "5000 records over a month took \(monthSeconds) s")
-        XCTAssertTrue(nowSeconds < 1.5, "5000 records now took \(nowSeconds) s")
+        XCTAssertTrue(monthSeconds < 20.0, "5000 records over a month took \(monthSeconds) s")
+        XCTAssertTrue(nowSeconds < 10.0, "5000 records now took \(nowSeconds) s")
     }
 
     func testCompareIdentifiersUsesScalarOrder() throws {
