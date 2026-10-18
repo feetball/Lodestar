@@ -13,6 +13,8 @@ struct ObjectRow: View {
     var isFavorite = false
     /// The observer's time zone, for rising times.
     var timeZone: TimeZone = .current
+    /// Whether to name how prominent a deep-sky object is (the catalogue lists and the prominence order).
+    var showsProminence = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -31,7 +33,7 @@ struct ObjectRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ObjectsFormat.spokenSummary(of: object, position: position, isFavorite: isFavorite,
-                                                        in: timeZone))
+                                                        in: timeZone, showsProminence: showsProminence))
     }
 
     private var names: some View {
@@ -57,6 +59,12 @@ struct ObjectRow: View {
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
                 .lineLimit(1)
+            if let line = ObjectsFormat.catalogueLine(of: object, showsProminence: showsProminence) {
+                Text(line)
+                    .font(.caption)
+                    .foregroundStyle(palette.tertiaryText)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -69,7 +77,7 @@ struct ObjectRow: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(palette.accent)
                 } else {
-                    Text("Below horizon")
+                    Text(ObjectsFormat.hiddenText(for: position))
                         .font(.subheadline)
                         .foregroundStyle(palette.tertiaryText)
                     if let rising = ObjectsFormat.risingText(for: position, in: timeZone) {

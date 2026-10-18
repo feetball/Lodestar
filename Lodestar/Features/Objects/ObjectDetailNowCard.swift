@@ -34,9 +34,9 @@ struct ObjectDetailNowCard: View {
 
     @ViewBuilder
     private func rows(for current: ObjectDetailCurrent) -> some View {
-        let isUp = current.horizontal.altitude > 0
+        let isUp = current.horizontal.altitude > 0 && !current.isBehindSkyline
         StatusChip(systemImage: isUp ? "arrow.up.right" : "arrow.down.right",
-                   text: isUp ? "Above the horizon" : "Below the horizon",
+                   text: isUp ? "Above the horizon" : (current.isBehindSkyline ? "Behind the skyline" : "Below the horizon"),
                    tone: isUp ? .positive : .neutral)
         InfoRow(label: "Altitude", value: AppFormat.altitude(current.horizontal.altitude))
         InfoRow(label: "Azimuth", value: AppFormat.azimuth(current.horizontal.azimuth))

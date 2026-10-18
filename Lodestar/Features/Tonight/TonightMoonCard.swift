@@ -7,6 +7,8 @@ struct TonightMoonCard: View {
 
     let summary: NightSummary
     let timeZone: TimeZone
+    /// Whether the site's skyline decides when the Moon is up.
+    var appliesSkyline = false
 
     private var moon: MoonSummary { summary.moon }
 
@@ -17,6 +19,9 @@ struct TonightMoonCard: View {
             moonlightChip
             horizonRows
             darkHoursRow
+            if appliesSkyline {
+                TonightSkylineNote(detail: "the Moon is up while it clears the skyline, and the moon-free dark hours follow.")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(palette)
@@ -73,9 +78,9 @@ struct TonightMoonCard: View {
         let events = moon.riseTransitSet
         switch events.circumstance {
         case .alwaysUp:
-            InfoRow(label: "Moon", value: "Above the horizon all night")
+            InfoRow(label: "Moon", value: appliesSkyline ? "Above the skyline all night" : "Above the horizon all night")
         case .alwaysDown:
-            InfoRow(label: "Moon", value: "Below the horizon all night")
+            InfoRow(label: "Moon", value: appliesSkyline ? "Behind the skyline all night" : "Below the horizon all night")
         case .normal:
             if let rise = events.rise, let set = events.set, set < rise {
                 InfoRow(label: "Moonset", value: AppFormat.time(set, in: timeZone))

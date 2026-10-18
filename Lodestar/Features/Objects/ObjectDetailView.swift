@@ -135,6 +135,9 @@ struct ObjectDetailHeader: View {
         if let magnitude = object.magnitude {
             StatusChip(systemImage: "sparkle", text: AppFormat.magnitude(magnitude))
         }
+        if object.isDeepSky {
+            StatusChip(systemImage: "star.circle", text: object.prominence.displayName)
+        }
         if object.category == .sun {
             StatusChip(systemImage: "exclamationmark.triangle", text: "Solar filter required", tone: .warning)
         }

@@ -59,6 +59,8 @@ struct TonightReport: Sendable {
     let tonightStart: Date
     /// How many nights this one is after tonight: 1 is tomorrow night, -1 is last night.
     let nightsFromTonight: Int
+    /// Whether the site's recorded skyline was applied to the Moon, the Milky Way core, the planets and the targets.
+    let appliesSkyline: Bool
 
     /// Local noon of the date this night starts on.
     var nightStart: Date { summary.night.start }

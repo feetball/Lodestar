@@ -8,10 +8,13 @@ struct TonightReportCards: View {
         Group {
             TonightTimelineCard(report: report)
             TonightSunCard(summary: report.summary, timeZone: report.timeZone)
-            TonightMoonCard(summary: report.summary, timeZone: report.timeZone)
-            TonightMilkyWayCard(summary: report.summary, timeZone: report.timeZone)
-            TonightPlanetsCard(summary: report.summary, timeZone: report.timeZone)
-            TonightTargetsCard(outcome: report.targets, timeZone: report.timeZone)
+            TonightMoonCard(summary: report.summary, timeZone: report.timeZone, appliesSkyline: report.appliesSkyline)
+            TonightMilkyWayCard(summary: report.summary, timeZone: report.timeZone,
+                                appliesSkyline: report.appliesSkyline)
+            TonightPlanetsCard(summary: report.summary, timeZone: report.timeZone,
+                               appliesSkyline: report.appliesSkyline)
+            TonightTargetsCard(outcome: report.targets, timeZone: report.timeZone,
+                               appliesSkyline: report.appliesSkyline)
         }
     }
 }

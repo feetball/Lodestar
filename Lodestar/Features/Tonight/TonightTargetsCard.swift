@@ -8,6 +8,8 @@ struct TonightTargetsCard: View {
 
     let outcome: TonightTargetsOutcome
     let timeZone: TimeZone
+    /// Whether the site's skyline decides which targets are usable.
+    var appliesSkyline = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -23,7 +25,8 @@ struct TonightTargetsCard: View {
         switch outcome {
         case .ranked(let targets) where targets.isEmpty:
             TonightNote(text: "No listed deep-sky object climbs above"
-                        + " \(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} while it is dark.")
+                        + " \(Int(TonightCalculator.minimumTargetAltitude))\u{00B0}"
+                        + (appliesSkyline ? " and clears your skyline" : "") + " while it is dark.")
         case .ranked(let targets):
             ForEach(targets) { target in
                 if target.id != targets.first?.id {
@@ -33,6 +36,9 @@ struct TonightTargetsCard: View {
             }
             TonightNote(text: "Ranked by height in the dark, brightness and size. Only objects that climb above "
                         + "\(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} are listed.", style: .footnote)
+            if appliesSkyline {
+                TonightSkylineNote(detail: "targets hidden behind the skyline are left out.")
+            }
         case .noDarkness:
             TonightNote(text: "There is no astronomical darkness on this night, so there is nothing to rank.")
         case .catalogPending:
