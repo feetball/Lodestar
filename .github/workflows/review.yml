@@ -1,0 +1,29 @@
+# Visual review harness (probe)
+name: Review
+
+on:
+  push:
+    branches: [features-1.1-review-ios]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Probe
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list runtimes
+          xcrun simctl list devicetypes | grep -E "iPhone|iPad|Watch"
+          xcrun simctl list devices available | head -60
+          sysctl -n hw.ncpu; sysctl -n hw.memsize
+          df -h / | tail -1
+          brew list --versions xcodegen || true
