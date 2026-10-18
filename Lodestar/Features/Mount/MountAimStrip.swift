@@ -95,11 +95,46 @@ struct MountAimStrip: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             progress(status, target: target)
+            skyWatcherLines
             messageLine
             actions(target: target)
         }
         .aimPanel(palette, padding: 8)
         .accessibilityElement(children: .contain)
+    }
+
+    /// The alignment, the tracking state and the pier side of a mount that Lodestar aligns, and what stands in the way.
+    @ViewBuilder
+    private var skyWatcherLines: some View {
+        if service.usesLodestarAlignment, let line = service.alignmentLine {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(line)
+                    .font(.caption)
+                    .foregroundStyle(service.needsFirstSync ? palette.warning : palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let state = service.trackingAndPierLine {
+                    Text(state)
+                        .font(.caption)
+                        .foregroundStyle(palette.secondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            if service.needsFirstSync {
+                Label(MountAlignmentText.notAlignedYet, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let stop = service.trackingStopText {
+                Label(stop, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private func header(_ status: MountStatus) -> some View {
@@ -240,7 +275,7 @@ struct MountAimStrip: View {
             let syncReason = service.syncUnavailableReason(for: target)
             VStack(spacing: 6) {
                 HStack(spacing: 6) {
-                    control("GoTo", systemImage: "location.north.line.fill") {
+                    control("Go to", systemImage: "location.north.line.fill") {
                         if let target { confirmation = MountConfirmation(kind: .goTo, object: target) }
                     }
                     .disabled(goToReason != nil || service.isWorking)
@@ -256,7 +291,8 @@ struct MountAimStrip: View {
                     MountStopButton(isCompact: true, minHeight: 50)
                     moreButton
                 }
-                if target != nil, let goToReason {
+                // "Not aligned yet" is already said above, in the card.
+                if target != nil, let goToReason, goToReason != MountAlignmentText.notAlignedYet {
                     Text(goToReason)
                         .font(.caption2)
                         .foregroundStyle(palette.warning)

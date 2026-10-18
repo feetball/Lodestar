@@ -82,6 +82,8 @@ final class AppModel {
     @ObservationIgnored private var hasRequestedLocationThisLaunch = false
     @ObservationIgnored private var lastAlignmentContext: AlignmentContext?
     @ObservationIgnored private var lastSunEvaluation: (date: Date, observer: Observer)?
+    /// A recent target that was not in the catalog at launch (a downloaded comet whose file is applied later).
+    @ObservationIgnored private var pendingTargetID: String?
 
     init(settingsStore: SettingsStore = SettingsStore()) {
         self.settingsStore = settingsStore
@@ -98,6 +100,7 @@ final class AppModel {
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
+        catalog.onSmallBodiesChange = { [weak self] in self?.smallBodiesChanged() }
     }
 
     #if DEBUG
@@ -178,8 +181,8 @@ final class AppModel {
         startMaintenance()
         syncServices()
         await catalog.load()
-        if target == nil, let id = settings.recentObjectIDs.first, let object = catalog.object(id: id) {
-            target = object
+        if target == nil, let id = settings.recentObjectIDs.first {
+            if let object = catalog.object(id: id) { target = object } else { pendingTargetID = id }
         }
         #if DEBUG
         if let id = ScreenshotMode.current?.targetID, let object = catalog.object(id: id) {
@@ -227,6 +230,7 @@ final class AppModel {
     /// Makes `object` the aiming target without changing tabs.
     func select(target object: CelestialObject) {
         satelliteAim.stop()
+        pendingTargetID = nil
         target = object
         if !object.id.hasPrefix("custom.") {
             settingsStore.noteRecent(object.id)
@@ -234,7 +238,20 @@ final class AppModel {
     }
 
     func clearTarget() {
+        pendingTargetID = nil
         target = nil
+    }
+
+    /// Downloaded comets and asteroids replaced the catalog's small bodies: a target that is one of them follows its
+    /// refreshed object (newer elements; one that dropped out of the data keeps what it had), and a recent target
+    /// that only now resolves is restored.
+    private func smallBodiesChanged() {
+        if let current = target, current.smallBody != nil, let refreshed = catalog.object(id: current.id) {
+            target = refreshed
+        } else if target == nil, let id = pendingTargetID, let object = catalog.object(id: id) {
+            target = object
+        }
+        pendingTargetID = nil
     }
 
     // MARK: Alignment

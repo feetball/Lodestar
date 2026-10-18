@@ -29,6 +29,22 @@ tilt the tripod head until it is in your frame.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night, and a polar-scope clock for star trackers.
+- **Events calendar** — meteor showers (with hourly rates and the radiant's altitude from your site), lunar and
+  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
+  and where to look and a button to aim at it.
+- **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
+  order, guided panel by panel in Aim), and star-trail and time-lapse planners.
+- **Real skyline** — sweep the phone along the horizon to record trees, buildings and mountains; rise and set
+  times, Tonight and the charts then use the site's own skyline.
+- **Comets and asteroids** — 216 bright asteroids built in and, optionally, the daily comet file: brightness
+  estimates, elongation warnings, a Bright Comets list, and the direction of a comet's ion tail with the camera
+  tilt that lays it along the frame.
+- **GoTo mounts** — connect over Wi-Fi to OnStep/LX200, Celestron NexStar and SynScan, ASCOM Alpaca and the
+  Sky-Watcher AZ-GTi / Star Adventurer GTi (with home position and star alignment); Go to, Sync, nudge arrows and
+  an always-available Stop, with altitude limits and a built-in simulated mount to try it without hardware.
+- **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
+  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast (MET
+  Norway, location rounded to about 10 km).
 - **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
@@ -38,8 +54,8 @@ tilt the tripod head until it is in your frame.
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
 - **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected.
-  Optional downloads (Settings ▸ Online Data) are off by default: ISS and bright-satellite passes and
-  Starlink streak warnings (CelesTrak), comets (Minor Planet Center) and a cloud forecast (MET Norway).
+  The optional online data downloads from CelesTrak, the Minor Planet Center and MET Norway only when you turn it
+  on, and a GoTo mount is reached over the local network only.
 
 ## Requirements
 
