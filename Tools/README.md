@@ -308,3 +308,8 @@ Android engine) with subcommands `sgp4`, `snapshot`, `passes` and `streaks`. Pin
 | JPL DE421 `de421.bsp` (Skyfield reference positions) | `a20a7139da04cbc462454634918e9a9ca69127044e2cc9d4f9c16e238d2deedc` |
 
 `snapshot` saves small CelesTrak GP snapshots (2026-10-18); the tests never touch the network.
+
+## Comet test data
+
+The comet generators (`gen_comet*.py` and companions copied from the comets work) rebuild the Kepler and Horizons
+test tables in `CometsKeplerData`/`CometsHorizonsData` from JPL Horizons queries and an independent mpmath solver.
