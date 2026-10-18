@@ -12,9 +12,18 @@ struct WatchTonightView: View {
     var body: some View {
         NavigationStack {
             TimelineView(.periodic(from: .now, by: 60)) { context in
-                ScrollView {
-                    content(at: context.date)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        content(at: Self.moment(context.date))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    #if DEBUG
+                    .task(id: model.entries.count) {
+                        // The visual review scrolls to a section (`scrollTo=core`).
+                        try? await Task.sleep(for: .milliseconds(600))
+                        if let id = WatchReviewMode.current?.scrollTo { proxy.scrollTo(id, anchor: .top) }
+                    }
+                    #endif
                 }
             }
             .navigationTitle(TonightLines.title)
@@ -34,15 +43,24 @@ struct WatchTonightView: View {
         }
     }
 
+    /// The moment shown: now (the visual review fixes it).
+    private static func moment(_ now: Date) -> Date {
+        #if DEBUG
+        return WatchReviewMode.current?.date ?? now
+        #else
+        return now
+        #endif
+    }
+
     @ViewBuilder
     private func content(at date: Date) -> some View {
         if let entry = TonightBuilder.current(in: model.entries, at: date), case .night(let night) = entry.content {
             let lines = TonightLines(night: night, now: date)
             VStack(alignment: .leading, spacing: 12) {
-                section(lines.dark, symbol: "moon.stars", valueStyle: TonightStyle.accent)
-                moon(lines)
-                section(lines.core, symbol: "sparkles", valueStyle: TonightStyle.primaryText)
-                section(lines.event, symbol: lines.eventSymbol ?? "calendar", valueStyle: TonightStyle.primaryText)
+                section(lines.dark, symbol: "moon.stars", valueStyle: TonightStyle.accent).id("dark")
+                moon(lines).id("moon")
+                section(lines.core, symbol: "sparkles", valueStyle: TonightStyle.primaryText).id("core")
+                section(lines.event, symbol: lines.eventSymbol ?? "calendar", valueStyle: TonightStyle.primaryText).id("event")
             }
         } else if model.isLoading {
             ProgressView()

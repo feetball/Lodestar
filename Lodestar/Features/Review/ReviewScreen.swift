@@ -30,6 +30,22 @@ enum ReviewScreen: Hashable {
     // Settings ▸ Location: the skyline recorder (full screen) and the site editor (a sheet).
     case skyline
     case siteEditor
+    // The Sky-Watcher mount: Settings ▸ Mount Control with the kind chosen (and its home position drawings) or with the
+    // simulated mount connected, not aligned and after one and two syncs; the Aim screen's mount sheet in the same
+    // states, and with the sync confirmation open.
+    case mountSkyWatcher
+    case mountSkyWatcherEquatorial
+    case mountSkyWatcherConnected
+    case mountSkyWatcherAligned1
+    case mountSkyWatcherAligned2
+    case mountSkyWatcherSheet
+    case mountSkyWatcherSheetAligned
+    case mountSkyWatcherSync
+    // The widgets drawn at their sizes (the widget views are in the app only in the review build), by variant.
+    case widgets
+    case widgetsStates
+    case widgetsLargeType
+    case widgetsRed
 
     private static let named: [String: ReviewScreen] = [
         "mosaic": .mosaic, "mount-sheet": .mountSheet, "mount-sheet-slewing": .mountSheetSlewing,
@@ -40,6 +56,12 @@ enum ReviewScreen: Hashable {
         "star-trails": .starTrails, "time-lapse": .timeLapse,
         "mount-connection": .mountConnection, "mount-connected": .mountConnected,
         "skyline": .skyline, "site-editor": .siteEditor,
+        "mount-sw": .mountSkyWatcher, "mount-sw-equatorial": .mountSkyWatcherEquatorial,
+        "mount-sw-connected": .mountSkyWatcherConnected, "mount-sw-aligned-1": .mountSkyWatcherAligned1,
+        "mount-sw-aligned-2": .mountSkyWatcherAligned2, "mount-sw-sheet": .mountSkyWatcherSheet,
+        "mount-sw-sheet-aligned": .mountSkyWatcherSheetAligned, "mount-sw-sync": .mountSkyWatcherSync,
+        "widgets": .widgets, "widgets-states": .widgetsStates, "widgets-large-type": .widgetsLargeType,
+        "widgets-red": .widgetsRed,
     ]
 
     /// The screen called `name` (exactly), or `nil`. Events are "event-" and the engine's name of the kind, such as
@@ -57,14 +79,25 @@ enum ReviewScreen: Hashable {
     /// The tab the screen belongs to.
     var tab: AppTab {
         switch self {
-        case .mosaic, .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing:
+        case .mosaic, .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing, .mountSkyWatcherSheet,
+             .mountSkyWatcherSheetAligned, .mountSkyWatcherSync:
             return .aim
-        case .eventsCalendar, .event, .cometsList, .asteroidsList:
+        case .eventsCalendar, .event, .cometsList, .asteroidsList, .widgets, .widgetsStates, .widgetsLargeType,
+             .widgetsRed:
             return .tonight
         case .cometDetail, .asteroidDetail:
             return .objects
-        case .starTrails, .timeLapse, .mountConnection, .mountConnected, .skyline, .siteEditor:
+        case .starTrails, .timeLapse, .mountConnection, .mountConnected, .skyline, .siteEditor, .mountSkyWatcher,
+             .mountSkyWatcherEquatorial, .mountSkyWatcherConnected, .mountSkyWatcherAligned1, .mountSkyWatcherAligned2:
             return .settings
+        }
+    }
+
+    /// Whether the screen is the widgets, which fill the window.
+    var isWidgets: Bool {
+        switch self {
+        case .widgets, .widgetsStates, .widgetsLargeType, .widgetsRed: return true
+        default: return false
         }
     }
 
@@ -72,13 +105,14 @@ enum ReviewScreen: Hashable {
     var aimSheet: AimSheet? {
         switch self {
         case .mosaic: return .mosaic
-        case .mountSheet, .mountSheetSlewing: return .mount
+        case .mountSheet, .mountSheetSlewing, .mountSkyWatcherSheet, .mountSkyWatcherSheetAligned,
+             .mountSkyWatcherSync: return .mount
         default: return nil
         }
     }
 
     /// Whether `ReviewHost` builds the screen (the others are the real tab, with a sheet for the Aim tab).
-    var usesHost: Bool { tab != .aim }
+    var usesHost: Bool { tab != .aim || isWidgets }
 
     /// Whether the screen is pushed on the host's navigation stack.
     var isPushed: Bool {
@@ -88,11 +122,27 @@ enum ReviewScreen: Hashable {
         }
     }
 
-    /// Whether the built-in simulated mount is connected before the screenshot.
-    var connectsMount: Bool {
+    /// What the mount is made to do before the screenshot.
+    enum MountSetup: Equatable {
+        case none
+        /// The built-in simulated mount is connected.
+        case demo
+        /// The simulated Sky-Watcher mount is connected and synced on `syncs` stars; the next suggested star becomes
+        /// the Aim target.
+        case skyWatcher(syncs: Int)
+        /// No mount is connected, the Sky-Watcher kind is chosen, with the given arrangement.
+        case chooseSkyWatcher(equatorial: Bool)
+    }
+
+    var mount: MountSetup {
         switch self {
-        case .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing, .mountConnected: return true
-        default: return false
+        case .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing, .mountConnected: return .demo
+        case .mountSkyWatcherConnected, .mountSkyWatcherSheet: return .skyWatcher(syncs: 0)
+        case .mountSkyWatcherAligned1: return .skyWatcher(syncs: 1)
+        case .mountSkyWatcherAligned2, .mountSkyWatcherSheetAligned, .mountSkyWatcherSync: return .skyWatcher(syncs: 2)
+        case .mountSkyWatcher: return .chooseSkyWatcher(equatorial: false)
+        case .mountSkyWatcherEquatorial: return .chooseSkyWatcher(equatorial: true)
+        default: return .none
         }
     }
 

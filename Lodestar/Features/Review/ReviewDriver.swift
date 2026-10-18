@@ -36,8 +36,8 @@ final class ReviewDriver {
     private func run(app: AppModel, mode: ScreenshotMode) async {
         write(state: "")
         await app.catalog.load()
-        if let screen = mode.screen, screen.connectsMount {
-            await connectMount(app: app, slews: screen.slews)
+        if let screen = mode.screen {
+            await prepareMount(app: app, screen: screen)
         }
         // Let the screen finish its first layout and its own background work before the script looks.
         try? await Task.sleep(for: .seconds(2))
@@ -52,16 +52,52 @@ final class ReviewDriver {
         }
     }
 
-    private func connectMount(app: AppModel, slews: Bool) async {
+    // MARK: Mount
+
+    private func prepareMount(app: AppModel, screen: ReviewScreen) async {
         let service = MountService.shared
-        service.connectDemo(observer: app.observerContext?.observer)
-        for _ in 0..<50 where !service.isConnected {
+        let observer = app.observerContext?.observer
+        switch screen.mount {
+        case .none:
+            return
+        case .chooseSkyWatcher(let equatorial):
+            service.selectedOptionID = MountConnectionOption.skyWatcher.id
+            service.settings.arrangement = equatorial ? .equatorial : .altAzimuth
+        case .demo:
+            service.connectDemo(observer: observer)
+            await waitForConnection(service)
+            guard screen.slews, service.isConnected, let target = app.target, let observer else { return }
+            await service.goTo(target, observer: observer)
+        case .skyWatcher(let syncs):
+            service.connectDemo(.demoSkyWatcher, observer: observer)
+            await waitForConnection(service)
+            guard service.isConnected, let observer, let catalog = app.catalog.catalog else { return }
+            // Stars the way the set-up screen suggests them, for the real time: the simulated mount runs on it.
+            var used: [EquatorialCoordinate] = []
+            for index in 0...syncs {
+                let date = Date()
+                let candidates = await Task.detached(priority: .userInitiated) {
+                    MountAlignmentSuggestions.candidates(catalog: catalog, observer: observer, date: date)
+                }.value
+                guard let star = MountAlignmentSuggestions.suggest(candidates, used: used, count: 1).first?.candidate
+                else { return }
+                if index == syncs {
+                    // The last star is the target the screen offers to sync on.
+                    app.select(target: star.object)
+                    return
+                }
+                await service.centreSimulatedMount(on: star.object, observer: observer)
+                await service.syncMount(to: star.object, observer: observer)
+                used.append(star.j2000)
+            }
+        }
+    }
+
+    private func waitForConnection(_ service: MountService) async {
+        for _ in 0..<50 {
+            if service.isConnected { return }
             try? await Task.sleep(for: .milliseconds(200))
         }
-        guard slews, service.isConnected, let target = app.target, let observer = app.observerContext?.observer else {
-            return
-        }
-        await service.goTo(target, observer: observer)
     }
 
     // MARK: Files

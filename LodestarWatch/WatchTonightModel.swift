@@ -27,6 +27,10 @@ final class WatchTonightModel {
         }
         self.link = link
         link.activate()
+        #if DEBUG
+        // The visual review fixes the place, so it must not ask for the location.
+        if WatchReviewMode.current != nil { return }
+        #endif
         locator.requestAuthorization()
     }
 
@@ -35,13 +39,7 @@ final class WatchTonightModel {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        let place: TonightPlace?
-        if let phonePlace {
-            place = phonePlace
-        } else {
-            place = await locator.currentPlace()
-        }
-        let now = Date()
+        let (place, now) = await placeAndDate()
         guard let place else {
             entries = []
             needsLocation = true
@@ -54,6 +52,15 @@ final class WatchTonightModel {
         needsLocation = false
         isLoading = false
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// The place to work for and the moment to start from. (The visual review of the Simulator fixes both.)
+    private func placeAndDate() async -> (TonightPlace?, Date) {
+        #if DEBUG
+        if let review = WatchReviewMode.current { return (review.place, review.date) }
+        #endif
+        if let phonePlace { return (phonePlace, Date()) }
+        return (await locator.currentPlace(), Date())
     }
 
     private func receive(_ place: TonightPlace) async {

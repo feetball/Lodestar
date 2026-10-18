@@ -1,0 +1,11 @@
+# name | arguments (after -LodestarReview)
+app-1|view=app
+app-2|view=app scrollTo=moon
+app-3|view=app scrollTo=core
+app-4|view=app scrollTo=event
+app-large-1|view=app type=large
+app-large-2|view=app type=large scrollTo=core
+app-large-3|view=app type=large scrollTo=event
+complications-1|view=complications
+complications-2|view=complications scrollTo=row1
+complications-3|view=complications scrollTo=row2

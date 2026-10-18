@@ -79,6 +79,14 @@ private struct MountControlPanel: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        #if DEBUG
+        // The visual review opens the sync confirmation once the target is chosen (`screen=mount-sw-sync`).
+        .task(id: model.guidanceTarget?.id) {
+            if ScreenshotMode.current?.screen == .mountSkyWatcherSync, let target = model.guidanceTarget {
+                confirmation = MountConfirmation(kind: .sync, object: target)
+            }
+        }
+        #endif
     }
 
     // MARK: Cards

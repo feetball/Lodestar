@@ -7,6 +7,7 @@ extension RootView {
     /// tabs. `nil` otherwise (and always in a Release build, where `ScreenshotMode` does not exist).
     var reviewHost: AnyView? {
         guard let screen = ScreenshotMode.current?.screen, screen.usesHost else { return nil }
+        if screen.isWidgets { return AnyView(ReviewWidgetsScreen(screen: screen)) }
         return AnyView(ReviewHost(screen: screen))
     }
 }
@@ -99,9 +100,10 @@ private struct ReviewDestination: View {
             ReviewObjectDetail(id: "asteroid.4")
         case .starTrails, .timeLapse:
             ToolsStarTrailsView()
-        case .mountConnection, .mountConnected:
+        case .mountConnection, .mountConnected, .mountSkyWatcher, .mountSkyWatcherEquatorial, .mountSkyWatcherConnected,
+             .mountSkyWatcherAligned1, .mountSkyWatcherAligned2:
             MountConnectionView()
-        case .mosaic, .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing, .skyline, .siteEditor:
+        default:
             EmptyView()
         }
     }

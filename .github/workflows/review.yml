@@ -1,4 +1,12 @@
-# Visual review harness (probe)
+# Visual review: renders the screens of the 1.1 features in the Simulator (an iPhone, an iPad, a small iPhone with large
+# text) and on a watchOS Simulator, and uploads the pictures as artifacts. Nothing is checked automatically; a person (or
+# an agent) looks at the pictures. It is not part of the default CI.
+#
+# The build is a Debug build of the Lodestar scheme for the Simulator, with two additions that only this workflow makes:
+# the widget views (WidgetShared and the two view files of LodestarWidgets) are copied into the app's folder and compiled
+# with -DREVIEW_WIDGETS, so that the app can draw them at the sizes of the widget families. The screens are opened by the
+# `screen=` key of screenshot mode (Lodestar/App/ScreenshotMode.swift, Lodestar/Features/Review) and photographed by
+# Tools/review/capture.sh; Tools/review/shots-*.txt list what is captured.
 name: Review
 
 on:
@@ -9,21 +17,178 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  probe:
+  build:
     runs-on: macos-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Probe
+
+      - name: Select the newest Xcode
         run: |
           XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
           sudo xcode-select --switch "$XCODE"
           xcodebuild -version
-          xcodebuild -showsdks
           xcrun simctl list runtimes
-          xcrun simctl list devicetypes | grep -E "iPhone|iPad|Watch"
-          xcrun simctl list devices available | head -60
-          sysctl -n hw.ncpu; sysctl -n hw.memsize
-          df -h / | tail -1
-          brew list --versions xcodegen || true
+
+      - name: Add the widget views to the app (review build only)
+        run: |
+          mkdir -p Lodestar/ReviewWidgetSources
+          cp WidgetShared/*.swift WidgetShared/Core/*.swift Lodestar/ReviewWidgetSources/
+          cp LodestarWidgets/TonightSystemView.swift LodestarWidgets/TonightWidget.swift Lodestar/ReviewWidgetSources/
+          ls Lodestar/ReviewWidgetSources
+
+      - name: Build the app for the Simulator (Debug)
+        run: |
+          set +e
+          xcodebuild build \
+            -project Lodestar.xcodeproj \
+            -scheme Lodestar \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            SWIFT_OPTIMIZATION_LEVEL=-O \
+            OTHER_SWIFT_FLAGS='$(inherited) -DREVIEW_WIDGETS' \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet 2>&1 | tee "$RUNNER_TEMP/build.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "---- errors"
+          grep -E "error:" "$RUNNER_TEMP/build.log" | sort -u | head -60 || true
+          echo "---- warnings in the review files"
+          grep -E "warning:" "$RUNNER_TEMP/build.log" | grep -E "Features/Review|LodestarWatch/Watch" | sort -u | head -30 || true
+          exit "$status"
+
+      - name: Check the products
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/Lodestar.app"
+          ls "$APP" "$APP/Watch" "$APP/PlugIns"
+          lipo -archs "$APP/Lodestar" "$APP/Watch/LodestarWatch.app/LodestarWatch" || true
+          du -sh "$APP"
+
+      - name: Pack the app
+        run: |
+          tar -C "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator" -cf "$RUNNER_TEMP/Lodestar.app.tar" Lodestar.app
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lodestar-app
+          path: ${{ runner.temp }}/Lodestar.app.tar
+          retention-days: 3
+          compression-level: 0
+
+  # The iOS screens. Each entry boots its own Simulator and works through its list of shots.
+  capture:
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: iphone-1
+            device: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+            shots: Tools/review/shots-iphone-1.txt
+            content_size: ""
+          - name: iphone-2
+            device: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+            shots: Tools/review/shots-iphone-2.txt
+            content_size: ""
+          - name: ipad
+            device: com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB
+            shots: Tools/review/shots-ipad.txt
+            content_size: ""
+          - name: small-large-text
+            device: com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation
+            shots: Tools/review/shots-small.txt
+            content_size: accessibility-extra-large
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lodestar-app
+          path: ${{ runner.temp }}/app
+
+      - name: Boot a Simulator and install the app
+        run: |
+          tar -C "$RUNNER_TEMP/app" -xf "$RUNNER_TEMP/app/Lodestar.app.tar"
+          RUNTIME="$(xcrun simctl list runtimes | grep -E '^iOS ' | tail -n 1 | sed -E 's/.* - //')"
+          echo "runtime $RUNTIME"
+          UDID="$(xcrun simctl create review-${{ matrix.name }} ${{ matrix.device }} "$RUNTIME")"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > /dev/null
+          xcrun simctl ui "$UDID" appearance dark
+          if [ -n "${{ matrix.content_size }}" ]; then xcrun simctl ui "$UDID" content_size ${{ matrix.content_size }}; fi
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+            --cellularMode active --cellularBars 4 --wifiBars 3
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/app/Lodestar.app"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Capture
+        run: bash Tools/review/capture.sh "$UDID" "$RUNNER_TEMP/shots" "${{ matrix.shots }}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: shots-${{ matrix.name }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 7
+
+  # The Apple Watch app and the complication views, on a watchOS Simulator when the runner has a runtime.
+  watch:
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: watch-46mm
+            device: com.apple.CoreSimulator.SimDeviceType.Apple-Watch-Series-11-46mm
+          - name: watch-40mm
+            device: com.apple.CoreSimulator.SimDeviceType.Apple-Watch-SE-3-40mm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lodestar-app
+          path: ${{ runner.temp }}/app
+
+      - name: Boot a watch and install the watch app
+        run: |
+          tar -C "$RUNNER_TEMP/app" -xf "$RUNNER_TEMP/app/Lodestar.app.tar"
+          RUNTIME="$(xcrun simctl list runtimes | grep -E '^watchOS ' | tail -n 1 | sed -E 's/.* - //')"
+          echo "runtime $RUNTIME"
+          UDID="$(xcrun simctl create review-${{ matrix.name }} ${{ matrix.device }} "$RUNTIME")"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > /dev/null
+          xcrun simctl install "$UDID" "$RUNNER_TEMP/app/Lodestar.app/Watch/LodestarWatch.app"
+          xcrun simctl listapps "$UDID" | grep -i lodestar || true
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Capture
+        run: bash Tools/review/capture-watch.sh "$UDID" "$RUNNER_TEMP/shots" Tools/review/shots-watch.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: shots-${{ matrix.name }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 7

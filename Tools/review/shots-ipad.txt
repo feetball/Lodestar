@@ -1,0 +1,10 @@
+# name | modes | launch arguments | options  (the app is an iPhone app: on the iPad it runs in a window of its own)
+tonight|dn|tab=tonight comets=1|pages=4
+objects|n|tab=objects comets=1|pages=3
+events-calendar|n|screen=events-calendar|pages=3
+event-meteorShower|n|screen=event-meteorShower|pages=3
+comet-detail|n|screen=comet-detail|pages=3
+star-trails|n|screen=star-trails|pages=3
+mosaic|n|screen=mosaic target=dso.M31|pages=3
+mount-sw-sheet-aligned|n|screen=mount-sw-sheet-aligned|pages=3
+widgets|n|screen=widgets|pages=3
