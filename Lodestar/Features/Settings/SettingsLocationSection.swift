@@ -8,6 +8,10 @@ struct SettingsLocationSection: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
     @State private var editorTarget: SiteEditorTarget?
+    @State private var horizonFlow = HorizonFlowState()
+    /// A place saved from "Current Location" to record its skyline: record it once the editor has closed.
+    @State private var recordsAfterSaving = false
+    @State private var siteToRecord: UUID?
 
     var body: some View {
         let store = app.settingsStore
@@ -25,13 +29,21 @@ struct SettingsLocationSection: View {
                 store.settings.locationSource = .device
                 app.location.requestAuthorization()
             }
+            .horizonFlow($horizonFlow)
             if settings.locationSource == .device {
                 accessPrompt
+                HorizonDeviceRow(blocker: skylineBlocker(isFull: isFull)) {
+                    if let fix = app.location.fix {
+                        recordsAfterSaving = true
+                        editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
+                    }
+                }
             }
             ForEach(settings.savedSites) { site in
                 SettingsSavedSiteRow(
                     site: site,
                     isSelected: settings.locationSource == .site(site.id),
+                    horizonFlow: $horizonFlow,
                     onSelect: { store.settings.locationSource = .site(site.id) },
                     onEdit: { editorTarget = .existing(site) })
             }
@@ -41,12 +53,13 @@ struct SettingsLocationSection: View {
                 Label("Add Site\u{2026}", systemImage: "plus.circle")
             }
             .disabled(isFull)
-            .sheet(item: $editorTarget) { target in
+            .sheet(item: $editorTarget, onDismiss: recordPendingSkyline) { target in
                 SettingsSheetRoot {
                     SiteEditor(target: target) { site in
                         // A newly added site becomes the observing location, as in onboarding.
                         if case .new = target {
                             app.settingsStore.settings.locationSource = .site(site.id)
+                            if recordsAfterSaving { siteToRecord = site.id }
                         }
                     }
                 }
@@ -62,6 +75,23 @@ struct SettingsLocationSection: View {
             if isFull {
                 SettingsCaption("You have reached the limit of \(AppSettings.maximumSavedSites) saved sites.")
             }
+        }
+    }
+
+    /// Why the current place cannot be saved as a site to record its skyline right now, or `nil`.
+    private func skylineBlocker(isFull: Bool) -> String? {
+        if app.location.fix == nil { return "Lodestar does not have your position yet." }
+        if isFull { return "You have reached the limit of \(AppSettings.maximumSavedSites) saved sites. Delete one first." }
+        return nil
+    }
+
+    /// After the editor has closed, records the skyline of a place that was saved for it.
+    private func recordPendingSkyline() {
+        recordsAfterSaving = false
+        guard let id = siteToRecord else { return }
+        siteToRecord = nil
+        if let site = app.settings.savedSites.first(where: { $0.id == id }) {
+            horizonFlow.recording = site
         }
     }
 
@@ -154,6 +184,7 @@ private struct SettingsSavedSiteRow: View {
     @Environment(\.palette) private var palette
     let site: SavedSite
     let isSelected: Bool
+    @Binding var horizonFlow: HorizonFlowState
     let onSelect: () -> Void
     let onEdit: () -> Void
 
@@ -168,6 +199,11 @@ private struct SettingsSavedSiteRow: View {
                         Text(subtitle)
                             .font(.footnote)
                             .foregroundStyle(palette.secondaryText)
+                        if site.horizon != nil {
+                            Text("Horizon: \(HorizonText.status(of: site))")
+                                .font(.footnote)
+                                .foregroundStyle(palette.secondaryText)
+                        }
                     }
                     Spacer(minLength: 0)
                 }
@@ -176,6 +212,7 @@ private struct SettingsSavedSiteRow: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
+            HorizonSiteMenu(site: site, flow: $horizonFlow)
             Button(action: onEdit) {
                 Image(systemName: "pencil.circle")
                     .font(.title3)

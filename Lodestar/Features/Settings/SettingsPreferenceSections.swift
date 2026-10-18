@@ -35,6 +35,9 @@ struct SettingsSkyDisplaySection: View {
             Toggle("Constellation lines", isOn: $store.settings.showConstellationLines)
             Toggle("Constellation names", isOn: $store.settings.showConstellationNames)
             Toggle("Deep-sky objects", isOn: $store.settings.showDeepSkyObjects)
+            if store.settings.showDeepSkyObjects {
+                SettingsDeepSkyDetailRow(level: $store.settings.deepSkyProminence)
+            }
             Toggle("Milky Way", isOn: $store.settings.showMilkyWay)
             VStack(alignment: .leading, spacing: 4) {
                 SettingsSliderRow(title: "Faintest stars",
@@ -57,6 +60,31 @@ struct SettingsSkyDisplaySection: View {
     }
 }
 
+/// Sky Display ▸ Deep-sky detail: how prominent a deep-sky object has to be to be drawn, from the showpieces only to
+/// everything in the catalog. The level is stored as the `Prominence` raw value, 1…4.
+private struct SettingsDeepSkyDetailRow: View {
+    private static let options = [
+        SettingsMenuOption(title: "Showpieces", value: 1),
+        SettingsMenuOption(title: "Prominent", value: 2),
+        SettingsMenuOption(title: "Notable", value: 3),
+        SettingsMenuOption(title: "Everything", value: 4),
+    ]
+
+    private static let caption = "Which deep-sky objects the Aim screen and the sky chart draw. Showpieces: the 250 or "
+        + "so best known, such as the Messier and Caldwell objects. Prominent: about 490, adding other bright or "
+        + "large ones. Notable: about 1,000. Everything: about 2,400, including more than a thousand faint objects "
+        + "and dark nebulae, which crowds the sky."
+
+    @Binding var level: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            SettingsMenuPicker(title: "Deep-sky detail", selection: $level, options: Self.options)
+            SettingsCaption(Self.caption)
+        }
+    }
+}
+
 /// Settings ▸ Atmosphere: the weather values that decide how much the air lifts objects near the horizon.
 struct SettingsAtmosphereSection: View {
     @Environment(AppModel.self) private var app
@@ -75,7 +103,8 @@ struct SettingsAtmosphereSection: View {
     }
 }
 
-/// Settings ▸ Tools: links to the exposure calculator and the polar alignment helper.
+/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner and the polar alignment
+/// helper.
 struct SettingsToolsSection: View {
     var body: some View {
         SettingsSection(title: "Tools") {
@@ -83,6 +112,11 @@ struct SettingsToolsSection: View {
                 ExposureCalculatorView()
             } label: {
                 Label("Exposure Calculator", systemImage: "timer")
+            }
+            NavigationLink {
+                ToolsStarTrailsView()
+            } label: {
+                Label("Star Trails & Time-Lapse", systemImage: "timelapse")
             }
             NavigationLink {
                 PolarAlignmentView()
