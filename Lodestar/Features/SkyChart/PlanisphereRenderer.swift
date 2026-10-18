@@ -28,6 +28,11 @@ struct PlanisphereRenderer {
     let palette: Palette
     let layers: SkyChartLayerOptions
     let selectedDirection: Vector3?
+    /// The step of the mosaic being shot, or `nil` without one.
+    let mosaic: MosaicDisplay?
+
+    /// Opacity of the ground's shade over the sky behind the skyline.
+    private static let groundShade = 0.7
 
     private var scene: SkyChartScene { content.scene }
 
@@ -39,6 +44,9 @@ struct PlanisphereRenderer {
     static func altitudeLabelID(_ altitude: Double) -> String {
         "altitude.\(Int(altitude))"
     }
+
+    /// The id of the canvas symbol that names the mosaic panel being shot.
+    static let mosaicLabelID = "mosaic.panel"
 
     /// Draws the whole chart. The compass letters and ticks go first, then the sky inside the horizon
     /// circle (on a copy of the context that is clipped to it), then the horizon ring and the labels.
@@ -55,6 +63,8 @@ struct PlanisphereRenderer {
         drawStars(&sky)
         if layers.deepSkyObjects { drawDeepSky(&sky) }
         occupied += drawBodies(&sky)
+        drawSkyline(&sky)
+        occupied += drawMosaic(&sky)
         occupied += drawTarget(&sky)
         drawSelection(&sky)
 
@@ -62,6 +72,7 @@ struct PlanisphereRenderer {
         drawTargetRimIndicator(&context)
         drawAltitudeLabels(&context)
         drawLabels(&context, occupied: occupied)
+        drawMosaicLabel(&context)
     }
 
     // MARK: Sky
@@ -118,13 +129,12 @@ struct PlanisphereRenderer {
         }
     }
 
-    /// Galaxies are drawn as ellipses, nebulae as rounded squares and clusters as circles. Fainter
-    /// objects appear as the chart is zoomed in.
+    /// Galaxies are drawn as ellipses, nebulae as rounded squares and clusters as circles; dark nebulae are dashed and
+    /// fainter. The scene holds the objects up to the prominence chosen in Settings.
     private func drawDeepSky(_ context: inout GraphicsContext) {
         let bounds = visibleBounds
-        let magnitudeLimit = 7 + 2 * log2(Double(viewport.zoom))
-        var galaxies = Path(), nebulae = Path(), clusters = Path()
-        for object in scene.deepSky where (object.magnitude ?? 9.5) <= magnitudeLimit {
+        var galaxies = Path(), nebulae = Path(), clusters = Path(), darkNebulae = Path()
+        for object in scene.deepSky {
             let center = viewport.screen(object.point)
             guard bounds.contains(center) else { continue }
             let extent = (object.extent ?? 0) * Double(viewport.pointsPerRadian(at: object.point))
@@ -134,8 +144,12 @@ struct PlanisphereRenderer {
                 let outline = CGSize(width: size, height: size * 0.6)
                 galaxies.addEllipse(in: PlanisphereBounds.rect(around: center, size: outline))
             case .nebulae:
-                nebulae.addRoundedRect(in: PlanisphereBounds.square(around: center, radius: size / 2),
-                                       cornerSize: CGSize(width: 1.5, height: 1.5))
+                let square = PlanisphereBounds.square(around: center, radius: size / 2)
+                if object.isDark {
+                    darkNebulae.addRoundedRect(in: square, cornerSize: CGSize(width: 1.5, height: 1.5))
+                } else {
+                    nebulae.addRoundedRect(in: square, cornerSize: CGSize(width: 1.5, height: 1.5))
+                }
             default:
                 clusters.addEllipse(in: PlanisphereBounds.square(around: center, radius: size / 2))
             }
@@ -144,6 +158,61 @@ struct PlanisphereRenderer {
         context.stroke(galaxies, with: .color(palette.deepSkyMarker), style: style)
         context.stroke(nebulae, with: .color(palette.deepSkyMarker), style: style)
         context.stroke(clusters, with: .color(palette.deepSkyMarker), style: style)
+        context.stroke(darkNebulae, with: .color(palette.deepSkyMarker.opacity(0.6)),
+                       style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+    }
+
+    // MARK: Skyline and mosaic
+
+    /// Shades the ground below the recorded skyline and draws the skyline; nothing for an open horizon.
+    private func drawSkyline(_ context: inout GraphicsContext) {
+        guard let skyline = scene.skyline else { return }
+        let transform = viewport.transform
+        context.fill(skyline.ground.applying(transform), with: .color(palette.background.opacity(Self.groundShade)),
+                     style: FillStyle(eoFill: true))
+        context.stroke(skyline.line.applying(transform), with: .color(palette.horizonLine),
+                       style: StrokeStyle(lineWidth: 2, lineJoin: .round))
+    }
+
+    /// Outlines the panels of the mosaic: the current one is filled and heavy, panels already shot are dim, the next one
+    /// is dashed. Returns the rectangle the current panel's name takes, so labels keep clear of it.
+    private func drawMosaic(_ context: inout GraphicsContext) -> [CGRect] {
+        guard let mosaic, !scene.mosaic.isEmpty else { return [] }
+        var done = Path(), later = Path(), next = Path(), current = Path(), currentFill = Path()
+        var currentCenter: CGPoint?
+        for panel in scene.mosaic {
+            switch mosaic.state(ofShootingPosition: panel.shootingPosition) {
+            case .done: done.addPath(panel.outline)
+            case .later: later.addPath(panel.outline)
+            case .next: next.addPath(panel.outline)
+            case .current:
+                current.addPath(panel.outline)
+                if let fill = panel.fill { currentFill.addPath(fill) }
+                currentCenter = panel.center
+            }
+        }
+        let transform = viewport.transform
+        context.fill(currentFill.applying(transform), with: .color(palette.guidance.opacity(0.16)))
+        context.stroke(done.applying(transform), with: .color(palette.positive.opacity(0.4)), lineWidth: 1)
+        context.stroke(later.applying(transform), with: .color(palette.dslrFrame.opacity(0.4)), lineWidth: 1)
+        context.stroke(next.applying(transform), with: .color(palette.dslrFrame.opacity(0.85)),
+                       style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+        context.stroke(current.applying(transform), with: .color(palette.guidance),
+                       style: StrokeStyle(lineWidth: 2.5, lineJoin: .round))
+        guard let currentCenter else { return [] }
+        let center = viewport.screen(currentCenter)
+        return visibleBounds.contains(center) ? [PlanisphereBounds.square(around: center, radius: 30)] : []
+    }
+
+    /// Names the current panel, "Panel 3 of 12", at its centre.
+    private func drawMosaicLabel(_ context: inout GraphicsContext) {
+        guard let mosaic, mosaic.step < mosaic.count,
+              let center = scene.mosaic.first(where: { $0.shootingPosition == mosaic.step })?.center,
+              let symbol = context.resolveSymbol(id: Self.mosaicLabelID) else { return }
+        let point = viewport.screen(center)
+        guard visibleBounds.contains(point), hypot(point.x - viewport.center.x, point.y - viewport.center.y) < viewport.radius
+        else { return }
+        context.draw(symbol, at: point, anchor: .center)
     }
 
     // MARK: Solar system

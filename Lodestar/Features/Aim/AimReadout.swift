@@ -10,7 +10,9 @@ struct AimReadout: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
-            if let target = model.guidanceTarget {
+            if model.mosaicSession.isActive {
+                AimMosaicReadout(model: model, frame: model.engine.frame())
+            } else if let target = model.guidanceTarget {
                 let frame = model.engine.frame()
                 VStack(spacing: 8) {
                     AimTargetCard(object: target, horizontal: frame?.target?.horizontal,
@@ -25,9 +27,14 @@ struct AimReadout: View {
         }
     }
 
-    /// "Below the horizon · rises 23:41 (in 5h 12m)", or `nil` while the target is up.
+    /// "Below the horizon · rises 23:41 (in 5h 12m)", "Behind your skyline", or `nil` while the target is in the clear.
     private func belowHorizonNote(for target: CelestialObject, frame: AimFrame?) -> String? {
-        guard let altitude = frame?.target?.horizontal.altitude, altitude < 0 else { return nil }
+        guard let altitude = frame?.target?.horizontal.altitude else { return nil }
+        if altitude >= 0, let horizontal = frame?.target?.horizontal,
+           model.skyContent?.skyline?.mask.isBelow(azimuth: horizontal.azimuth, altitude: altitude) == true {
+            return "Behind your skyline"
+        }
+        guard altitude < 0 else { return nil }
         guard let info = model.riseInfo, info.targetID == target.id,
               let timeZone = model.app.observerContext?.timeZone else { return "Below the horizon" }
         if let rise = info.nextRise {
@@ -90,7 +97,7 @@ private struct AimTargetCard: View {
 }
 
 /// The pan and tilt the head has to make, or the state that replaces them.
-private struct AimMoveRow: View {
+struct AimMoveRow: View {
     let summary: AimGuidanceSummary
     @Environment(\.palette) private var palette
 
@@ -121,7 +128,7 @@ private struct AimMoveRow: View {
     }
 }
 
-private struct AimMovePill: View {
+struct AimMovePill: View {
     let move: AimGuidanceSummary.Move
     @Environment(\.palette) private var palette
 

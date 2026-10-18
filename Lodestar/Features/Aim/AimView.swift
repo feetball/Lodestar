@@ -98,6 +98,10 @@ private struct AimScreen: View {
                 .presentationDetents([.fraction(0.45), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
                 .presentationDragIndicator(.visible)
+        case .mosaic:
+            AimMosaicSheet(model: model)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }

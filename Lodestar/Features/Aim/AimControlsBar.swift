@@ -1,39 +1,53 @@
 import SwiftUI
 import LodestarKit
 
-/// The buttons of the screen: target, align, camera, night mode and zoom, in a row or, in a wide HUD, in a column.
+/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, in a row or, in a wide HUD, in two
+/// columns.
 struct AimControlsBar: View {
     let model: AimViewModel
     @Binding var sheet: AimSheet?
     var axis: Axis = .horizontal
     @Environment(AppModel.self) private var app
 
+    /// The two columns of a wide HUD.
+    private static let columns = [GridItem(.fixed(66), spacing: 6), GridItem(.fixed(66), spacing: 6)]
+
     var body: some View {
+        if axis == .horizontal {
+            HStack(spacing: 6) { buttons }
+        } else {
+            LazyVGrid(columns: Self.columns, spacing: 6) { buttons }
+                .frame(width: 2 * 66 + 6)
+        }
+    }
+
+    @ViewBuilder
+    private var buttons: some View {
         let previewOn = model.configuration.wantsCameraPreview
         let nightMode = app.settings.nightMode
-        let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(spacing: 6))
-        layout {
-            control("Target", systemImage: "scope") { sheet = .targetPicker }
-                .accessibilityLabel("Choose target")
-                .accessibilityValue(model.guidanceTarget?.name ?? "None")
-            control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) { sheet = .alignment }
-                .accessibilityLabel("Align on a star")
-                .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
-            control("Camera", systemImage: previewOn ? "camera.fill" : "video.slash", isOn: previewOn) {
-                model.toggleCameraPreview()
-            }
-            .disabled(!model.configuration.phoneCameraFollowsLens)
-            .accessibilityLabel("Camera picture")
-            .accessibilityValue(previewOn ? "On" : (model.configuration.phoneCameraFollowsLens ? "Off" : "Not available with this mount"))
-            control(nightTitle(nightMode), systemImage: nightIcon(nightMode), isOn: app.isNightModeActive) {
-                model.cycleNightMode()
-            }
-            .accessibilityLabel("Night mode")
-            .accessibilityValue(nightMode.title)
-            .accessibilityHint("Cycles between off, on and after sunset.")
-            AimFieldOfViewButton(model: model, minHeight: buttonHeight)
+        let mosaic = model.mosaicSession
+        control("Target", systemImage: "scope") { sheet = .targetPicker }
+            .accessibilityLabel("Choose target")
+            .accessibilityValue(model.guidanceTarget?.name ?? "None")
+        control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) { sheet = .alignment }
+            .accessibilityLabel("Align on a star")
+            .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
+        control("Mosaic", systemImage: "square.grid.3x3", isOn: mosaic.isActive) { sheet = .mosaic }
+            .accessibilityLabel("Plan a mosaic")
+            .accessibilityValue(mosaic.isActive ? mosaic.progressText : "Off")
+        control("Camera", systemImage: previewOn ? "camera.fill" : "video.slash", isOn: previewOn) {
+            model.toggleCameraPreview()
         }
-        .frame(width: axis == .vertical ? 66 : nil)
+        .disabled(!model.configuration.phoneCameraFollowsLens)
+        .accessibilityLabel("Camera picture")
+        .accessibilityValue(previewOn ? "On" : (model.configuration.phoneCameraFollowsLens ? "Off" : "Not available with this mount"))
+        control(nightTitle(nightMode), systemImage: nightIcon(nightMode), isOn: app.isNightModeActive) {
+            model.cycleNightMode()
+        }
+        .accessibilityLabel("Night mode")
+        .accessibilityValue(nightMode.title)
+        .accessibilityHint("Cycles between off, on and after sunset.")
+        AimFieldOfViewButton(model: model, minHeight: buttonHeight)
     }
 
     private func control(_ title: String, systemImage: String, isOn: Bool = false,
