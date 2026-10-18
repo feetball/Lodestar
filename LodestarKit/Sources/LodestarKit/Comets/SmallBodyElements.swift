@@ -34,7 +34,7 @@ public enum OrbitShape: String, CaseIterable, Codable, Hashable, Sendable {
 /// `fromMeanAnomaly`. Times are Julian Days in Terrestrial Time (TT; the difference to the TDB of JPL is below 2 ms).
 ///
 /// Instances come from the failable initializer or `fromMeanAnomaly`, which return `nil` for values out of range.
-public struct OrbitalElements: Hashable, Sendable {
+public struct SmallBodyElements: Hashable, Sendable {
     /// Perihelion distance q in AU, 0.00001 to 1000.
     public let perihelionDistanceAU: Double
     /// Eccentricity e, 0 to 100 (`< 1` elliptic, `== 1` parabolic, `> 1` hyperbolic).
@@ -92,12 +92,12 @@ public struct OrbitalElements: Hashable, Sendable {
     /// - Parameter meanAnomaly: Mean anomaly at `epochJulianDayTT` in degrees (any finite value).
     public static func fromMeanAnomaly(semiMajorAxisAU: Double, eccentricity: Double, inclination: Double,
                                        argumentOfPerihelion: Double, longitudeOfAscendingNode: Double,
-                                       meanAnomaly: Double, epochJulianDayTT: Double) -> OrbitalElements? {
+                                       meanAnomaly: Double, epochJulianDayTT: Double) -> SmallBodyElements? {
         guard eccentricity >= 0, eccentricity < 1 else { return nil }
         guard semiMajorAxisAU > 0, semiMajorAxisAU.isFinite, meanAnomaly.isFinite else { return nil }
         let motion = AstroMath.degrees(OrbitPropagator.gaussianGravitationalConstant / (semiMajorAxisAU * semiMajorAxisAU.squareRoot()))
         let signedAnomaly = AstroMath.normalizeSignedDegrees(meanAnomaly)
-        return OrbitalElements(
+        return SmallBodyElements(
             perihelionDistanceAU: semiMajorAxisAU * (1 - eccentricity), eccentricity: eccentricity,
             inclination: inclination, argumentOfPerihelion: argumentOfPerihelion,
             longitudeOfAscendingNode: longitudeOfAscendingNode,

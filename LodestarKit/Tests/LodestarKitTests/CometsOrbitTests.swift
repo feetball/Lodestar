@@ -4,13 +4,13 @@ import XCTest
 /// Orbital elements and two-body propagation of comets and asteroids.
 final class CometsOrbitTests: XCTestCase {
     private func elements(q: Double = 1.0, e: Double = 0.5, i: Double = 0.0, w: Double = 0.0, node: Double = 0.0,
-                          t: Double = 2_460_000.0, epoch: Double? = nil) throws -> OrbitalElements {
-        try XCTUnwrap(OrbitalElements(perihelionDistanceAU: q, eccentricity: e, inclination: i, argumentOfPerihelion: w,
+                          t: Double = 2_460_000.0, epoch: Double? = nil) throws -> SmallBodyElements {
+        try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: q, eccentricity: e, inclination: i, argumentOfPerihelion: w,
                                       longitudeOfAscendingNode: node, perihelionJulianDayTT: t, epochJulianDayTT: epoch))
     }
 
-    private func create(_ q: Double, _ e: Double, _ i: Double, _ w: Double, _ node: Double, _ t: Double, _ epoch: Double? = nil) -> OrbitalElements? {
-        OrbitalElements(perihelionDistanceAU: q, eccentricity: e, inclination: i, argumentOfPerihelion: w,
+    private func create(_ q: Double, _ e: Double, _ i: Double, _ w: Double, _ node: Double, _ t: Double, _ epoch: Double? = nil) -> SmallBodyElements? {
+        SmallBodyElements(perihelionDistanceAU: q, eccentricity: e, inclination: i, argumentOfPerihelion: w,
                         longitudeOfAscendingNode: node, perihelionJulianDayTT: t, epochJulianDayTT: epoch)
     }
 
@@ -103,7 +103,7 @@ final class CometsOrbitTests: XCTestCase {
 
     func testMeanAnomalyConstructorRecoversTheAnomalyAtTheEpoch() throws {
         // Vesta (MPC): epoch 2026 June 9, M = 81.19019 degrees, a = 2.3613660 AU, e = 0.0902037.
-        let orbit = try XCTUnwrap(OrbitalElements.fromMeanAnomaly(
+        let orbit = try XCTUnwrap(SmallBodyElements.fromMeanAnomaly(
             semiMajorAxisAU: 2.361_366, eccentricity: 0.090_203_7, inclination: 7.143_93, argumentOfPerihelion: 151.468_56,
             longitudeOfAscendingNode: 103.701_35, meanAnomaly: 81.190_19, epochJulianDayTT: 2_461_200.5))
         XCTAssertEqual(try XCTUnwrap(orbit.meanAnomaly(at: 2_461_200.5)), 81.190_19, accuracy: 1e-9)
@@ -114,8 +114,8 @@ final class CometsOrbitTests: XCTestCase {
     }
 
     func testMeanAnomalyConstructorReducesTheAnomaly() throws {
-        func make(_ anomaly: Double) throws -> OrbitalElements {
-            try XCTUnwrap(OrbitalElements.fromMeanAnomaly(
+        func make(_ anomaly: Double) throws -> SmallBodyElements {
+            try XCTUnwrap(SmallBodyElements.fromMeanAnomaly(
                 semiMajorAxisAU: 2.0, eccentricity: 0.1, inclination: 5.0, argumentOfPerihelion: 10.0,
                 longitudeOfAscendingNode: 20.0, meanAnomaly: anomaly, epochJulianDayTT: 2_460_000.5))
         }
@@ -127,8 +127,8 @@ final class CometsOrbitTests: XCTestCase {
     }
 
     func testMeanAnomalyConstructorRejectsInvalidInput() {
-        func make(_ a: Double, _ e: Double, _ i: Double, _ m: Double, _ epoch: Double) -> OrbitalElements? {
-            OrbitalElements.fromMeanAnomaly(semiMajorAxisAU: a, eccentricity: e, inclination: i, argumentOfPerihelion: 10.0,
+        func make(_ a: Double, _ e: Double, _ i: Double, _ m: Double, _ epoch: Double) -> SmallBodyElements? {
+            SmallBodyElements.fromMeanAnomaly(semiMajorAxisAU: a, eccentricity: e, inclination: i, argumentOfPerihelion: 10.0,
                                             longitudeOfAscendingNode: 20.0, meanAnomaly: m, epochJulianDayTT: epoch)
         }
         XCTAssertNil(make(2.0, 1.0, 5.0, 40.0, 2_460_000.5))

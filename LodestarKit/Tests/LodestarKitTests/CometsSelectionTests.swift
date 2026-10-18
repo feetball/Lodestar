@@ -96,7 +96,7 @@ final class CometsSelectionTests: XCTestCase {
     func testPeakBetweenSamplesIsRefined() throws {
         // C/2023 A3 brightened towards the Sun in early October 2024; with daily samples the peak falls between two of them.
         let item = CometsHorizonsData.c2023a3
-        let orbit = try XCTUnwrap(OrbitalElements(
+        let orbit = try XCTUnwrap(SmallBodyElements(
             perihelionDistanceAU: item.perihelionDistance, eccentricity: item.eccentricity, inclination: item.inclination,
             argumentOfPerihelion: item.argumentOfPerihelion, longitudeOfAscendingNode: item.ascendingNode,
             perihelionJulianDayTT: item.perihelionTimeTDB, epochJulianDayTT: item.epochTDB))
@@ -162,7 +162,7 @@ final class CometsSelectionTests: XCTestCase {
     }
 
     func testPrefilterBoundForSpecialOrbits() throws {
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 0.5, eccentricity: 1.0, inclination: 20.0, argumentOfPerihelion: 30.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 0.5, eccentricity: 1.0, inclination: 20.0, argumentOfPerihelion: 30.0,
                                                   longitudeOfAscendingNode: 40.0, perihelionJulianDayTT: 2_461_340.0))
         let photometry = SmallBodyPhotometry.comet(try XCTUnwrap(CometMagnitudes(totalMagnitude: 8.0, totalSlope: 10.0)))
         let parabolic = try XCTUnwrap(SmallBody(designation: "P", kind: .comet, orbit: orbit, photometry: photometry))
@@ -187,7 +187,7 @@ final class CometsSelectionTests: XCTestCase {
         XCTAssertEqual(SmallBodySelection.brightestPossible(for: parabolic, startTT: 2_461_340.0 + 60_000.0, endTT: 2_461_340.0 + 60_010.0), -Double.infinity)
         XCTAssertEqual(SmallBodySelection.brightestPossible(for: parabolic, startTT: 2_461_340.0, endTT: 2_461_340.0 + 60_000.0), -Double.infinity)
         // An elliptic orbit that completes several revolutions in the window passes perihelion and aphelion.
-        let short = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 1.0, eccentricity: 0.1, inclination: 5.0, argumentOfPerihelion: 0.0,
+        let short = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 1.0, eccentricity: 0.1, inclination: 5.0, argumentOfPerihelion: 0.0,
                                                   longitudeOfAscendingNode: 0.0, perihelionJulianDayTT: 2_461_000.0)) // period 1.2 years
         let asteroid = try XCTUnwrap(SmallBody(designation: "A", kind: .asteroid, orbit: short,
                                                photometry: .asteroid(try XCTUnwrap(AsteroidMagnitudes(absoluteMagnitude: 10.0, slopeParameter: 0.15)))))
@@ -285,7 +285,7 @@ final class CometsSelectionTests: XCTestCase {
         // A negative elongation limit is clamped to 0.
         XCTAssertFalse(SmallBodySelection.brightNow(in: bodies, at: now, magnitudeLimit: 30.0, minimumElongation: -50.0).isEmpty)
         // Records without photometry are skipped.
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 0.3, eccentricity: 1.0, inclination: 20.0, argumentOfPerihelion: 30.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 0.3, eccentricity: 1.0, inclination: 20.0, argumentOfPerihelion: 30.0,
                                                   longitudeOfAscendingNode: 40.0, perihelionJulianDayTT: 2_461_330.0))
         let bare = try XCTUnwrap(SmallBody(designation: "B", kind: .comet, orbit: orbit))
         XCTAssertEqual(SmallBodySelection.brightNow(in: [bare], at: now, magnitudeLimit: 99.0), [])
@@ -326,7 +326,7 @@ final class CometsSelectionTests: XCTestCase {
 
     func testCompareIdentifiersUsesScalarOrder() throws {
         // Equal magnitudes are ordered by identifier; identifiers are compared scalar by scalar.
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 2.0, eccentricity: 0.1, inclination: 5.0, argumentOfPerihelion: 10.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 2.0, eccentricity: 0.1, inclination: 5.0, argumentOfPerihelion: 10.0,
                                                   longitudeOfAscendingNode: 20.0, perihelionJulianDayTT: 2_461_330.0))
         let photometry = SmallBodyPhotometry.comet(try XCTUnwrap(CometMagnitudes(totalMagnitude: 5.0, totalSlope: 10.0)))
         let bodies = try ["C/B", "C/A", "C/AA", "C/\u{00E9}"].map { try XCTUnwrap(SmallBody(designation: $0, kind: .comet, orbit: orbit, photometry: photometry)) }

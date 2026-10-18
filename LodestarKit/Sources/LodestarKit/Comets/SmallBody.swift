@@ -16,7 +16,7 @@ public struct SmallBody: Hashable, Sendable {
     /// The periodic-comet number (12 for 12P) or the asteroid number, if it has one.
     public let number: Int?
     /// The heliocentric orbit.
-    public let orbit: OrbitalElements
+    public let orbit: SmallBodyElements
     /// How to compute the magnitude; `nil` when the source gave no magnitude parameters.
     public let photometry: SmallBodyPhotometry?
 
@@ -26,7 +26,7 @@ public struct SmallBody: Hashable, Sendable {
     /// Creates a body, or returns `nil` if `designation` is empty after trimming, a text is longer than
     /// `maximumTextLength` characters or contains control characters, or `number` is not in 1…99 999 999.
     /// Surrounding spaces of the texts are removed. The identifier is built from `kind` and `designation`.
-    public init?(designation: String, name: String = "", kind: SmallBodyKind, number: Int? = nil, orbit: OrbitalElements,
+    public init?(designation: String, name: String = "", kind: SmallBodyKind, number: Int? = nil, orbit: SmallBodyElements,
                  photometry: SmallBodyPhotometry? = nil) {
         guard let cleanDesignation = Self.cleaned(designation), let cleanName = Self.cleaned(name) else { return nil }
         guard !cleanDesignation.isEmpty else { return nil }

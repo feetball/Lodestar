@@ -51,7 +51,7 @@ public enum MinorPlanetElementsParser {
             throw SmallBodyParseError.inconsistentElements(
                 reason: "the mean motion \(meanMotion) and the semi-major axis \(semiMajorAxis) disagree")
         }
-        guard let orbit = OrbitalElements.fromMeanAnomaly(
+        guard let orbit = SmallBodyElements.fromMeanAnomaly(
             semiMajorAxisAU: semiMajorAxis, eccentricity: eccentricity, inclination: inclination,
             argumentOfPerihelion: argumentOfPerihelion, longitudeOfAscendingNode: ascendingNode,
             meanAnomaly: meanAnomaly, epochJulianDayTT: epoch) else {

@@ -13,7 +13,7 @@ import XCTest
 /// elements that are decades old are not.
 final class CometsEphemerisTests: XCTestCase {
     private func body(_ item: CometsHorizonsData.Case) throws -> SmallBody {
-        let orbit = try XCTUnwrap(OrbitalElements(
+        let orbit = try XCTUnwrap(SmallBodyElements(
             perihelionDistanceAU: item.perihelionDistance, eccentricity: item.eccentricity, inclination: item.inclination,
             argumentOfPerihelion: item.argumentOfPerihelion, longitudeOfAscendingNode: item.ascendingNode,
             perihelionJulianDayTT: item.perihelionTimeTDB, epochJulianDayTT: item.epochTDB))
@@ -467,7 +467,7 @@ final class CometsEphemerisTests: XCTestCase {
         XCTAssertEqual(SmallBodyEphemeris.defaultMagnitudeLimit, 10.0)
         XCTAssertEqual(SmallBodyEphemeris.defaultMinimumElongation, 25.0)
         // A body without photometry is never photographable.
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 10.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 10.0,
                                                   argumentOfPerihelion: 20.0, longitudeOfAscendingNode: 30.0,
                                                   perihelionJulianDayTT: item.perihelionTimeTDB))
         let bare = try XCTUnwrap(SmallBody(designation: "X", kind: .comet, orbit: orbit))
@@ -521,7 +521,7 @@ final class CometsEphemerisTests: XCTestCase {
     /// A synthetic state 1e6 AU away in the horizontal direction `h` (ENU), whose tail points along `tail` (ENU) for `frame`.
     private func syntheticState(_ frame: SkyFrame, _ h: Vector3, _ tail: Vector3) throws -> SmallBodyState {
         let toJ2000 = frame.j2000ToHorizontal.transposed
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 10.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 10.0,
                                                   argumentOfPerihelion: 20.0, longitudeOfAscendingNode: 30.0,
                                                   perihelionJulianDayTT: 2_460_000.0))
         let body = try XCTUnwrap(SmallBody(designation: "S", kind: .comet, orbit: orbit))

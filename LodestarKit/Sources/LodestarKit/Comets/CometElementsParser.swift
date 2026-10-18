@@ -58,8 +58,8 @@ public enum CometElementsParser {
         let perihelionTime = RecordFields.julianDay(year: year, month: month, day: 1) + (day - 1.0)
 
         // Orbit.
-        let perihelionDistance = try decimalField(columns, 31, 39, .perihelionDistance, 0.0, OrbitalElements.maximumPerihelionDistanceAU)
-        let eccentricity = try decimalField(columns, 42, 49, .eccentricity, 0.0, OrbitalElements.maximumEccentricity)
+        let perihelionDistance = try decimalField(columns, 31, 39, .perihelionDistance, 0.0, SmallBodyElements.maximumPerihelionDistanceAU)
+        let eccentricity = try decimalField(columns, 42, 49, .eccentricity, 0.0, SmallBodyElements.maximumEccentricity)
         let argumentOfPerihelion = try decimalField(columns, 52, 59, .argumentOfPerihelion, 0.0, 360.0)
         let ascendingNode = try decimalField(columns, 62, 69, .longitudeOfAscendingNode, 0.0, 360.0)
         let inclination = try decimalField(columns, 72, 79, .inclination, 0.0, 180.0)
@@ -81,7 +81,7 @@ public enum CometElementsParser {
             epoch = RecordFields.julianDay(year: epochYear, month: epochMonth, day: epochDay)
         }
 
-        guard let orbit = OrbitalElements(
+        guard let orbit = SmallBodyElements(
             perihelionDistanceAU: perihelionDistance, eccentricity: eccentricity, inclination: inclination,
             argumentOfPerihelion: argumentOfPerihelion, longitudeOfAscendingNode: ascendingNode,
             perihelionJulianDayTT: perihelionTime, epochJulianDayTT: epoch) else {

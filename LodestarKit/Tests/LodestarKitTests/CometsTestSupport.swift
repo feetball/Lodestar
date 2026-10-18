@@ -35,7 +35,7 @@ final class SyntheticOrbits {
                 let axis = next(1.0, 4.5)
                 let eccentricity = next(0.0, 0.6)
                 let anomaly = next(0.0, 360.0)
-                let orbit = OrbitalElements.fromMeanAnomaly(
+                let orbit = SmallBodyElements.fromMeanAnomaly(
                     semiMajorAxisAU: axis, eccentricity: eccentricity, inclination: inclination.truncatingRemainder(dividingBy: 40),
                     argumentOfPerihelion: argument, longitudeOfAscendingNode: node, meanAnomaly: anomaly, epochJulianDayTT: 2_461_200.5)
                 let magnitudes = AsteroidMagnitudes(absoluteMagnitude: next(3.0, 15.0), slopeParameter: 0.15)
@@ -49,7 +49,7 @@ final class SyntheticOrbits {
                 let perihelion = exp(next(log(0.1), log(6.0)))
                 let eccentricity = shape < 0.55 ? next(0.3, 0.999) : (shape < 0.65 ? 1.0 : next(1.0, 1.02))
                 let time = 2_461_300.0 + next(-1_100.0, 1_100.0)
-                let orbit = OrbitalElements(perihelionDistanceAU: perihelion, eccentricity: eccentricity, inclination: inclination,
+                let orbit = SmallBodyElements(perihelionDistanceAU: perihelion, eccentricity: eccentricity, inclination: inclination,
                                             argumentOfPerihelion: argument, longitudeOfAscendingNode: node,
                                             perihelionJulianDayTT: time, epochJulianDayTT: 2_461_330.5)
                 let magnitudes = CometMagnitudes(totalMagnitude: next(4.0, 16.0), totalSlope: next(5.0, 20.0))

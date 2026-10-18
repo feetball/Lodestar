@@ -76,7 +76,7 @@ public enum SmallBodyEphemeris {
         geometry(of: body.orbit, earth: EarthReference(julianDate: julianDate))?.apparent
     }
 
-    static func geometry(of orbit: OrbitalElements, earth: EarthReference) -> Geometry? {
+    static func geometry(of orbit: SmallBodyElements, earth: EarthReference) -> Geometry? {
         // Light-time: the body is seen where it was `lightTime` ago, the Earth where it is now.
         var lightTime = 0.0
         var position = Vector3.zero

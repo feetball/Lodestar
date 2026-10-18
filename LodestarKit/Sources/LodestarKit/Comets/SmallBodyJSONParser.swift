@@ -86,7 +86,7 @@ public enum SmallBodyJSONParser {
             throw SmallBodyParseError.unsupportedObject(reason: "the orbit has no elements")
         }
         let elements = namedValues(elementArray)
-        guard let eccentricity = try numericValue(elements["e"], .eccentricity, 0.0, OrbitalElements.maximumEccentricity) else {
+        guard let eccentricity = try numericValue(elements["e"], .eccentricity, 0.0, SmallBodyElements.maximumEccentricity) else {
             throw SmallBodyParseError.missingField(.eccentricity)
         }
         guard let inclination = try numericValue(elements["i"], .inclination, 0.0, 180.0) else {
@@ -98,16 +98,16 @@ public enum SmallBodyJSONParser {
         guard let argument = try numericValue(elements["w"], .argumentOfPerihelion, 0.0, 360.0) else {
             throw SmallBodyParseError.missingField(.argumentOfPerihelion)
         }
-        let epoch = try numericValue(orbitObject["epoch"], .epoch, OrbitalElements.minimumJulianDay, OrbitalElements.maximumJulianDay)
+        let epoch = try numericValue(orbitObject["epoch"], .epoch, SmallBodyElements.minimumJulianDay, SmallBodyElements.maximumJulianDay)
         let semiMajorAxis = try numericValue(elements["a"], .semiMajorAxis, -1e12, 1e12)
-        let perihelionDistance = try numericValue(elements["q"], .perihelionDistance, 0.0, OrbitalElements.maximumPerihelionDistanceAU)
-        let perihelionTime = try numericValue(elements["tp"], .perihelionTime, OrbitalElements.minimumJulianDay, OrbitalElements.maximumJulianDay)
-        let orbit: OrbitalElements
+        let perihelionDistance = try numericValue(elements["q"], .perihelionDistance, 0.0, SmallBodyElements.maximumPerihelionDistanceAU)
+        let perihelionTime = try numericValue(elements["tp"], .perihelionTime, SmallBodyElements.minimumJulianDay, SmallBodyElements.maximumJulianDay)
+        let orbit: SmallBodyElements
         if let perihelionTime {
             var q = perihelionDistance
             if q == nil, let semiMajorAxis, eccentricity < 1, semiMajorAxis > 0 { q = semiMajorAxis * (1 - eccentricity) }
             guard let q else { throw SmallBodyParseError.missingField(.perihelionDistance) }
-            guard let made = OrbitalElements(
+            guard let made = SmallBodyElements(
                 perihelionDistanceAU: q, eccentricity: eccentricity, inclination: inclination, argumentOfPerihelion: argument,
                 longitudeOfAscendingNode: node, perihelionJulianDayTT: perihelionTime, epochJulianDayTT: epoch) else {
                 throw SmallBodyParseError.inconsistentElements(reason: "the elements do not describe an orbit")
@@ -121,7 +121,7 @@ public enum SmallBodyJSONParser {
             if axis == nil, let perihelionDistance, eccentricity < 1 { axis = perihelionDistance / (1 - eccentricity) }
             guard let a = axis else { throw SmallBodyParseError.missingField(.semiMajorAxis) }
             guard let epoch else { throw SmallBodyParseError.missingField(.epoch) }
-            guard let made = OrbitalElements.fromMeanAnomaly(
+            guard let made = SmallBodyElements.fromMeanAnomaly(
                 semiMajorAxisAU: a, eccentricity: eccentricity, inclination: inclination, argumentOfPerihelion: argument,
                 longitudeOfAscendingNode: node, meanAnomaly: anomaly, epochJulianDayTT: epoch) else {
                 throw SmallBodyParseError.inconsistentElements(reason: "the elements do not describe an elliptic orbit")

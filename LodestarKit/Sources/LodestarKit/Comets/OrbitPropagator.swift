@@ -1,6 +1,6 @@
 import Foundation
 
-/// Two-body heliocentric motion of a small body from `OrbitalElements`, for every eccentricity.
+/// Two-body heliocentric motion of a small body from `SmallBodyElements`, for every eccentricity.
 ///
 /// Kepler's equation is solved in universal variables (Stumpff functions; Bate, Mueller & White, *Fundamentals of
 /// Astrodynamics*, §4.4; Vallado 2013, §2.3), starting at perihelion: with `χ` the universal anomaly, `α = (1 − e)/q`
@@ -36,7 +36,7 @@ public enum OrbitPropagator {
 
     /// The heliocentric position in AU at `julianDayTT` in the mean ecliptic and equinox of J2000.0, or `nil`
     /// if the date is not finite or too far from perihelion for an unbound orbit.
-    public static func heliocentricEcliptic(of elements: OrbitalElements, at julianDayTT: Double) -> Vector3? {
+    public static func heliocentricEcliptic(of elements: SmallBodyElements, at julianDayTT: Double) -> Vector3? {
         guard let perifocal = perifocal(q: elements.perihelionDistanceAU, e: elements.eccentricity,
                                         days: julianDayTT - elements.perihelionJulianDayTT) else { return nil }
         let cosI = AstroMath.cosDeg(elements.inclination)
@@ -59,12 +59,12 @@ public enum OrbitPropagator {
 
     /// The heliocentric position in AU at `julianDayTT` in the mean equatorial frame of J2000.0 (the frame of
     /// `BodyState.geocentricJ2000`), or `nil` as for `heliocentricEcliptic(of:at:)`.
-    public static func heliocentricJ2000(of elements: OrbitalElements, at julianDayTT: Double) -> Vector3? {
+    public static func heliocentricJ2000(of elements: SmallBodyElements, at julianDayTT: Double) -> Vector3? {
         heliocentricEcliptic(of: elements, at: julianDayTT).map { eclipticToEquatorialJ2000 * $0 }
     }
 
     /// The distance from the Sun in AU at `julianDayTT`; `nil` as for `heliocentricEcliptic(of:at:)`. Cheaper than the position.
-    public static func heliocentricDistance(of elements: OrbitalElements, at julianDayTT: Double) -> Double? {
+    public static func heliocentricDistance(of elements: SmallBodyElements, at julianDayTT: Double) -> Double? {
         perifocal(q: elements.perihelionDistanceAU, e: elements.eccentricity,
                   days: julianDayTT - elements.perihelionJulianDayTT)?.r
     }

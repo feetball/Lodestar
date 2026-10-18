@@ -653,7 +653,7 @@ final class CometsParsingTests: XCTestCase {
     // MARK: SmallBody
 
     func testSmallBodyCreationValidatesText() throws {
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 0.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 0.0,
                                                   argumentOfPerihelion: 0.0, longitudeOfAscendingNode: 0.0,
                                                   perihelionJulianDayTT: 2_460_000.0))
         func make(_ designation: String, _ name: String = "", number: Int? = nil) -> SmallBody? {
@@ -678,7 +678,7 @@ final class CometsParsingTests: XCTestCase {
     }
 
     func testTitlesFollowAstronomicalConvention() throws {
-        let orbit = try XCTUnwrap(OrbitalElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 0.0,
+        let orbit = try XCTUnwrap(SmallBodyElements(perihelionDistanceAU: 1.0, eccentricity: 0.5, inclination: 0.0,
                                                   argumentOfPerihelion: 0.0, longitudeOfAscendingNode: 0.0,
                                                   perihelionJulianDayTT: 2_460_000.0))
         func make(_ designation: String, _ name: String, _ kind: SmallBodyKind, _ number: Int?) throws -> SmallBody {
