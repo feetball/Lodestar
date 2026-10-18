@@ -1,121 +1,108 @@
 import SwiftUI
 import LodestarKit
 
-/// The sections of the time-lapse plan: the shots, the playback, the pictures and the numbers that follow.
+/// The sections of the time-lapse plan: timing, playback, camera and storage, and the plan.
 struct ToolsTimeLapseSections: View {
-    @Environment(\.palette) private var palette
     @Binding var inputs: ToolsLapseInputs
 
     var body: some View {
-        let result = Result { try TimeLapsePlanner.plan(
-            interval: inputs.interval, exposure: inputs.exposure, frameRate: inputs.frameRate, target: inputs.target,
-            frameSizeMegabytes: inputs.pictureMegabytes, minimumGapSeconds: inputs.writeSeconds) }
-        shotSection
+        timingSection
         playbackSection
-        pictureSection
-        resultSection(result)
+        storageSection
+        planSection
     }
 
     // MARK: Inputs
 
-    private var shotSection: some View {
+    private var timingSection: some View {
         SettingsSection(
-            title: "Shots",
-            footer: "The interval runs from the start of one exposure to the start of the next. What is left after "
-                + "the exposure is the gap: the time the camera needs to write the picture and be ready again. If the "
-                + "gap is too short, the camera skips frames.") {
+            title: "Timing",
+            footer: "The interval is the time from the start of one picture to the start of the next. What is left "
+                + "after the exposure is the time the camera has to save the picture.") {
             SettingsNumberField(title: "Interval", unit: "s", value: $inputs.interval,
                                 range: 0.1...TimeLapsePlanner.maximumIntervalSeconds, fractionDigits: 1)
             SettingsNumberField(title: "Exposure", unit: "s", value: $inputs.exposure,
                                 range: 0.1...TimeLapsePlanner.maximumIntervalSeconds, fractionDigits: 1)
-            SettingsNumberField(title: "Camera write time", unit: "s", value: $inputs.writeSeconds,
-                                range: 0...TimeLapsePlanner.maximumMinimumGapSeconds, fractionDigits: 1)
+            InfoRow(label: "Gap between pictures",
+                    value: ToolsPlannerText.seconds(inputs.interval - inputs.exposure))
         }
     }
 
     private var playbackSection: some View {
-        SettingsSection(title: "Clip") {
-            SettingsNumberField(title: "Playback", unit: "fps", value: $inputs.frameRate,
-                                range: 1...TimeLapsePlanner.maximumFrameRate, fractionDigits: 2)
-            Picker("Plan for", selection: $inputs.goal) {
-                ForEach(ToolsLapseInputs.Goal.allCases) { goal in
-                    Text(goal.title).tag(goal)
+        SettingsSection(
+            title: "Playback",
+            footer: "Give the length of the finished clip, the time you will shoot, or the number of pictures; the "
+                + "other two follow.") {
+            SettingsNumberField(title: "Frame rate", unit: "fps", value: $inputs.frameRate,
+                                range: 1...TimeLapsePlanner.maximumFrameRate, fractionDigits: 0)
+            Picker("What the length is given by", selection: $inputs.basis) {
+                ForEach(ToolsLapseInputs.Basis.allCases) { basis in
+                    Text(basis.title).tag(basis)
                 }
             }
             .pickerStyle(.segmented)
-            switch inputs.goal {
+            switch inputs.basis {
             case .clipLength:
                 SettingsNumberField(title: "Clip length", unit: "s", value: $inputs.clipSeconds,
-                                    range: 0.1...3600, fractionDigits: 1)
+                                    range: 0.1...86_400, fractionDigits: 1)
             case .shootingTime:
                 SettingsNumberField(title: "Shooting time", unit: "min", value: $inputs.shootingMinutes,
-                                    range: 1...6000, fractionDigits: 0)
-            case .frameCount:
-                SettingsNumberField(title: "Frames", value: $inputs.frames,
+                                    range: 0.1...14_400, fractionDigits: 1)
+            case .frames:
+                SettingsNumberField(title: "Pictures", value: $inputs.frameCount,
                                     range: 1...Double(TimeLapsePlanner.maximumFrameCount), fractionDigits: 0)
             }
         }
     }
 
-    private var pictureSection: some View {
+    private var storageSection: some View {
         SettingsSection(
-            title: "Pictures",
-            footer: "The size of one picture, for the storage estimate. A raw file from a high-resolution camera is "
-                + "often 25 MB or more.") {
-            SettingsNumberField(title: "Picture size", unit: "MB", optionalValue: $inputs.pictureMegabytes,
-                                range: 0.1...TimeLapsePlanner.maximumFrameSizeMegabytes, fractionDigits: 1,
-                                placeholder: "Optional")
+            title: "Camera & Storage",
+            footer: "A raw picture from a 24 MP camera is about 25 MB, from a 45 MP camera about 50 MB. Leave the "
+                + "size empty if you do not need the storage.") {
+            SettingsNumberField(title: "Size of a picture", unit: "MB", optionalValue: $inputs.pictureMegabytes,
+                                range: 0.1...TimeLapsePlanner.maximumFrameSizeMegabytes, fractionDigits: 1)
+            SettingsNumberField(title: "Time to save a picture", unit: "s", value: $inputs.writeSeconds,
+                                range: 0...TimeLapsePlanner.maximumMinimumGapSeconds, fractionDigits: 1)
         }
     }
 
     // MARK: Results
 
-    @ViewBuilder
-    private func resultSection(_ result: Result<TimeLapsePlan, Error>) -> some View {
-        switch result {
-        case .success(let plan):
-            planSection(plan)
-        case .failure(let error):
-            SettingsSection(title: "Time-Lapse") {
-                ToolsProblemRow(message: ToolsPlannerText.message(forLapse: error))
-                if let timeLapseError = error as? TimeLapseError,
-                   case .gapTooShort(_, _, let minimumInterval) = timeLapseError {
-                    SettingsCaption("Use an interval of at least \(ToolsPlannerText.seconds(minimumInterval)): the "
-                                    + "exposure plus the camera\u{2019}s write time. Or shorten the exposure.")
-                    Button {
-                        inputs.interval = minimumInterval
-                    } label: {
-                        Label("Use \(ToolsPlannerText.seconds(minimumInterval)) Interval", systemImage: "timer")
+    private var planSection: some View {
+        let result = Result { try TimeLapsePlanner.plan(
+            interval: inputs.interval, exposure: inputs.exposure, frameRate: inputs.frameRate, target: inputs.target,
+            frameSizeMegabytes: inputs.pictureMegabytes, minimumGapSeconds: inputs.writeSeconds) }
+        return SettingsSection(title: "Time-Lapse") {
+            switch result {
+            case .success(let plan):
+                ToolsHeadline(
+                    title: "\(ToolsPlannerText.count(plan.frameCount)) pictures",
+                    subtitle: "one every \(ToolsPlannerText.seconds(plan.interval)), each "
+                        + "\(ToolsPlannerText.seconds(plan.exposure)) long")
+                InfoRow(label: "Shooting time", value: AngleFormatter.formatDuration(seconds: plan.shootingTime))
+                InfoRow(label: "Clip length",
+                        value: "\(AngleFormatter.formatDuration(seconds: plan.clipLength)) at "
+                            + "\(plan.frameRate.formatted(.number.precision(.fractionLength(0...1)))) fps")
+                InfoRow(label: "Speed-up",
+                        value: "\(plan.speedUp.formatted(.number.precision(.fractionLength(0...1))))\u{00D7}")
+                InfoRow(label: "Gap between pictures", value: ToolsPlannerText.seconds(plan.gap, maximumDigits: 2))
+                if let megabytes = plan.storageMegabytes {
+                    InfoRow(label: "Storage", value: ToolsPlannerText.storage(megabytes: megabytes))
+                } else {
+                    SettingsCaption("Enter the size of a picture to see how much storage the pictures need.")
+                }
+                InfoRow(label: "Battery", value: ToolsPlannerText.battery(plan.batteryDemand))
+                SettingsCaption(plan.batteryNote)
+            case .failure(let error):
+                let failure = ToolsPlannerText.failure(for: error)
+                ToolsProblemRow(message: failure.message)
+                if let interval = failure.suggestedInterval {
+                    Button("Use an interval of \(ToolsPlannerText.seconds(interval, maximumDigits: 2))") {
+                        inputs.interval = min(interval, TimeLapsePlanner.maximumIntervalSeconds)
                     }
                 }
             }
-        }
-    }
-
-    private func planSection(_ plan: TimeLapsePlan) -> some View {
-        SettingsSection(title: "Time-Lapse") {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(ToolsPlannerText.count(plan.frameCount)) \(plan.frameCount == 1 ? "frame" : "frames")")
-                    .font(.largeTitle.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(palette.accent)
-                Text("Every \(ToolsPlannerText.seconds(plan.interval)), \(ToolsPlannerText.seconds(plan.exposure)) "
-                     + "exposures")
-                    .font(.footnote)
-                    .foregroundStyle(palette.secondaryText)
-            }
-            .accessibilityElement(children: .combine)
-            InfoRow(label: "Shooting time", value: AngleFormatter.formatDuration(seconds: plan.shootingTime))
-            InfoRow(label: "Clip length", value: AngleFormatter.formatDuration(seconds: plan.clipLength))
-            InfoRow(label: "Playback speed",
-                    value: "\u{00D7}\(plan.speedUp.formatted(.number.precision(.fractionLength(0...1)))) real time")
-            InfoRow(label: "Gap between exposures", value: ToolsPlannerText.seconds(plan.gap))
-            if let megabytes = plan.storageMegabytes {
-                InfoRow(label: "Storage", value: ToolsPlannerText.storage(megabytes: megabytes))
-            } else {
-                InfoRow(label: "Storage", value: AppFormat.missing)
-            }
-            SettingsCaption(plan.batteryNote)
         }
     }
 }

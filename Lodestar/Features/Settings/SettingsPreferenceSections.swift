@@ -35,8 +35,9 @@ struct SettingsSkyDisplaySection: View {
             Toggle("Constellation lines", isOn: $store.settings.showConstellationLines)
             Toggle("Constellation names", isOn: $store.settings.showConstellationNames)
             Toggle("Deep-sky objects", isOn: $store.settings.showDeepSkyObjects)
-            SettingsDeepSkyDetailRow(level: $store.settings.deepSkyProminence,
-                                     isEnabled: store.settings.showDeepSkyObjects)
+            if store.settings.showDeepSkyObjects {
+                SettingsDeepSkyDetailRow(level: $store.settings.deepSkyProminence)
+            }
             Toggle("Milky Way", isOn: $store.settings.showMilkyWay)
             VStack(alignment: .leading, spacing: 4) {
                 SettingsSliderRow(title: "Faintest stars",
@@ -69,25 +70,17 @@ private struct SettingsDeepSkyDetailRow: View {
         SettingsMenuOption(title: "Everything", value: 4),
     ]
 
+    private static let caption = "Which deep-sky objects the Aim screen and the sky chart draw. Showpieces: the 250 or "
+        + "so best known, such as the Messier and Caldwell objects. Prominent: about 490, adding other bright or "
+        + "large ones. Notable: about 1,000. Everything: about 2,400, including more than a thousand faint objects "
+        + "and dark nebulae, which crowds the sky."
+
     @Binding var level: Int
-    /// Whether deep-sky objects are drawn at all; the level has no effect while they are not.
-    let isEnabled: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             SettingsMenuPicker(title: "Deep-sky detail", selection: $level, options: Self.options)
-            SettingsCaption(caption)
-        }
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.4)
-    }
-
-    private var caption: String {
-        switch level {
-        case 1: return "Only the Messier and Caldwell objects and the best-known named targets."
-        case 2: return "Adds bright or well-known objects and the larger nebulae."
-        case 3: return "Adds everything else bright, large or named enough to be worth a place in a list."
-        default: return "Adds the faint, small and obscure objects. A wide sky gets crowded."
+            SettingsCaption(Self.caption)
         }
     }
 }

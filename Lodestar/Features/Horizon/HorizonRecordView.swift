@@ -10,25 +10,37 @@ import LodestarKit
 struct HorizonRecordView: View {
     /// Fewest seconds between two spoken hints.
     private static let announcementInterval: TimeInterval = 3
+    /// Further from the site than this, the compass is corrected for the declination of the wrong place.
+    private static let nearSiteMetres = 100_000.0
+    /// The share of the screen height the top panel may take before it scrolls.
+    private static let panelHeightShare = 0.45
+
+    /// Done was tapped before the circle was complete.
+    private struct Incomplete: Equatable {
+        var coverage: Double
+        var gaps: [AzimuthRange]
+    }
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     private let site: SavedSite
     @State private var model: HorizonRecordingModel
-    @State private var showsCamera: Bool
     @State private var isConfirmingCancel = false
-    @State private var isConfirmingStartOver = false
-    @State private var isConfirmingGaps = false
+    @State private var incomplete: Incomplete?
     @State private var lastAnnouncement = Date.distantPast
 
     init(site: SavedSite, app: AppModel) {
         self.site = site
         _model = State(initialValue: HorizonRecordingModel(app: app, base: site.horizon))
+    }
+
+    /// Whether the camera picture is wanted behind the crosshair: the Aim screen's preferences, night mode included.
+    private var isCameraWanted: Bool {
         let settings = app.settings
-        _showsCamera = State(initialValue: settings.cameraPreviewEnabled
-                             && (!app.isNightModeActive || settings.cameraPreviewAtNight))
+        return settings.cameraPreviewEnabled && (!palette.isNight || settings.cameraPreviewAtNight)
     }
 
     var body: some View {
@@ -36,23 +48,20 @@ struct HorizonRecordView: View {
         ZStack {
             palette.background
                 .ignoresSafeArea()
-            if showsCamera {
+            if isCameraWanted {
                 HorizonCameraBackdrop()
                     .ignoresSafeArea()
             }
             HorizonCrosshair()
                 .ignoresSafeArea()
-            VStack(spacing: 10) {
-                topBar(reading)
-                HorizonDirectionReadout(reading: reading)
-                if showsCamera, app.camera.authorization == .notDetermined {
-                    HorizonCameraPrompt()
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    topPanel(reading, maxHeight: proxy.size.height * Self.panelHeightShare)
+                    Spacer(minLength: 0)
+                    bottomPanel(reading)
                 }
-                Spacer(minLength: 0)
-                bottomPanel(reading)
+                .frame(width: proxy.size.width, height: proxy.size.height)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
             .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
         .task {
@@ -62,8 +71,8 @@ struct HorizonRecordView: View {
             app.keepsMotionRunning = true
             app.keepsScreenAwake = true
         }
-        .onChange(of: showsCamera, initial: true) { _, wantsCamera in
-            app.keepsCameraRunning = wantsCamera
+        .onChange(of: isCameraWanted, initial: true) { _, wanted in
+            app.keepsCameraRunning = wanted
         }
         .onDisappear {
             app.keepsMotionRunning = false
@@ -74,45 +83,67 @@ struct HorizonRecordView: View {
             announce(hint)
         }
         .statusBarHidden()
-        .confirmationDialog("Discard this recording?", isPresented: $isConfirmingCancel, titleVisibility: .visible) {
-            Button("Discard Recording", role: .destructive) { dismiss() }
+        .confirmationDialog("Discard This Recording?", isPresented: $isConfirmingCancel, titleVisibility: .visible) {
             Button("Keep Recording", role: .cancel) {}
+            Button("Discard", role: .destructive) { dismiss() }
         } message: {
-            Text("The skyline you have swept so far will be lost.")
+            Text("What you have recorded so far is not saved.")
         }
-        .confirmationDialog("Start the sweep again?", isPresented: $isConfirmingStartOver, titleVisibility: .visible) {
-            Button("Start Over", role: .destructive) { model.startOver() }
-            Button("Keep Recording", role: .cancel) {}
-        } message: {
-            Text("What you have swept so far will be forgotten.")
-        }
-        .confirmationDialog("Part of the horizon is missing", isPresented: $isConfirmingGaps,
-                            titleVisibility: .visible) {
-            gapChoices
-        } message: {
-            Text(gapMessage(reading))
+        .confirmationDialog("Not All the Way Round", isPresented: isAskingAboutGaps, titleVisibility: .visible,
+                            presenting: incomplete) { _ in
+            incompleteChoices
+        } message: { pending in
+            Text(incompleteMessage(pending))
         }
     }
 
     // MARK: Top
 
+    /// Cancel, the title and Done; under them the feedback, the instruction and, if needed, the camera access offer.
+    /// It scrolls when it would take more than `maxHeight`.
+    private func topPanel(_ reading: HorizonReading, maxHeight: CGFloat) -> some View {
+        ViewThatFits(in: .vertical) {
+            topContent(reading)
+            ScrollView {
+                topContent(reading)
+            }
+        }
+        .frame(maxHeight: maxHeight, alignment: .top)
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(bottomLeadingRadius: 20, bottomTrailingRadius: 20, style: .continuous)
+                .fill(palette.background.opacity(0.86))
+                .ignoresSafeArea(edges: .top)
+        }
+    }
+
+    private func topContent(_ reading: HorizonReading) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            topBar(reading)
+            VStack(alignment: .leading, spacing: 6) {
+                messages(reading)
+                cameraAccess
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func topBar(_ reading: HorizonReading) -> some View {
         HStack(spacing: 8) {
-            Button {
+            Button("Cancel") {
                 if reading.hasSamples {
                     isConfirmingCancel = true
                 } else {
                     dismiss()
                 }
-            } label: {
-                Text("Cancel")
-                    .modifier(HorizonBarLabel())
             }
-            .buttonStyle(.plain)
+            .frame(minHeight: 44)
             Spacer(minLength: 4)
             VStack(spacing: 0) {
                 Text("Record Skyline")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.headline)
                     .foregroundStyle(palette.primaryText)
                 Text(site.name)
                     .font(.caption)
@@ -123,93 +154,130 @@ struct HorizonRecordView: View {
             .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 4)
             Button {
-                showsCamera.toggle()
+                finish()
             } label: {
-                Image(systemName: showsCamera ? "video.fill" : "video.slash")
-                    .modifier(HorizonBarLabel())
+                Text("Done")
+                    .fontWeight(.semibold)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Camera picture")
-            .accessibilityValue(showsCamera ? "On" : "Off")
-            .accessibilityAddTraits(.isToggle)
-            Button {
-                isConfirmingStartOver = true
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-                    .modifier(HorizonBarLabel())
-            }
-            .buttonStyle(.plain)
+            .frame(minHeight: 44)
             .disabled(!reading.hasSamples)
-            .opacity(reading.hasSamples ? 1 : 0.4)
-            .accessibilityLabel("Start over")
+            .accessibilityHint("Saves the skyline with the site")
+        }
+        .padding(.horizontal, 12)
+    }
+
+    /// Feedback (spoken when it changes), warnings and the instruction.
+    private func messages(_ reading: HorizonReading) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let hint = reading.hint {
+                HorizonHintRow(hint: hint)
+            }
+            if !reading.isComplete {
+                Text("Aim at the skyline and turn slowly all the way round; sweep back over a stretch to redo it.")
+                    .font(.subheadline)
+                    .foregroundStyle(palette.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let warning = locationWarning {
+                Text(warning)
+                    .font(.footnote)
+                    .foregroundStyle(palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !isCameraWanted {
+                Text("The camera picture is off in Settings (Camera, and Night Mode at night). You can still record "
+                     + "by pointing the back of the phone along the skyline.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Why the directions might be off for this site, or `nil`.
+    private var locationWarning: String? {
+        guard let observer = app.observerContext?.location else {
+            return "Lodestar does not know where you are yet, so it cannot turn compass directions into true north. "
+                + "Choose this site or Current Location as your observing location first."
+        }
+        if HorizonText.distanceMetres(observer, site.location) > Self.nearSiteMetres {
+            return "You are observing from a place far from this site, so the compass is corrected for the wrong "
+                + "location. Choose this site or Current Location as your observing location first."
+        }
+        return nil
+    }
+
+    /// Explains the camera picture and asks for access, as the Aim screen does.
+    @ViewBuilder private var cameraAccess: some View {
+        let authorization = app.camera.authorization
+        if isCameraWanted, authorization == .notDetermined || authorization == .denied {
+            let isDenied = authorization == .denied
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Show the skyline through the camera?")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(palette.primaryText)
+                Text(isDenied
+                     ? "Camera access is off for Lodestar. Allow it in the iOS Settings app to keep the skyline on "
+                        + "the crosshair. Without it you can still record, but you have to aim by eye."
+                     : "The live picture helps you keep the skyline on the crosshair. Nothing is recorded or saved. "
+                        + "Without it you can still record, but you have to aim by eye.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    if isDenied {
+                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                    } else {
+                        Task { _ = await app.camera.requestAccess() }
+                    }
+                } label: {
+                    Label(isDenied ? "Open iOS Settings" : "Enable Camera", systemImage: "camera.fill")
+                }
+                .buttonStyle(.lodestarSecondary)
+            }
         }
     }
 
     // MARK: Bottom
 
     private func bottomPanel(_ reading: HorizonReading) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let hint = reading.hint {
-                HorizonHintRow(hint: hint)
-            } else {
-                Text("Aim at the skyline and turn slowly all the way round; sweep back over a stretch to redo it.")
-                    .font(.subheadline)
-                    .foregroundStyle(palette.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            HorizonDirectionReadout(reading: reading)
             HorizonSkylineStrip(reading: reading)
             coverageRow(reading)
-            if let note = cameraNote {
-                Text(note)
-                    .font(.footnote)
-                    .foregroundStyle(palette.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Button {
-                finish()
-            } label: {
-                Text("Done")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.lodestarPrimary)
-            .disabled(!reading.hasSamples)
-            .accessibilityHint("Saves the skyline with the site")
         }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(palette.surface.opacity(0.9)))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.stroke, lineWidth: 0.5))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background {
+            UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20, style: .continuous)
+                .fill(palette.background.opacity(0.86))
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
+    /// The share recorded, what is still to sweep, and Start Over.
     private func coverageRow(_ reading: HorizonReading) -> some View {
-        let showsGaps = reading.hasSamples && !reading.gaps.isEmpty && reading.gaps != [.full]
-        return HStack(alignment: .firstTextBaseline) {
-            Text("\(AppFormat.percent(reading.coverage)) swept")
-                .font(.footnote.weight(.semibold))
-                .monospacedDigit()
-                .foregroundStyle(palette.accent)
-            Spacer(minLength: 8)
-            if showsGaps {
-                Text("Still to sweep: \(HorizonText.describe(reading.gaps))")
-                    .font(.footnote)
-                    .foregroundStyle(palette.secondaryText)
-                    .multilineTextAlignment(.trailing)
+        let showsGaps = reading.coverage >= HorizonSkylineStrip.showGapsFrom && !reading.gaps.isEmpty
+        return HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("\(AppFormat.percent(reading.coverage)) covered")
+                    .font(.body.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(palette.primaryText)
+                if showsGaps {
+                    Text("Still to sweep: \(HorizonText.gapsText(reading.gaps))")
+                        .font(.footnote)
+                        .foregroundStyle(palette.secondaryText)
+                }
             }
-        }
-        .accessibilityHidden(true)
-    }
-
-    /// Why there may be no camera picture, when it is wanted.
-    private var cameraNote: String? {
-        guard showsCamera else { return nil }
-        switch app.camera.authorization {
-        case .denied:
-            return "Camera access is off for Lodestar, so there is no picture. The recording works without it."
-        case .restricted:
-            return "Camera access is restricted on this iPhone, so there is no picture. The recording works without it."
-        case .unavailable:
-            return "This iPhone has no usable camera, so there is no picture. The recording works without it."
-        case .notDetermined, .authorized:
-            return nil
+            .accessibilityHidden(true)
+            Spacer(minLength: 8)
+            Button("Start Over") {
+                model.startOver()
+            }
+            .frame(minHeight: 44)
+            .disabled(!reading.hasSamples)
         }
     }
 
@@ -217,47 +285,48 @@ struct HorizonRecordView: View {
 
     /// Saves a complete sweep; for a partial one the person chooses what happens to the rest.
     private func finish() {
-        let recording = model.finish(fill: .keepBase, keepingPrevious: true)
+        let recording = model.finish(fill: .keepBase)
         if recording.isComplete {
-            save(recording.profile)
+            save(recording)
         } else {
-            isConfirmingGaps = true
+            incomplete = Incomplete(coverage: recording.coverage, gaps: recording.gaps)
         }
     }
 
-    @ViewBuilder private var gapChoices: some View {
-        if site.horizon != nil {
-            Button("Merge with the Previous Skyline") {
-                save(model.finish(fill: .keepBase, keepingPrevious: true).profile)
-            }
-        } else {
-            Button("Treat the Rest as Open Horizon") {
-                save(model.finish(fill: .keepBase, keepingPrevious: false).profile)
-            }
-        }
-        Button("Join the Ends with Straight Lines") {
-            save(model.finish(fill: .interpolate, keepingPrevious: false).profile)
-        }
+    private var isAskingAboutGaps: Binding<Bool> {
+        Binding(get: { incomplete != nil }, set: { isPresented in
+            if !isPresented { incomplete = nil }
+        })
+    }
+
+    /// Keep sweeping, keep the old skyline (or leave the rest open) for what is missing, or join the ends.
+    @ViewBuilder private var incompleteChoices: some View {
         Button("Keep Sweeping", role: .cancel) {}
+        Button(site.horizon != nil ? "Keep the Old Skyline for the Rest" : "Leave the Rest Open") {
+            save(model.finish(fill: .keepBase))
+        }
+        Button("Join the Ends With Straight Lines") {
+            save(model.finish(fill: .interpolate))
+        }
     }
 
-    private func gapMessage(_ reading: HorizonReading) -> String {
-        var text = "\(AppFormat.percent(reading.coverage)) of the horizon is swept. Still to sweep: "
-            + "\(HorizonText.describe(reading.gaps))."
+    private func incompleteMessage(_ pending: Incomplete) -> String {
+        let recorded = "\(AppFormat.percent(pending.coverage)) of the circle is recorded. "
+            + "Not yet swept: \(HorizonText.gapsText(pending.gaps))."
         if site.horizon != nil {
-            text += " Merging keeps the previous skyline for the rest."
-        } else {
-            text += " The rest can count as open horizon, or the ends can be joined by straight lines."
+            return "\(recorded) The old skyline can stay in those stretches."
         }
-        return text
+        return "\(recorded) Those stretches can stay open, as a clear horizon, or be joined by straight lines."
     }
 
     /// Stores the skyline with the site (a flat one means an open horizon) and closes the screen.
-    private func save(_ profile: HorizonProfile) {
+    private func save(_ recording: HorizonRecorder.Recording) {
         let store = app.settingsStore
+        // The stored site may have changed while recording (the editor only keeps a draft), so build on that one.
         if var saved = store.settings.savedSites.first(where: { $0.id == site.id }) {
-            saved.horizon = profile.isFlat ? nil : profile
+            saved.horizon = recording.profile.isFlat ? nil : recording.profile
             store.updateSite(saved)
+            HorizonCoverageMemory.store(siteID: site.id, horizon: saved.horizon, coverage: recording.coverage)
         }
         dismiss()
     }
@@ -276,36 +345,17 @@ struct HorizonRecordView: View {
 
 // MARK: - Pieces
 
-/// A label on the top bar: a capsule of the palette's surface colour, at least 44 points tall.
-private struct HorizonBarLabel: ViewModifier {
-    @Environment(\.palette) private var palette
-
-    func body(content: Content) -> some View {
-        content
-            .font(.body.weight(.medium))
-            .foregroundStyle(palette.accent)
-            .padding(.horizontal, 14)
-            .frame(minWidth: 44, minHeight: 44)
-            .background(Capsule().fill(palette.surface.opacity(0.85)))
-            .overlay(Capsule().strokeBorder(palette.stroke, lineWidth: 0.5))
-            .contentShape(Capsule())
-    }
-}
-
 /// The camera's azimuth and altitude now.
 private struct HorizonDirectionReadout: View {
     @Environment(\.palette) private var palette
     let reading: HorizonReading
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: 24) {
             value(title: "Azimuth", text: reading.azimuth.map(AppFormat.azimuth) ?? AppFormat.missing)
             value(title: "Altitude", text: reading.altitude.map(AppFormat.altitude) ?? AppFormat.missing)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(palette.surface.opacity(0.85)))
-        .overlay(Capsule().strokeBorder(palette.stroke, lineWidth: 0.5))
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Camera direction")
         .accessibilityValue(spokenValue)
@@ -339,7 +389,7 @@ private struct HorizonHintRow: View {
     var body: some View {
         Label {
             Text(hint.text)
-                .font(.subheadline.weight(.medium))
+                .font(.subheadline.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             Image(systemName: hint.systemImage)
@@ -406,31 +456,5 @@ private struct HorizonCameraBackdrop: View {
                 .opacity(palette.isNight ? 0.35 + 0.45 * app.settings.nightIntensity : 1)
                 .accessibilityHidden(true)
         }
-    }
-}
-
-/// Explains the camera picture and asks for access, while the person has not yet decided.
-private struct HorizonCameraPrompt: View {
-    @Environment(AppModel.self) private var app
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Text("Show the camera picture?")
-                .font(.headline)
-                .foregroundStyle(palette.primaryText)
-            Text("It helps you keep the crosshair on the skyline. Nothing is recorded or saved. Without it the "
-                 + "recording works just the same.")
-                .font(.footnote)
-                .foregroundStyle(palette.secondaryText)
-                .multilineTextAlignment(.center)
-            Button {
-                Task { _ = await app.camera.requestAccess() }
-            } label: {
-                Label("Enable camera", systemImage: "camera.fill")
-            }
-            .buttonStyle(.lodestarPrimary)
-        }
-        .card(palette)
     }
 }

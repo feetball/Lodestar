@@ -1,12 +1,9 @@
 import SwiftUI
 import LodestarKit
 
-/// The sections of the star-trail plan: camera and lens, declination, the trail of a chosen time, the time for a
-/// chosen trail, the stacking plan and the pole.
+/// The sections of the star-trail plan: camera and lens, declination, the total time, the trail it draws, the time for
+/// a chosen trail, the stacking plan and where the pole is.
 struct ToolsStarTrailSections: View {
-    /// A gap between two exposures of a stack shows as a break in the trail above this many pixels.
-    private static let visibleGapPixels = 2.0
-
     @Environment(\.palette) private var palette
     @Binding var inputs: ToolsTrailInputs
     let myCamera: LensSetup
@@ -16,8 +13,9 @@ struct ToolsStarTrailSections: View {
         let setup = inputs.setup
         cameraSection(setup: setup)
         declinationSection
+        durationSection
         trailSection(setup: setup)
-        durationSection(setup: setup)
+        arcSection(setup: setup)
         stackSection(setup: setup)
         poleSection
     }
@@ -32,8 +30,8 @@ struct ToolsStarTrailSections: View {
     private func cameraSection(setup: LensSetup) -> some View {
         SettingsSection(
             title: "Camera & Lens",
-            footer: "Starts from the camera and lens in Settings. Changes here stay in this tool. The pixel pitch "
-                + "gives lengths in pixels; without it Lodestar assumes \(Self.defaultPitchText) \u{00B5}m.") {
+            footer: "Starts from the camera in Settings; changes here stay in this planner. Without a pixel pitch "
+                + "Lodestar assumes \(Self.defaultPitchText) \u{00B5}m, typical of a high-resolution camera.") {
             SettingsMenuPicker(title: "Sensor", selection: $inputs.sensor,
                                options: sensorOptions.map { SettingsMenuOption(title: $0.name, value: $0) })
             SettingsNumberField(title: "Focal length", unit: "mm", value: $inputs.focalLength,
@@ -54,10 +52,11 @@ struct ToolsStarTrailSections: View {
     }
 
     private var declinationSection: some View {
-        SettingsSection(
+        let poleDeclination = sky?.poleDeclination ?? 90
+        return SettingsSection(
             title: "Target Declination",
-            footer: "Stars near the celestial pole draw shorter trails. 0\u{00B0} is the celestial equator, where "
-                + "trails are longest.") {
+            footer: "A star at the celestial equator (0\u{00B0}) draws the longest trail; the closer to the pole, the "
+                + "shorter. At the pole itself a star does not move.") {
             SettingsSliderRow(title: "Declination",
                               valueText: AngleFormatter.formatSignedDegrees(inputs.declination, decimals: 1),
                               value: $inputs.declination, range: -90...90, step: 1)
@@ -72,10 +71,22 @@ struct ToolsStarTrailSections: View {
                 SettingsCaption("Choose a target on the Objects tab to use its declination here.")
             }
             Button {
-                inputs.declination = sky?.poleDeclination ?? 90
+                inputs.declination = poleDeclination
             } label: {
-                Label("Use the Celestial Pole", systemImage: "location.north.line")
+                Label("Use the celestial pole (\(AngleFormatter.formatSignedDegrees(poleDeclination, decimals: 0)))",
+                      systemImage: "location.north.line")
             }
+        }
+    }
+
+    private var durationSection: some View {
+        SettingsSection(
+            title: "Total Time",
+            footer: "The time the trails should span, from the start of the first exposure to the end of the last. "
+                + "The sky turns 15\u{00B0} in an hour.") {
+            SettingsNumberField(title: "Duration", unit: "min", value: $inputs.durationMinutes,
+                                range: 0.1...ToolsTrailInputs.maximumMinutes, fractionDigits: 1)
+            InfoRow(label: "In hours and minutes", value: AngleFormatter.formatDuration(seconds: inputs.durationSeconds))
         }
     }
 
@@ -84,39 +95,29 @@ struct ToolsStarTrailSections: View {
     private func trailSection(setup: LensSetup) -> some View {
         let result = Result { try StarTrailPlanner.trail(duration: inputs.durationSeconds,
                                                          declination: inputs.declination, setup: setup) }
-        return SettingsSection(title: "Star Trail") {
-            SettingsNumberField(title: "Time", unit: "min", value: $inputs.durationMinutes,
-                                range: 1...(StarTrailPlanner.maximumDurationSeconds / 60), fractionDigits: 0)
+        return SettingsSection(title: "Star Trail", footer: ToolsPlannerText.rateNote) {
             switch result {
             case .success(let trail):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ToolsPlannerText.degrees(trail.arcLengthDegrees))
-                        .font(.largeTitle.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(palette.accent)
-                    Text("Trail on the sky \u{00B7} \(ToolsPlannerText.pixels(trail.arcLengthPixels)) in the image")
-                        .font(.footnote)
-                        .foregroundStyle(palette.secondaryText)
-                }
-                .accessibilityElement(children: .combine)
-                InfoRow(label: "Sky rotation about the pole", value: ToolsPlannerText.degrees(trail.rotationDegrees))
+                ToolsHeadline(
+                    title: ToolsPlannerText.degrees(trail.arcLengthDegrees),
+                    subtitle: "long on the sky at "
+                        + "\(AngleFormatter.formatSignedDegrees(trail.declination, decimals: 1)) declination")
+                InfoRow(label: "Trail in the picture", value: ToolsPlannerText.pixels(trail.arcLengthPixels))
+                InfoRow(label: "Turn about the pole", value: ToolsPlannerText.degrees(trail.rotationDegrees))
                 InfoRow(label: "Distance from the pole", value: ToolsPlannerText.degrees(trail.radiusFromPoleDegrees))
-                if trail.radiusFromPoleDegrees <= 0 {
-                    SettingsCaption("A star at the celestial pole stays in place and the sky turns around it. Stars "
-                                    + "near the pole draw circles; the rotation above is how much of a circle they "
-                                    + "complete.")
-                }
                 if trail.usedDefaultPixelPitch {
                     SettingsCaption("The length in pixels assumes a pixel pitch of \(Self.defaultPitchText) \u{00B5}m "
                                     + "because yours is not set.")
                 }
+                SettingsCaption("Pixels are counted at the centre of the picture. Near the edges of a wide lens the "
+                                + "trails are longer.")
             case .failure(let error):
                 ToolsProblemRow(message: ToolsPlannerText.message(for: error))
             }
         }
     }
 
-    private func durationSection(setup: LensSetup) -> some View {
+    private func arcSection(setup: LensSetup) -> some View {
         let result = Result { () throws -> Double in
             switch inputs.arcUnit {
             case .degrees:
@@ -128,8 +129,8 @@ struct ToolsStarTrailSections: View {
         }
         return SettingsSection(
             title: "Time for a Chosen Trail",
-            footer: "How long to shoot for stars at this declination to draw a trail of the length you want.") {
-            Picker("Trail length in", selection: $inputs.arcUnit) {
+            footer: "How long stars at this declination need to draw a trail of the length you want.") {
+            Picker("Unit of the trail length", selection: $inputs.arcUnit) {
                 ForEach(ToolsTrailInputs.ArcUnit.allCases) { unit in
                     Text(unit.title).tag(unit)
                 }
@@ -137,24 +138,18 @@ struct ToolsStarTrailSections: View {
             .pickerStyle(.segmented)
             switch inputs.arcUnit {
             case .degrees:
-                SettingsNumberField(title: "Trail on the sky", unit: "\u{00B0}", value: $inputs.arcDegrees,
+                SettingsNumberField(title: "Trail length", unit: "\u{00B0}", value: $inputs.arcDegrees,
                                     range: 0.1...360, fractionDigits: 1)
             case .pixels:
-                SettingsNumberField(title: "Trail in the image", unit: "px", value: $inputs.arcPixels,
+                SettingsNumberField(title: "Trail length", unit: "px", value: $inputs.arcPixels,
                                     range: 1...100_000, fractionDigits: 0)
             }
             switch result {
             case .success(let seconds):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(AngleFormatter.formatDuration(seconds: seconds))
-                        .font(.largeTitle.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(palette.accent)
-                    Text("of shooting")
-                        .font(.footnote)
-                        .foregroundStyle(palette.secondaryText)
+                InfoRow(label: "Time needed", value: AngleFormatter.formatDuration(seconds: seconds))
+                Button("Use as the total time") {
+                    inputs.durationMinutes = min(max(seconds / 60, 0.1), ToolsTrailInputs.maximumMinutes)
                 }
-                .accessibilityElement(children: .combine)
             case .failure(let error):
                 ToolsProblemRow(message: ToolsPlannerText.message(for: error))
             }
@@ -164,49 +159,45 @@ struct ToolsStarTrailSections: View {
     private func stackSection(setup: LensSetup) -> some View {
         let result = Result { try StarTrailPlanner.stackingPlan(
             totalDuration: inputs.durationSeconds, declination: inputs.declination, setup: setup, rule: inputs.rule,
-            exposureSeconds: inputs.exposure, gapSeconds: inputs.gap) }
+            exposureSeconds: inputs.frameSeconds, gapSeconds: inputs.gapSeconds) }
         return SettingsSection(
             title: "Stacking Plan",
-            footer: "Shoot the frames one after another, then stack them (lighten or maximum blend) into one picture. "
-                + "Each frame is short enough to keep the stars sharp, and together they add up to the trail of the "
-                + "time above.") {
+            footer: "Many short exposures stacked in software draw the same trails as one long exposure, without its "
+                + "noise and sensor heat. Each frame is as long as the rule allows without trailing, rounded down to "
+                + "a setting you can dial.") {
             Picker("Rule", selection: $inputs.rule) {
                 ForEach(ExposureRule.allCases) { option in
                     Text(option.stackShortName).tag(option)
                 }
             }
             .pickerStyle(.segmented)
-            SettingsNumberField(title: "Exposure", unit: "s", optionalValue: $inputs.exposure,
+            SettingsNumberField(title: "Frame length", unit: "s", optionalValue: $inputs.frameSeconds,
                                 range: 0.1...StarTrailPlanner.maximumExposureSeconds, fractionDigits: 1,
-                                placeholder: "From the rule")
-            SettingsNumberField(title: "Gap between exposures", unit: "s", value: $inputs.gap,
+                                placeholder: "Automatic")
+            SettingsNumberField(title: "Gap between frames", unit: "s", value: $inputs.gapSeconds,
                                 range: 0...StarTrailPlanner.maximumGapSeconds, fractionDigits: 1)
             switch result {
             case .success(let plan):
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(ToolsPlannerText.count(plan.frameCount)) \(plan.frameCount == 1 ? "frame" : "frames") "
-                         + "of \(AngleFormatter.formatExposure(seconds: plan.exposureSeconds))")
-                        .font(.title2.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(palette.accent)
-                    Text(inputs.exposure == nil
-                         ? "The longest exposure the \(plan.estimate.rule.displayName) rule allows, rounded down."
-                         : "Your exposure.")
-                        .font(.footnote)
-                        .foregroundStyle(palette.secondaryText)
-                }
-                .accessibilityElement(children: .combine)
+                ToolsHeadline(
+                    title: "\(ToolsPlannerText.count(plan.frameCount)) frames of "
+                        + AngleFormatter.formatExposure(seconds: plan.exposureSeconds),
+                    subtitle: "\(ToolsPlannerText.seconds(plan.gapSeconds)) between frames \u{00B7} "
+                        + plan.estimate.rule.displayName)
                 InfoRow(label: "Time covered", value: AngleFormatter.formatDuration(seconds: plan.actualDuration))
-                InfoRow(label: "Light collected", value: AngleFormatter.formatDuration(seconds: plan.lightSeconds))
+                InfoRow(label: "Shutter open in all", value: AngleFormatter.formatDuration(seconds: plan.lightSeconds))
+                InfoRow(label: "Longest frame by the rule",
+                        value: AngleFormatter.formatExposure(seconds: plan.estimate.seconds))
                 InfoRow(label: "Trail in one frame", value: ToolsPlannerText.pixels(plan.exposureTrailPixels))
-                InfoRow(label: "Break between frames", value: ToolsPlannerText.pixels(plan.gapPixels))
-                if plan.gapPixels > Self.visibleGapPixels {
-                    SettingsCaption("The break between two frames is more than \(Int(Self.visibleGapPixels)) pixels "
-                                    + "long, so it shows as a gap in the trail. Use a shorter gap or a longer "
-                                    + "exposure.")
+                InfoRow(label: "Movement during the gap", value: ToolsPlannerText.pixels(plan.gapPixels))
+                SettingsCaption(ToolsPlannerText.gapVerdict(pixels: plan.gapPixels))
+                if inputs.frameSeconds != nil, plan.exposureSeconds > plan.estimate.seconds {
+                    SettingsCaption("This frame is longer than the rule allows, so stars may trail within each "
+                                    + "frame.")
                 }
-                ForEach(plan.estimate.notes, id: \.self) { note in
-                    SettingsCaption(note)
+                if inputs.frameSeconds == nil {
+                    ForEach(plan.estimate.notes, id: \.self) { note in
+                        SettingsCaption(note)
+                    }
                 }
             case .failure(let error):
                 ToolsProblemRow(message: ToolsPlannerText.message(for: error))
@@ -214,30 +205,72 @@ struct ToolsStarTrailSections: View {
         }
     }
 
+    // MARK: The pole
+
     private var poleSection: some View {
         SettingsSection(
-            title: "Pole",
-            footer: "The trails are circles around the celestial pole. Put it in the frame, and the stars draw arcs "
-                + "around it.") {
+            title: "Where the Pole Is",
+            footer: "Trails are arcs of circles centred on the celestial pole. Point the camera near it and the stars "
+                + "draw circles around the frame; point away from it and the arcs flatten.") {
             if let sky {
-                let name = sky.hemisphere == .north ? "North celestial pole" : "South celestial pole"
-                InfoRow(label: name, value: sky.poleAltitude >= 0 ? "Above the horizon" : "Below the horizon")
+                InfoRow(label: "Pole", value: sky.hemisphere == .north ? "North celestial pole" : "South celestial pole")
+                InfoRow(label: "Azimuth", value: AppFormat.azimuth(sky.poleAzimuth))
                 InfoRow(label: "Altitude", value: AppFormat.altitude(sky.poleAltitude))
-                InfoRow(label: "Direction", value: AppFormat.azimuth(sky.poleAzimuth))
+                SettingsCaption(sky.isPoleAboveHorizon
+                                ? "The pole is \(AngleFormatter.formatDegrees(sky.poleAltitude, decimals: 0)) above "
+                                    + "the horizon here: aim the camera at it for full circles."
+                                : "The pole is below the horizon here, so no star circles it for you; trails are "
+                                    + "arcs low in the sky.")
                 if let target = sky.target {
-                    InfoRow(label: "From \(target.name)", value: AppFormat.separation(target.separationFromPole))
-                    SettingsCaption(target.poleInFrame
-                                    ? "With the camera on \(target.name) the pole is inside the frame."
-                                    : "With the camera on \(target.name) the pole is outside the frame.")
+                    SettingsCaption(Self.targetLine(target))
                 }
             } else {
-                SettingsCaption("Choose an observing location in Settings to see where the pole stands.")
+                SettingsCaption("Lodestar needs an observing location to find the pole. Choose one in Settings.")
             }
         }
     }
 
+    /// Where the pole falls when the camera points at the target.
+    private static func targetLine(_ target: ToolsTrailSky.Target) -> String {
+        guard let separation = target.separationFromPole else { return "\(target.name) is below the horizon now." }
+        let placement: String
+        if target.isPoleBehind {
+            placement = "behind the camera"
+        } else if target.poleInLandscape && target.poleInPortrait {
+            placement = "inside the frame, held either way"
+        } else if target.poleInLandscape {
+            placement = "inside a landscape frame but outside a portrait one"
+        } else if target.poleInPortrait {
+            placement = "inside a portrait frame but outside a landscape one"
+        } else {
+            placement = "outside the frame"
+        }
+        return "With \(target.name) at the centre of the frame, the pole is \(AppFormat.separation(separation)) away, "
+            + "\(placement)."
+    }
+
     private static var defaultPitchText: String {
         ExposureCalculator.defaultPixelPitchMicrometers.formatted(.number.precision(.fractionLength(1)))
+    }
+}
+
+/// A large result with a line under it.
+struct ToolsHeadline: View {
+    @Environment(\.palette) private var palette
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.title.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(palette.accent)
+            Text(subtitle)
+                .font(.footnote)
+                .foregroundStyle(palette.secondaryText)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -10,6 +10,8 @@ struct HorizonSkylineStrip: View {
         (0, "N"), (90, "E"), (180, "S"), (270, "W"), (360, "N"),
     ]
     private static let labelBand: CGFloat = 16
+    /// The stretches still to sweep are listed once this much of the circle is recorded.
+    static let showGapsFrom = 0.5
 
     @Environment(\.palette) private var palette
     let reading: HorizonReading
@@ -25,9 +27,9 @@ struct HorizonSkylineStrip: View {
     }
 
     private var summary: String {
-        var text = "\(AppFormat.percent(reading.coverage)) of the horizon swept."
-        if reading.hasSamples, !reading.gaps.isEmpty, reading.gaps != [.full] {
-            text += " Still to sweep: \(HorizonText.describe(reading.gaps))."
+        var text = "\(AppFormat.percent(reading.coverage)) covered."
+        if reading.coverage >= HorizonSkylineStrip.showGapsFrom, !reading.gaps.isEmpty {
+            text += " Still to sweep: \(HorizonText.gapsText(reading.gaps))."
         }
         return text
     }

@@ -25,12 +25,13 @@ private struct HorizonFlowModifier: ViewModifier {
                 HorizonRecordView(site: site, app: app)
                     .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
             }
-            .confirmationDialog("Clear the skyline?", isPresented: isConfirmingClear, titleVisibility: .visible,
+            .confirmationDialog("Clear the Skyline?", isPresented: isConfirmingClear, titleVisibility: .visible,
                                 presenting: flow.clearing) { site in
                 Button("Clear Skyline", role: .destructive) { clear(site) }
-                Button("Keep Skyline", role: .cancel) {}
+                Button("Keep", role: .cancel) {}
             } message: { site in
-                Text("The recorded skyline of \u{201C}\(site.name)\u{201D} is removed and the site has an open horizon again.")
+                Text("\u{201C}\(site.name)\u{201D} goes back to an open horizon. You can record the skyline again, but "
+                     + "this one cannot be brought back.")
             }
     }
 
@@ -42,28 +43,38 @@ private struct HorizonFlowModifier: ViewModifier {
 
     private func clear(_ site: SavedSite) {
         let store = app.settingsStore
-        guard var saved = store.settings.savedSites.first(where: { $0.id == site.id }) else { return }
-        saved.horizon = nil
-        store.updateSite(saved)
+        // The stored site may have changed since the confirmation was asked for.
+        if var saved = store.settings.savedSites.first(where: { $0.id == site.id }) {
+            saved.horizon = nil
+            store.updateSite(saved)
+        }
+        HorizonCoverageMemory.store(siteID: site.id, horizon: nil, coverage: 0)
     }
 }
 
-/// The "Horizon" section of the site editor: the state of the skyline with Record Skyline and Clear.
+/// The "Horizon" section of the site editor: the state of the skyline with Record Skyline and Clear Skyline.
 struct HorizonSiteSection: View {
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
     /// The site being edited, or `nil` for a site that is not saved yet.
     let siteID: UUID?
+    /// Whether the position being edited is not where the site was stored.
+    let movedAway: Bool
     @Binding var flow: HorizonFlowState
 
     var body: some View {
         SettingsSection(
             title: "Horizon",
-            footer: "Trees, hills and buildings hide the sky near the horizon. Sweep the phone along the skyline once "
-                + "and Lodestar takes it into account for rise and set times, what is up now and tonight\u{2019}s "
-                + "plan. The skyline belongs to this place: record it again if you move the site.") {
+            footer: "Record the outline of trees, hills and buildings by turning slowly all the way round with the "
+                + "camera on the skyline. Planning then counts what is behind it as hidden.") {
             if let site = savedSite {
-                Text(HorizonText.status(of: site.horizon))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(HorizonText.status(of: site))
+                    if movedAway, site.horizon != nil {
+                        SettingsCaption("You moved this site. A skyline belongs to one spot: record it again if the "
+                                        + "new place is different.")
+                    }
+                }
                 Button {
                     flow.recording = site
                 } label: {
@@ -73,17 +84,17 @@ struct HorizonSiteSection: View {
                     Button {
                         flow.clearing = site
                     } label: {
-                        Text("Clear")
+                        Text("Clear Skyline\u{2026}")
                             .foregroundStyle(palette.critical)
                     }
                 }
             } else {
-                Text(HorizonText.status(of: nil))
-                SettingsCaption("Save the site first, then record its skyline.")
+                SettingsCaption("Save the site first, then record its skyline here.")
             }
         }
     }
 
+    /// The site as stored now: recording and clearing save at once, outside the editor's draft.
     private var savedSite: SavedSite? {
         guard let siteID else { return nil }
         return app.settings.savedSites.first { $0.id == siteID }
@@ -107,7 +118,7 @@ struct HorizonSiteMenu: View {
                 Button(role: .destructive) {
                     flow.clearing = site
                 } label: {
-                    Label("Clear Skyline", systemImage: "trash")
+                    Label("Clear Skyline\u{2026}", systemImage: "trash")
                 }
             }
         } label: {
@@ -118,24 +129,54 @@ struct HorizonSiteMenu: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Skyline of \(site.name)")
-        .accessibilityValue(HorizonText.status(of: site.horizon))
+        .accessibilityLabel("Skyline options for \(site.name)")
+        .accessibilityValue(HorizonText.status(of: site))
     }
 }
 
-/// Under "Current Location": a skyline belongs to a saved site, so the place can be saved as one first.
-struct HorizonDeviceNote: View {
-    let canSave: Bool
+/// The row under "Current Location": the device position has no skyline, because a skyline belongs to a place that can
+/// be visited again. Tapping it explains that and offers to save the place as a site first.
+struct HorizonDeviceRow: View {
+    @Environment(\.palette) private var palette
+    /// Why the place cannot be saved right now, or `nil`.
+    let blocker: String?
     let onSave: () -> Void
+    @State private var isAsking = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SettingsCaption("Horizon: open. A recorded skyline belongs to a saved site, not to your current position.")
-            Button(action: onSave) {
-                Label("Save This Place as a Site\u{2026}", systemImage: "mountain.2")
+        Button {
+            isAsking = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "mountain.2")
+                    .font(.title3)
+                    .foregroundStyle(palette.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Record Skyline\u{2026}")
+                        .foregroundStyle(palette.primaryText)
+                    Text("\(HorizonText.openHorizon). Skylines belong to saved sites.")
+                        .font(.footnote)
+                        .foregroundStyle(palette.secondaryText)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(palette.tertiaryText)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.lodestarSecondary)
-            .disabled(!canSave)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .alert("Save This Place First", isPresented: $isAsking) {
+            if blocker == nil {
+                Button("Save This Place as a Site\u{2026}", action: onSave)
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("A skyline belongs to a place you can come back to, so Lodestar keeps it with a saved site. Save "
+                 + "this place as a site, then record its skyline." + (blocker.map { " \($0)" } ?? ""))
         }
     }
 }

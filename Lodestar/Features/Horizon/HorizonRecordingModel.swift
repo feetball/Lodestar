@@ -26,34 +26,33 @@ enum HorizonHint: Equatable {
     var text: String {
         switch self {
         case .noSensors:
-            return "Recording a skyline needs the motion sensors of an iPhone, which the Simulator does not have."
+            return "This iPhone has no motion sensors, so it cannot record a skyline."
         case .sensorProblem(let message):
             return message
         case .waiting:
-            return "Starting the motion sensors\u{2026}"
+            return "Waiting for the motion sensors\u{2026}"
         case .headingNotSet:
-            return "The heading is not set. Align on a star in Aim, or switch the heading source to Compass."
+            return "Gyro Lock has no heading yet. Choose Compass as the heading source in Settings, or align on a "
+                + "star first."
         case .calibrateCompass:
-            return "The compass needs calibrating. Wave the phone in a figure 8."
+            return "The compass needs calibrating. Move the phone in a figure 8, away from metal and magnets."
         case .slowDown:
-            return "Slow down."
+            return "Too fast. Turn more slowly."
         case .aimAtSkyline:
-            return "Aim the camera at the skyline."
+            return "Point the camera at the skyline."
         case .interference:
-            return "Magnetic interference nearby. Keep away from cars and metal."
+            return "Magnetic interference nearby. Move away from metal and electronics, or the directions may be off."
         case .complete:
-            return "The whole circle is recorded. Tap Done."
+            return "All the way round. Tap Done to save the skyline."
         }
     }
 
     var systemImage: String {
         switch self {
-        case .noSensors, .sensorProblem, .headingNotSet, .calibrateCompass, .interference:
-            return "exclamationmark.triangle.fill"
+        case .noSensors, .sensorProblem, .headingNotSet, .calibrateCompass, .interference, .slowDown, .aimAtSkyline:
+            return "exclamationmark.triangle"
         case .waiting: return "hourglass"
-        case .slowDown: return "tortoise.fill"
-        case .aimAtSkyline: return "scope"
-        case .complete: return "checkmark.circle.fill"
+        case .complete: return "checkmark.circle"
         }
     }
 
@@ -74,16 +73,19 @@ struct HorizonReading: Equatable {
     var altitude: Double?
     /// The fraction of the circle swept so far, 0…1.
     var coverage: Double
+    /// How many of the 360 bins hold a sample.
+    var recordedBins: Int
     /// The skyline as it stands: swept stretches, small gaps closed, the rest from the previous skyline.
     var skyline: HorizonProfile
     /// The stretches still to be swept.
     var gaps: [AzimuthRange]
     var hint: HorizonHint?
-    /// Whether a bin has been recorded at all.
-    var hasSamples: Bool
 
-    static let empty = HorizonReading(azimuth: nil, altitude: nil, coverage: 0, skyline: .flat, gaps: [.full],
-                                      hint: .waiting, hasSamples: false)
+    var hasSamples: Bool { recordedBins > 0 }
+    var isComplete: Bool { recordedBins >= HorizonProfile.binCount }
+
+    static let empty = HorizonReading(azimuth: nil, altitude: nil, coverage: 0, recordedBins: 0, skyline: .flat,
+                                      gaps: [.full], hint: .waiting)
 }
 
 /// Feeds the motion sensors' newest attitude to a `HorizonRecorder` while the recording screen is open.
@@ -94,7 +96,7 @@ struct HorizonReading: Equatable {
 @Observable
 final class HorizonRecordingModel {
     /// Seconds between refreshes of the reading.
-    private static let publishInterval = 0.09
+    private static let publishInterval = 0.1
     private static let loopInterval: Duration = .milliseconds(16)
     /// A rejection is shown for this long after the last sample it applied to.
     private static let hintDuration = 1.2
@@ -105,19 +107,22 @@ final class HorizonRecordingModel {
 
     private(set) var reading = HorizonReading.empty
 
+    /// The skyline stored with the site when the recording started: unswept stretches keep it.
+    @ObservationIgnored let storedSkyline: HorizonProfile?
     @ObservationIgnored private let app: AppModel
-    @ObservationIgnored private let base: HorizonProfile?
     @ObservationIgnored private var recorder = HorizonRecorder()
     @ObservationIgnored private var lastTimestamp: TimeInterval?
     @ObservationIgnored private var lastPublish = Date.distantPast
     @ObservationIgnored private var lastRejection: (reason: HorizonRecorder.Rejection, date: Date)?
+    @ObservationIgnored private var isHeadingMissing = false
+    @ObservationIgnored private var hasInterference = false
 
     /// - Parameters:
     ///   - app: The app model, for the motion sensors, the alignment and the mount.
     ///   - base: The site's current skyline, which unswept stretches keep.
     init(app: AppModel, base: HorizonProfile?) {
         self.app = app
-        self.base = base
+        storedSkyline = base
         publish(now: Date())
     }
 
@@ -133,19 +138,24 @@ final class HorizonRecordingModel {
 
     private func step() {
         let now = Date()
-        if let sample = app.motion.latestSample(), sample.timestamp != lastTimestamp {
-            lastTimestamp = sample.timestamp
-            add(sample, now: now)
+        if let sample = app.motion.latestSample() {
+            updateHeadingConditions(for: sample)
+            if sample.timestamp != lastTimestamp {
+                lastTimestamp = sample.timestamp
+                add(sample, now: now)
+            }
         }
         if now.timeIntervalSince(lastPublish) >= Self.publishInterval {
             publish(now: now)
         }
     }
 
-    /// The phone's own back camera is what the person holds along the skyline, so the mount is not applied; the
-    /// star alignment's compass correction is, so azimuths are true.
+    /// The user holds the phone, so the direction is that of its own back camera, whatever mount is set. The raw
+    /// attitude is used: the smoothed one lags behind the turn by the smoothing time (2° or more at a normal sweep),
+    /// which would shift the whole skyline; the recorder's median takes care of the noise. The star alignment's
+    /// compass correction is applied, so azimuths are true.
     private func add(_ sample: MotionSample, now: Date) {
-        let attitude = sample.attitude.withHeadingOffset(app.alignment.headingOffset(for: app.mountProfile))
+        let attitude = sample.rawAttitude.withHeadingOffset(app.alignment.headingOffset(for: app.mountProfile))
         let direction = HorizontalCoordinate(vector: attitude.deviceToWorld * DeviceAttitude.backCameraAxis)
         if let reason = recorder.add(azimuth: direction.azimuth, altitude: direction.altitude,
                                      timestamp: sample.timestamp, quality: headingQuality(of: sample)) {
@@ -153,12 +163,22 @@ final class HorizonRecordingModel {
         }
     }
 
-    /// How far the heading can be trusted, 0…1, as the engine documents; `nil` when unknown.
-    private func headingQuality(of sample: MotionSample) -> Double? {
+    /// In gyro lock the heading is only meaningful once it was transferred from the compass or set by a star.
+    private func updateHeadingConditions(for sample: MotionSample) {
         let motion = app.motion
-        if motion.headingSource == .gyroLock {
-            // Immune to magnetic interference once the heading comes from the compass transfer or a star alignment.
-            return motion.isGyroHeadingReferenced || app.alignment.isAligned ? 1 : 0
+        let isGyroLock = motion.headingSource == .gyroLock
+        let alignment = app.alignment
+        let isAligned = alignment.isAligned && alignment.isApplicable(to: app.mountProfile)
+        isHeadingMissing = isGyroLock && !(motion.isGyroHeadingReferenced || isAligned)
+        hasInterference = !isGyroLock && (motion.magneticDisturbance ?? 0) > Self.interferenceThreshold
+    }
+
+    /// How far the heading can be trusted, 0…1, as the engine documents; `nil` when unknown. In gyro lock the heading
+    /// comes from the compass transfer or the star alignment and magnetic interference cannot move it, so it counts
+    /// as perfect once it is set and as useless before.
+    private func headingQuality(of sample: MotionSample) -> Double? {
+        if app.motion.headingSource == .gyroLock {
+            return isHeadingMissing ? 0 : 1
         }
         switch sample.compassQuality {
         case .high: return 1
@@ -178,59 +198,43 @@ final class HorizonRecordingModel {
         publish(now: Date())
     }
 
-    /// The recording as it stands. The sweep can go on afterwards.
-    func finish(fill: HorizonRecorder.UnrecordedFill, keepingPrevious: Bool) -> HorizonRecorder.Recording {
-        recorder.finish(fill: fill, base: keepingPrevious ? base : nil)
+    /// The recording as it stands, with unswept stretches filled as `fill` says (the stored skyline stays in them
+    /// for `.keepBase`). The sweep can go on afterwards.
+    func finish(fill: HorizonRecorder.UnrecordedFill) -> HorizonRecorder.Recording {
+        recorder.finish(fill: fill, base: storedSkyline)
     }
 
     // MARK: Reading
 
     private func publish(now: Date) {
         lastPublish = now
-        let recording = recorder.finish(fill: .keepBase, base: base)
+        let recording = recorder.finish(fill: .keepBase, base: storedSkyline)
         let next = HorizonReading(
             azimuth: recorder.lastAzimuth, altitude: recorder.lastAltitude, coverage: recording.coverage,
-            skyline: recording.profile, gaps: recording.gaps, hint: hint(at: now),
-            hasSamples: recorder.recordedBinCount > 0)
+            recordedBins: recorder.recordedBinCount, skyline: recording.profile, gaps: recording.gaps,
+            hint: hint(at: now))
         if next != reading { reading = next }
     }
 
+    /// What to tell the person, from the latest rejection (if recent), the speed and the compass conditions.
     private func hint(at now: Date) -> HorizonHint? {
-        let motion = app.motion
-        switch motion.status {
+        switch app.motion.status {
         case .unavailable: return .noSensors
         case .failed(let message): return .sensorProblem(message)
-        case .idle, .starting: return .waiting
-        case .running: break
+        case .idle, .starting, .running: break
         }
-        guard lastTimestamp != nil else { return .waiting }
-
-        let configuration = recorder.configuration
-        if let quality = headingQuality(), quality < configuration.minimumQuality {
-            return motion.headingSource == .gyroLock ? .headingNotSet : .calibrateCompass
+        let recent = lastRejection.flatMap { now.timeIntervalSince($0.date) < Self.hintDuration ? $0.reason : nil }
+        if recent == .lowQuality {
+            return isHeadingMissing ? .headingNotSet : .calibrateCompass
         }
-        if let rejection = lastRejection, now.timeIntervalSince(rejection.date) < Self.hintDuration {
-            switch rejection.reason {
-            case .tooFast: return .slowDown
-            case .outOfRange: return .aimAtSkyline
-            case .lowQuality: return motion.headingSource == .gyroLock ? .headingNotSet : .calibrateCompass
-            case .invalid: break
-            }
-        }
-        if let rate = recorder.sweepRate, rate > configuration.maximumSweepRate * Self.warningFraction {
+        let maximumRate = recorder.configuration.maximumSweepRate
+        if recent == .tooFast || (recorder.sweepRate ?? 0) > Self.warningFraction * maximumRate {
             return .slowDown
         }
-        if motion.headingSource == .compass, let disturbance = motion.magneticDisturbance,
-           disturbance > Self.interferenceThreshold {
-            return .interference
-        }
-        if recorder.recordedBinCount == HorizonProfile.binCount { return .complete }
+        if recent == .outOfRange { return .aimAtSkyline }
+        if hasInterference { return .interference }
+        if recorder.lastAzimuth == nil { return .waiting }
+        if recorder.recordedBinCount >= HorizonProfile.binCount { return .complete }
         return nil
-    }
-
-    /// The quality of the newest sample, for the standing warning about the compass.
-    private func headingQuality() -> Double? {
-        guard let sample = app.motion.latestSample() else { return nil }
-        return headingQuality(of: sample)
     }
 }
