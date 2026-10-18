@@ -1,6 +1,7 @@
 # Builds the iOS app with the newest Xcode on GitHub's macOS runners and runs the LodestarKit tests.
 # The Lodestar scheme also builds what the app embeds: the widget extension (LodestarWidgets) and the Apple Watch
 # app (LodestarWatch) with its complications (LodestarWatchWidgets); a step checks that all three end up in the app.
+# The app builds come first so that a compile error shows without waiting for the 2.5 minutes of package tests.
 # No signing: this verifies that everything compiles; Xcode Cloud produces the signed builds.
 name: CI
 
@@ -31,9 +32,6 @@ jobs:
           xcodebuild -version
           swift --version
 
-      - name: Test LodestarKit
-        run: swift test --package-path LodestarKit
-
       - name: List the project's targets and the installed SDKs
         run: |
           xcodebuild -list -project Lodestar.xcodeproj
@@ -62,6 +60,9 @@ jobs:
 
       - name: Check the widgets and the watch app are embedded (device build)
         run: bash Tools/check-embedded-products.sh Release-iphoneos
+
+      - name: Test LodestarKit
+        run: swift test --package-path LodestarKit
 
   # The committed Lodestar.xcodeproj is what is built above.  This job only checks that the XcodeGen fallback
   # (project.yml) still generates a project with the same targets and embeds; it is informational.
