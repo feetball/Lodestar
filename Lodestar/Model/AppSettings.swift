@@ -145,6 +145,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var showConstellationNames = true
     var showDeepSkyObjects = true
     var showMilkyWay = true
+    /// Deep-sky objects drawn in the sky views, up to this `Prominence` level (1 showpieces … 4 everything).
+    var deepSkyProminence = 2
     var starMagnitudeLimit: Double = 5.0
     var coordinateStyle: CoordinateStyle = .sexagesimal
 
@@ -191,6 +193,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
         showMilkyWay = value(.showMilkyWay, d.showMilkyWay)
+        deepSkyProminence = value(.deepSkyProminence, d.deepSkyProminence)
         starMagnitudeLimit = value(.starMagnitudeLimit, d.starMagnitudeLimit)
         coordinateStyle = value(.coordinateStyle, d.coordinateStyle)
         temperatureCelsius = value(.temperatureCelsius, d.temperatureCelsius)
@@ -214,6 +217,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         nightIntensity = clamp(nightIntensity, 0.25...1, 0.7)
         nightBrightness = clamp(nightBrightness, 0.01...1, 0.2)
         starMagnitudeLimit = clamp(starMagnitudeLimit, 1...6.5, 5)
+        deepSkyProminence = min(max(deepSkyProminence, 1), 4)
         temperatureCelsius = clamp(temperatureCelsius, -60...60, 10)
         pressureMillibars = clamp(pressureMillibars, 300...1100, 1010)
         if case .site(let id) = locationSource, !savedSites.contains(where: { $0.id == id }) {
