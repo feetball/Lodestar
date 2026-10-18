@@ -296,13 +296,20 @@ struct TonightLines: Equatable {
 
 /// Number and time formatting for the lines.
 enum TonightText {
-    /// "9:40 PM" or "21:40", as the user's clock is set. `compact` leaves out AM and PM: "9:40".
+    /// "9:40 PM" or "21:40", as the user's clock is set. `compact` leaves out AM and PM: "9:40". (The compact form is the
+    /// full one without the marker: the hour style that omits it pads the hour to two digits on Apple's platforms,
+    /// "09:40", which reads as 24-hour time.)
     static func time(_ date: Date, in timeZone: TimeZone, compact: Bool = false) -> String {
-        if compact {
-            let style = Date.FormatStyle(timeZone: timeZone).hour(.defaultDigits(amPM: .omitted)).minute()
-            return date.formatted(style)
+        let full = date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: timeZone))
+        guard compact else { return full }
+        var text = full
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        let markers: [String] = [formatter.amSymbol, formatter.pmSymbol]
+        for marker in markers where !marker.isEmpty {
+            text = text.replacingOccurrences(of: marker, with: "")
         }
-        return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, timeZone: timeZone))
+        return text.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{202F}\u{00A0}")))
     }
 
     /// "9:40 PM – 4:12 AM".

@@ -123,25 +123,51 @@ struct WatchTonightView: View {
         .accessibilityLabel(lines.moon.spoken)
     }
 
+    /// The label line of an item. When the label, the badge and the figure do not fit side by side (a small watch, a large
+    /// text size), the badge goes on a line of its own and the label may take two lines.
     private func labelLine(_ item: TonightItem, @ViewBuilder icon: () -> some View) -> some View {
-        HStack(spacing: 4) {
-            icon()
-            Text(item.label)
-                .font(.caption2)
-                .foregroundStyle(TonightStyle.secondaryText)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 4) {
+                icon()
+                labelText(item, lines: 1)
+                badgeText(item)
+                trailingText(item)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    icon()
+                    labelText(item, lines: 2)
+                    trailingText(item)
+                }
+                badgeText(item)
+            }
+        }
+    }
+
+    private func labelText(_ item: TonightItem, lines: Int) -> some View {
+        Text(item.label)
+            .font(.caption2)
+            .foregroundStyle(TonightStyle.secondaryText)
+            .lineLimit(lines)
+    }
+
+    @ViewBuilder
+    private func badgeText(_ item: TonightItem) -> some View {
+        if let badge = item.badge {
+            Text("\u{00B7} \(badge)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(TonightStyle.accent)
                 .lineLimit(1)
-            if let badge = item.badge {
-                Text("\u{00B7} \(badge)")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(TonightStyle.accent)
-                    .lineLimit(1)
-            }
-            if let trailing = item.trailing {
-                Spacer(minLength: 2)
-                Text(trailing)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(TonightStyle.primaryText)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private func trailingText(_ item: TonightItem) -> some View {
+        if let trailing = item.trailing {
+            Spacer(minLength: 2)
+            Text(trailing)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(TonightStyle.primaryText)
         }
     }
 
