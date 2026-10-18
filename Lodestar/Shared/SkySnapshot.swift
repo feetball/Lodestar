@@ -82,6 +82,8 @@ struct SkySnapshot: Sendable {
     let target: Target?
     /// The panels of the active mosaic in the order of `MosaicPlan.panels`; empty without a mosaic.
     let mosaic: [MosaicPanelOutline]
+    /// The comets and asteroids to draw: the target and the bright ones, target first, then brightest first.
+    let smallBodies: [SmallBodyMarker]
 
     /// The local frame used to build the snapshot (for horizon/grid drawing and inverse lookups).
     var frame: SkyFrame { SkyFrame(date: date, observer: observer) }
@@ -95,6 +97,8 @@ struct SkySnapshotOptions: Sendable, Equatable {
     var includeMilkyWay = true
     /// Deep-sky objects are drawn up to this prominence: `.showpiece` only the best known, `.obscure` everything.
     var deepSkyProminence: Prominence = .prominent
+    /// Comets and asteroids brighter than this magnitude are included, and the target whatever its brightness.
+    var smallBodyMagnitudeLimit = SmallBodySkyMarkers.defaultMagnitudeLimit
 
     /// The prominence for the "deep-sky detail" setting (1 showpieces … 4 everything); out-of-range values are
     /// pulled into range.
@@ -171,9 +175,13 @@ enum SkySnapshotBuilder {
             return SkySnapshot.Target(object: object, direction: horizontal.unitVector, horizontal: horizontal)
         }
 
+        let smallBodies = SmallBodySkyMarkers.build(smallBodies: catalog.smallBodies, frame: frame, target: target,
+                                                    magnitudeLimit: options.smallBodyMagnitudeLimit)
+
         return SkySnapshot(date: date, observer: observer, stars: stars, bodies: bodies, deepSky: deepSky,
                            constellations: constellations, milkyWay: milkyWay, target: targetPosition,
-                           mosaic: mosaic.map { mosaicOutlines(of: $0, frame: frame) } ?? [])
+                           mosaic: mosaic.map { mosaicOutlines(of: $0, frame: frame) } ?? [],
+                           smallBodies: smallBodies)
     }
 
     /// The panels of `plan` at the instant of `frame`, with refraction like everything else on screen.

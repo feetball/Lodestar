@@ -97,7 +97,7 @@ extension SkyOverlayRenderer {
         if let panel = frame.mosaic, let mosaic {
             aim = (panel.aim.horizontal.unitVector, "Panel \(min(mosaic.step + 1, mosaic.count))")
         } else if let target = frame.target {
-            aim = (target.direction, target.object.name)
+            aim = (target.direction, SmallBodyText.displayName(target.object))
         } else {
             return
         }

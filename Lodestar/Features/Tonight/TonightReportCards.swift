@@ -13,6 +13,9 @@ struct TonightReportCards: View {
                                 appliesSkyline: report.appliesSkyline)
             TonightPlanetsCard(summary: report.summary, timeZone: report.timeZone,
                                appliesSkyline: report.appliesSkyline)
+            if let smallBodies = report.smallBodies {
+                SmallBodyTonightCard(entries: smallBodies, timeZone: report.timeZone)
+            }
             TonightTargetsCard(outcome: report.targets, timeZone: report.timeZone,
                                appliesSkyline: report.appliesSkyline)
         }

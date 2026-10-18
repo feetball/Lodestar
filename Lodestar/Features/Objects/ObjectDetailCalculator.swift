@@ -47,7 +47,9 @@ enum ObjectDetailCalculator {
             distance: distance,
             illuminatedFraction: illuminatedFraction,
             moonPhase: moonPhase,
-            isBehindSkyline: isBehindSkyline)
+            isBehindSkyline: isBehindSkyline,
+            isSmallBody: object.smallBody != nil,
+            smallBody: object.smallBody.flatMap { SmallBodyDetail.compute($0, frame: frame) })
     }
 
     // MARK: Tonight

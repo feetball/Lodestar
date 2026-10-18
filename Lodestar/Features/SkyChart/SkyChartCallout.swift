@@ -16,7 +16,7 @@ struct SkyChartCallout: View {
             HStack(spacing: 8) {
                 ObjectIcon(category: selection.object.category)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(selection.object.name)
+                    Text(SmallBodyText.displayName(selection.object))
                         .font(.headline)
                         .foregroundStyle(palette.primaryText)
                         .lineLimit(2)
@@ -67,6 +67,7 @@ struct SkyChartCallout: View {
     /// The object's type, constellation and current magnitude.
     private var subtitle: String {
         let object = selection.object
+        if object.smallBody != nil { return SmallBodyText.summary(of: object, info: selection.smallBody) }
         var parts = [object.category.displayName]
         if let constellation = object.constellationName { parts.append(constellation) }
         if let magnitude = selection.magnitude { parts.append(AppFormat.magnitude(magnitude)) }

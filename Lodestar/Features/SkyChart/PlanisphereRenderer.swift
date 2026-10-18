@@ -66,6 +66,7 @@ struct PlanisphereRenderer {
         drawStars(&sky)
         if layers.deepSkyObjects { drawDeepSky(&sky) }
         occupied += drawBodies(&sky)
+        occupied += drawSmallBodies(&sky)
         drawSkyline(&sky)
         occupied += drawMosaic(&sky)
         occupied += drawTarget(&sky)

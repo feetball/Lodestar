@@ -24,6 +24,9 @@ struct TonightView: View {
                 .navigationDestination(for: CelestialObject.self) { object in
                     ObjectDetailView(object: object)
                 }
+                .navigationDestination(for: SmallBodyListRoute.self) { _ in
+                    SmallBodyListView()
+                }
                 .eventsDestinations()
         }
         .environment(events)
