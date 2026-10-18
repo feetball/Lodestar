@@ -295,3 +295,16 @@ python3 -I Tools/ephemeris/gen_planetary_theory.py <dir with VSOP87B.*> \
   Francou (A&A 202, 309, 1988). Download the eight `VSOP87B.*` files from
   `ftp.imcce.fr/pub/ephem/planets/vsop87/` (also on CDS VizieR, catalogue VI/81); their SHA-256 digests
   are listed in the header of the generated file, which the script reproduces byte for byte.
+
+## Satellite test fixtures — `make_satellite_fixtures.py`
+
+Regenerates the satellite fixtures in `LodestarKit/Tests/LodestarKitTests/Fixtures/` (and the identical copies in the
+Android engine) with subcommands `sgp4`, `snapshot`, `passes` and `streaks`. Pinned inputs:
+
+| Source | sha256 |
+| --- | --- |
+| CelesTrak SGP4 reference code `cpp.zip` (Vallado et al., AIAA 2006-6753) | `16276bb1e72f90efd9c94c25a83403b0e4b04977d0d5f87487685cd479cd6866` |
+| `AIAA-2006-6753.zip` (verification TLEs and MATLAB output) | `3642043b706c76be87cf012db3f22e04da6b80498d00f515e51879e0ffadc115` |
+| JPL DE421 `de421.bsp` (Skyfield reference positions) | `a20a7139da04cbc462454634918e9a9ca69127044e2cc9d4f9c16e238d2deedc` |
+
+`snapshot` saves small CelesTrak GP snapshots (2026-10-18); the tests never touch the network.
