@@ -20,6 +20,12 @@ enum ObjectsHorizon {
                                              within: interval)
         case .solarSystem(let body):
             return visibility.riseTransitSet(for: body, observer: observer, within: interval)
+        case .smallBody:
+            // A comet or asteroid moves against the stars: follow its own position.
+            let position = { (date: Date) in
+                SkyFrame(date: date, observer: observer).horizontal(of: object, refraction: false)
+            }
+            return visibility.riseTransitSet(of: position, within: interval)
         case .celestialPole(let north):
             // The pole stands still at the latitude, due north or due south.
             let altitude = north ? observer.location.latitude : -observer.location.latitude
