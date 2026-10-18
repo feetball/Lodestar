@@ -14,6 +14,8 @@ struct ObserverContext: Equatable, Sendable {
     var horizontalAccuracy: Double?
     /// When the device location was measured (device location only).
     var timestamp: Date?
+    /// The site's recorded skyline, or nil for an open horizon (always nil for the device location).
+    var horizon: HorizonProfile?
 
     var location: GeographicLocation { observer.location }
 

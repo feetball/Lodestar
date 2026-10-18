@@ -20,10 +20,12 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
     var elevation: Double
     /// IANA time zone of the site, when known (resolved by reverse geocoding).
     var timeZoneIdentifier: String?
+    /// The recorded skyline (trees, mountains), or nil for an open horizon.
+    var horizon: HorizonProfile?
 
     /// Validates the coordinates and trims/limits the name; returns nil for invalid input.
     init?(id: UUID = UUID(), name: String, latitude: Double, longitude: Double, elevation: Double = 0,
-          timeZoneIdentifier: String? = nil) {
+          timeZoneIdentifier: String? = nil, horizon: HorizonProfile? = nil) {
         guard let location = GeographicLocation.validated(latitude: latitude, longitude: longitude, elevation: elevation) else {
             return nil
         }
@@ -34,10 +36,11 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
         self.longitude = location.longitude
         self.elevation = location.elevation
         self.timeZoneIdentifier = timeZoneIdentifier.flatMap { TimeZone(identifier: $0) != nil ? $0 : nil }
+        self.horizon = horizon.flatMap { $0.isFlat ? nil : $0 }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, latitude, longitude, elevation, timeZoneIdentifier
+        case id, name, latitude, longitude, elevation, timeZoneIdentifier, horizon
     }
 
     /// Decodes and re-validates a stored site; invalid entries throw and are dropped by the caller.
@@ -48,7 +51,9 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
                                    latitude: try c.decode(Double.self, forKey: .latitude),
                                    longitude: try c.decode(Double.self, forKey: .longitude),
                                    elevation: try c.decodeIfPresent(Double.self, forKey: .elevation) ?? 0,
-                                   timeZoneIdentifier: try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier)) else {
+                                   timeZoneIdentifier: try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier),
+                                   // A damaged skyline is dropped rather than losing the site.
+                                   horizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .horizon)) ?? nil) else {
             throw DecodingError.dataCorruptedError(forKey: .latitude, in: c, debugDescription: "Invalid site coordinates")
         }
         self = site

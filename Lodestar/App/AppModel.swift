@@ -131,7 +131,8 @@ final class AppModel {
         case .site(let id):
             guard let site = settings.savedSites.first(where: { $0.id == id }) else { return nil }
             return ObserverContext(observer: Observer(location: site.location, atmosphere: atmosphere),
-                                   timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id))
+                                   timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id),
+                                   horizon: site.horizon)
         }
     }
 
