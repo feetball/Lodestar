@@ -43,8 +43,14 @@ final class TonightLocator {
     /// Whether Core Location lets this process read the location.
     var isAuthorized: Bool {
         switch manager.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse: return true
-        default: return manager.isAuthorizedForWidgetUpdates
+        case .authorizedAlways, .authorizedWhenInUse:
+            return true
+        default:
+            #if os(watchOS)
+            return false
+            #else
+            return manager.isAuthorizedForWidgetUpdates
+            #endif
         }
     }
 
