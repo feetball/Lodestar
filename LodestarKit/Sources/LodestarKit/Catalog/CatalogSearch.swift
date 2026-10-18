@@ -42,12 +42,14 @@ extension Catalog {
     /// "alpha1") and drops leading zeros of numbers. So "m31", "M 31", "Messier 31" and "M031" are the
     /// same query, as are "ngc224" and "NGC 0224", and "alpha cma", "alpha canis majoris" and "α CMa".
     /// It matches names, common names and the designations of every object: Messier, NGC and IC
-    /// numbers, Bayer and Flamsteed designations with the constellation as abbreviation or genitive,
-    /// and HR, HD and HIP numbers.
+    /// numbers, the numbers of the other deep-sky catalogues (Caldwell "C 14" and "Caldwell 14", Sharpless
+    /// "Sh2-155", "Sh 2-155" and "Sharpless 155", Barnard "B33" and "Barnard 33", Lynds "LDN 1622" and
+    /// "Lynds 1622", Collinder "Cr 399", Melotte "Mel 20", Trumpler "Tr 24", Stock "St 2"), Bayer and
+    /// Flamsteed designations with the constellation as abbreviation or genitive, and HR, HD and HIP numbers.
     ///
-    /// Results are ordered by `MatchKind`; matches of the same kind are ordered by listed objects
-    /// first, then brighter objects, then name. `MatchKind.fuzzy` results only appear when there
-    /// are no other matches.
+    /// Results are ordered by `MatchKind`; matches of the same kind are ordered by listed objects first,
+    /// then more prominent objects (`CelestialObject.prominence`), then brighter objects (objects without a
+    /// magnitude last), then name. `MatchKind.fuzzy` results only appear when there are no other matches.
     ///
     /// - Parameters:
     ///   - query: The text to look for. Only its first `maximumQueryLength` characters are used. A

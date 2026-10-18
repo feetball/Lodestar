@@ -58,32 +58,119 @@ enum CatalogDesignation {
         let aliases: [String]
     }
 
-    /// Prefix of an OpenNGC identifier → the form shown and the other spellings of the prefix.
-    private static let prefixes: [String: (display: String, aliases: [String])] = [
-        "M": ("M", ["Messier"]),
-        "NGC": ("NGC", []),
-        "IC": ("IC", []),
-        "C": ("Caldwell", ["C"]),
-        "Mel": ("Melotte", ["Mel"]),
-        "B": ("Barnard", ["B"]),
-        "H": ("Harvard", ["H"]),
-        "Cl": ("Collinder", ["Cl", "Cr"]),
-        "ESO": ("ESO", []),
-        "HCG": ("HCG", ["Hickson"]),
-        "MWSC": ("MWSC", []),
-        "PGC": ("PGC", []),
-        "UGC": ("UGC", []),
+    /// The form shown and the other spellings of an identifier prefix, and the catalogue it stands for, if
+    /// it is one of `DeepSkyCatalogue`.
+    private struct Names {
+        let display: String
+        let aliases: [String]
+        let catalogue: DeepSkyCatalogue?
+
+        init(_ display: String, _ aliases: [String], _ catalogue: DeepSkyCatalogue? = nil) {
+            self.display = display
+            self.aliases = aliases
+            self.catalogue = catalogue
+        }
+    }
+
+    /// Prefix of a compact designation → the form shown and the other spellings of the prefix.
+    private static let prefixes: [String: Names] = [
+        "M": Names("M", ["Messier"], .messier),
+        "NGC": Names("NGC", [], .ngc),
+        "IC": Names("IC", [], .ic),
+        "C": Names("Caldwell", ["C"], .caldwell),
+        "Mel": Names("Melotte", ["Mel"], .melotte),
+        "B": Names("Barnard", ["B"], .barnard),
+        "H": Names("Harvard", ["H"]),
+        "Cl": Names("Collinder", ["Cl", "Cr"], .collinder),
+        "Tr": Names("Trumpler", ["Tr"], .trumpler),
+        "St": Names("Stock", ["St"], .stock),
+        "LDN": Names("LDN", ["Lynds", "L"], .lynds),
+        "ESO": Names("ESO", []),
+        "HCG": Names("HCG", ["Hickson"]),
+        "MWSC": Names("MWSC", []),
+        "PGC": Names("PGC", []),
+        "UGC": Names("UGC", []),
     ]
 
-    /// The spelling of an OpenNGC identifier such as `M31`, `C14`, `ESO56-115` or `IC2431_NED02`.
+    /// The prefix of the Sharpless 2 designations, which carry the catalogue number: `Sh2-155`.
+    private static let sharplessPrefix = "Sh2-"
+    /// The longest number a Sharpless 2 designation has (the catalogue ends at 313).
+    private static let maximumSharplessDigits = 4
+    /// "Sharpless 2-155" is only an alias of numbers with this many digits, see `spelling(ofIdentifier:)`.
+    private static let minimumDigitsOfUnambiguousSharplessAlias = 3
+    /// The longest prefix and the longest number a compact designation has.
+    private static let maximumPrefixLength = 6
+    private static let maximumNumberDigits = 6
+
+    /// The spelling of a compact designation, that is an OpenNGC identifier such as `M31`, `C14`, `Sh2-155`,
+    /// `LDN1622`, `ESO56-115` or `IC2431_NED02`.
+    ///
+    /// Sharpless regions are shown as "Sh2-155" and found as "Sh 2-155", "Sharpless 155" and, from Sh2-100
+    /// on, "Sharpless 2-155". The last form is left out below 100 because a search key has no punctuation:
+    /// "Sharpless 2-45" and "Sharpless 245" are the same key, and "Sharpless 245" must find Sh2-245, not M 17.
     static func spelling(ofIdentifier id: String) -> Spelling {
+        if id.hasPrefix(sharplessPrefix), id.count > sharplessPrefix.count {
+            let number = String(id.dropFirst(sharplessPrefix.count))
+            var aliases = ["Sh 2-\(number)", "Sharpless \(number)"]
+            if number.count >= minimumDigitsOfUnambiguousSharplessAlias { aliases.append("Sharpless 2-\(number)") }
+            return Spelling(display: "Sh2-\(number)", aliases: aliases)
+        }
         let prefix = String(id.prefix(while: { $0.isASCII && $0.isLetter }))
         let number = String(id.dropFirst(prefix.count)).replacingOccurrences(of: "_", with: " ")
         guard !prefix.isEmpty, !number.isEmpty else {
             return Spelling(display: id.replacingOccurrences(of: "_", with: " "), aliases: [])
         }
-        let known = prefixes[prefix] ?? (prefix, [])
+        let known = prefixes[prefix] ?? Names(prefix, [])
         return Spelling(display: "\(known.display) \(number)", aliases: known.aliases.map { "\($0) \(number)" })
+    }
+
+    /// Whether `text` is a compact designation of the kind the `cat` member of a deep-sky record holds: one to
+    /// six ASCII letters, the first of them upper case, and a number of up to six digits, optionally followed
+    /// by one more letter (`C20`, `Mel22`, `B67a`, `NGC2818A`, `LDN1622`), or a Sharpless 2 designation (`Sh2-117`).
+    static func isCompact(_ text: String) -> Bool {
+        parse(text) != nil
+    }
+
+    /// A compact designation split into its prefix, its number and the letter after the number, if any.
+    private struct Parts {
+        let prefix: String
+        let number: Int
+        let suffix: String
+    }
+
+    private static func parse(_ text: String) -> Parts? {
+        if text.hasPrefix(sharplessPrefix) {
+            guard let number = number(String(text.dropFirst(sharplessPrefix.count)), maximumDigits: maximumSharplessDigits) else {
+                return nil
+            }
+            return Parts(prefix: "Sh2", number: number, suffix: "")
+        }
+        let prefix = String(text.prefix(while: { $0.isASCII && $0.isLetter }))
+        guard !prefix.isEmpty, prefix.count <= maximumPrefixLength, prefix.first?.isUppercase == true else { return nil }
+        let rest = text.dropFirst(prefix.count)
+        let digits = String(rest.prefix(while: { $0.isASCII && $0.isNumber }))
+        guard let number = number(digits, maximumDigits: maximumNumberDigits) else { return nil }
+        let suffix = String(rest.dropFirst(digits.count))
+        if suffix.count > 1 || (!suffix.isEmpty && !(suffix.first.map { $0.isASCII && $0.isLetter } ?? false)) {
+            return nil
+        }
+        return Parts(prefix: prefix, number: number, suffix: suffix)
+    }
+
+    private static func number(_ digits: String, maximumDigits: Int) -> Int? {
+        guard !digits.isEmpty, digits.count <= maximumDigits, digits.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let value = Int(digits), value >= 1 else { return nil }
+        return value
+    }
+
+    /// The catalogue number of a compact designation (`M31`, `NGC7000`, `C14`, `Sh2-155`, `B67a`, `LDN1622`,
+    /// `Cl399`, `Mel20`), or `nil` for an identifier of a catalogue that is not a `DeepSkyCatalogue`
+    /// (`ESO56-115`, `H20`, `PGC143`) or for something that is no designation.
+    static func catalogNumber(of text: String) -> CatalogNumber? {
+        guard let parts = parse(text) else { return nil }
+        let catalogue = parts.prefix == "Sh2" ? DeepSkyCatalogue.sharpless : prefixes[parts.prefix]?.catalogue
+        guard let catalogue else { return nil }
+        return CatalogNumber(catalogue: catalogue, number: parts.number, suffix: parts.suffix)
     }
 }
 
@@ -219,7 +306,7 @@ enum CatalogFactory {
             colorIndex: entry.colorIndex, spectralType: entry.spectralType,
             distanceLightYears: entry.distanceParsecs.map { $0 * lightYearsPerParsec },
             isListed: entry.properName != nil || entry.magnitude <= maximumListedStarMagnitude,
-            notes: isQuasar ? quasarNote : nil)
+            notes: isQuasar ? quasarNote : nil, prominence: Prominence(starMagnitude: entry.magnitude))
         return ObjectDraft(object: object, keys: keys)
     }
 
@@ -249,6 +336,7 @@ enum CatalogFactory {
             noteSentences.append("Surface brightness \(CatalogFormat.oneDecimal(brightness)) mag/arcsec\u{00B2}.")
         }
 
+        let prominence = entry.prominence ?? .notable
         let object = CelestialObject(
             id: "dso.\(entry.id)", name: name, designations: designations, alternateNames: alternateNames,
             category: ObjectCategory(openNGCType: entry.typeCode),
@@ -257,30 +345,55 @@ enum CatalogFactory {
             angularSize: entry.majorAxis.flatMap {
                 AngularSize(majorArcminutes: $0, minorArcminutes: entry.minorAxis, positionAngle: entry.positionAngle)
             },
-            position: .fixed(entry.position, nil), isListed: true,
-            notes: noteSentences.isEmpty ? nil : noteSentences.joined(separator: " "))
+            position: .fixed(entry.position, nil), isListed: prominence <= Prominence.lastListed,
+            notes: noteSentences.isEmpty ? nil : noteSentences.joined(separator: " "),
+            prominence: prominence, catalogNumbers: catalogNumbers(of: entry))
         return ObjectDraft(object: object, keys: keys)
     }
 
     /// The designations of a deep-sky record: Messier, NGC and IC numbers, then the identifier of
-    /// the data file when it is from another catalog.
+    /// the data file when it is from another catalog, then the designations of other catalogues the
+    /// record lists (`cat`: Caldwell, Sharpless, Melotte...). A designation that reads like an earlier one
+    /// is left out.
     static func spellings(of entry: DeepSkyEntry) -> [CatalogDesignation.Spelling] {
         var spellings: [CatalogDesignation.Spelling] = []
+        var keys: [[UInt8]] = []
+        func add(_ spelling: CatalogDesignation.Spelling) {
+            let key = SearchText.key(for: spelling.display).bytes
+            if !keys.contains(key) {
+                keys.append(key)
+                spellings.append(spelling)
+            }
+        }
         if let number = entry.messier {
-            spellings.append(.init(display: "M \(number)", aliases: ["Messier \(number)"]))
+            add(.init(display: "M \(number)", aliases: ["Messier \(number)"]))
         }
         for number in entry.ngc {
-            spellings.append(.init(display: "NGC \(number)", aliases: []))
+            add(.init(display: "NGC \(number)", aliases: []))
         }
         for number in entry.ic {
-            spellings.append(.init(display: "IC \(number)", aliases: []))
+            add(.init(display: "IC \(number)", aliases: []))
         }
-        let own = CatalogDesignation.spelling(ofIdentifier: entry.id)
-        let ownKey = SearchText.key(for: own.display).bytes
-        if !spellings.contains(where: { SearchText.key(for: $0.display).bytes == ownKey }) {
-            spellings.append(own)
+        add(CatalogDesignation.spelling(ofIdentifier: entry.id))
+        for designation in entry.cat {
+            add(CatalogDesignation.spelling(ofIdentifier: designation))
         }
         return spellings
+    }
+
+    /// The catalogue numbers of a deep-sky record, in the order of its designations: Messier, NGC, IC, the
+    /// identifier of the data file, then `cat`; repeats and identifiers of other catalogues are left out.
+    static func catalogNumbers(of entry: DeepSkyEntry) -> [CatalogNumber] {
+        var numbers: [CatalogNumber] = []
+        func add(_ number: CatalogNumber?) {
+            if let number, !numbers.contains(number) { numbers.append(number) }
+        }
+        if let messier = entry.messier { add(CatalogNumber(catalogue: .messier, number: messier)) }
+        for number in entry.ngc { add(CatalogNumber(catalogue: .ngc, number: number)) }
+        for number in entry.ic { add(CatalogNumber(catalogue: .ic, number: number)) }
+        add(CatalogDesignation.catalogNumber(of: entry.id))
+        for designation in entry.cat { add(CatalogDesignation.catalogNumber(of: designation)) }
+        return numbers
     }
 
     /// The identifier under which a deep-sky object with an acronym for a name ("LMC") also answers.

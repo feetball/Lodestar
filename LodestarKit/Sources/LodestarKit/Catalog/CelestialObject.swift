@@ -59,18 +59,33 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
     public let distanceLightYears: Double?
     /// Whether browse lists show the object.
     ///
-    /// All solar-system and special objects and all deep-sky objects are listed, and so are stars
-    /// with a proper name and other stars of magnitude 3.5 or brighter. The remaining stars are
-    /// only found by search and drawn on the sky.
+    /// All solar-system and special objects are listed, and so are the deep-sky objects whose
+    /// `prominence` is `.notable` or better, stars with a proper name and other stars of magnitude 3.5
+    /// or brighter. The remaining objects (the obscure deep-sky objects and the faint stars) are only
+    /// found by search, by catalogue (`Catalog.objects(in:)` with a `DeepSkyCatalogue`) and drawn on
+    /// the sky.
     public let isListed: Bool
     /// A short note for the detail view, if there is something worth saying.
     public let notes: String?
+    /// How conspicuous the object is, see `Prominence`.
+    ///
+    /// Deep-sky objects have the value of the data file (a record without one counts as `.notable`),
+    /// stars follow their magnitude (`Prominence(starMagnitude:)`), and the Sun, the Moon, the planets,
+    /// the special directions and custom targets are showpieces.
+    public let prominence: Prominence
+    /// The object's numbers in the catalogues of `DeepSkyCatalogue`, in the order of `designations`
+    /// (Messier, NGC, IC, then the others).
+    ///
+    /// Empty for stars, solar-system bodies and deep-sky objects that are only in other catalogues
+    /// (ESO, PGC, UGC...).
+    public let catalogNumbers: [CatalogNumber]
 
     init(id: String, name: String, designations: [String] = [], alternateNames: [String] = [],
          category: ObjectCategory, constellation: String? = nil, constellationName: String? = nil,
          magnitude: Double? = nil, angularSize: AngularSize? = nil, position: ObjectPosition,
          colorIndex: Double? = nil, spectralType: String? = nil, distanceLightYears: Double? = nil,
-         isListed: Bool, notes: String? = nil) {
+         isListed: Bool, notes: String? = nil, prominence: Prominence = .notable,
+         catalogNumbers: [CatalogNumber] = []) {
         self.id = id
         self.name = name
         self.designations = designations
@@ -86,6 +101,8 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
         self.distanceLightYears = distanceLightYears
         self.isListed = isListed
         self.notes = notes
+        self.prominence = prominence
+        self.catalogNumbers = catalogNumbers
     }
 
     /// Hashes the identifier only, so objects with the same identifier hash alike.
@@ -97,6 +114,18 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
 
     /// The browse group of the object's category.
     public var group: ObjectGroup { category.group }
+
+    /// The catalogues the object is in, in the order of `catalogNumbers` (for example Messier, NGC, Caldwell).
+    public var catalogues: [DeepSkyCatalogue] {
+        var found: [DeepSkyCatalogue] = []
+        for number in catalogNumbers where !found.contains(number.catalogue) {
+            found.append(number.catalogue)
+        }
+        return found
+    }
+
+    /// `true` for the objects of the deep-sky data (identifiers starting with `"dso."`).
+    public var isDeepSky: Bool { id.hasPrefix("dso.") }
 
     /// The J2000 position of a fixed object; `nil` for solar-system bodies and the poles.
     public var j2000: EquatorialCoordinate? {
@@ -162,7 +191,8 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
         let cleanedName = cleanedCustomName(name)
         return CelestialObject(id: "custom.\(id.uuidString)",
                                name: cleanedName.isEmpty ? defaultCustomName : cleanedName,
-                               category: .custom, position: .fixed(position, nil), isListed: true)
+                               category: .custom, position: .fixed(position, nil), isListed: true,
+                               prominence: .showpiece)
     }
 
     private static func cleanedCustomName(_ raw: String) -> String {

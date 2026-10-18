@@ -47,6 +47,8 @@ enum CatalogFixture {
         let pa: Double?
         let h: String?
         let sb: Double?
+        let cat: [String]?
+        let p: Int?
     }
 
     private struct StarFile: Decodable { let stars: [RawStar] }
@@ -106,7 +108,7 @@ final class CatalogLoadingTests: XCTestCase {
         let stars = try CatalogFixture.rawStars()
         let deepSky = try CatalogFixture.rawDeepSky()
         XCTAssertEqual(stars.count, 9001)
-        XCTAssertEqual(deepSky.count, 693)
+        XCTAssertEqual(deepSky.count, 2441)
         XCTAssertEqual(catalog.renderStars.count, stars.count)
         XCTAssertEqual(catalog.constellations.count, 88)
         XCTAssertEqual(catalog.milkyWay.levels.count, 5)
@@ -287,7 +289,8 @@ final class CatalogLoadingTests: XCTestCase {
                 XCTAssertNil(record.m)
                 continue
             }
-            XCTAssertTrue(object.isListed)
+            XCTAssertEqual(object.isListed, (record.p ?? 3) <= 3, record.id)
+            XCTAssertEqual(object.prominence.rawValue, record.p ?? 3, record.id)
             XCTAssertEqual(object.group == .special, object.category == .other || object.category == .milkyWay)
             XCTAssertEqual(object.category, expectedCategory(forOpenNGCType: record.t), record.id)
             XCTAssertEqual(object.magnitude, record.vm ?? record.bm, record.id)
@@ -320,28 +323,33 @@ final class CatalogLoadingTests: XCTestCase {
     func testOtherCatalogDesignationsAreSpelledOut() throws {
         let catalog = try CatalogFixture.catalog()
         XCTAssertEqual(catalog.object(id: "dso.C14")?.designations, ["Caldwell 14"])
-        XCTAssertEqual(catalog.object(id: "dso.C41")?.designations, ["Caldwell 41"])
+        XCTAssertEqual(catalog.object(id: "dso.C9")?.designations, ["Caldwell 9", "Sh2-155"])
+        XCTAssertEqual(catalog.object(id: "dso.C41")?.designations, ["Caldwell 41", "Melotte 25", "Collinder 50"])
         XCTAssertEqual(catalog.object(id: "dso.Mel111")?.designations, ["Melotte 111"])
         XCTAssertEqual(catalog.object(id: "dso.B33")?.designations, ["Barnard 33"])
         XCTAssertEqual(catalog.object(id: "dso.ESO56-115")?.designations, ["ESO 56-115"])
         XCTAssertEqual(catalog.object(id: "dso.Cl399")?.designations, ["Collinder 399"])
-        XCTAssertEqual(catalog.object(id: "dso.H5")?.designations, ["Harvard 5"])
+        XCTAssertEqual(catalog.object(id: "dso.H5")?.designations, ["Harvard 5", "Collinder 258"])
         XCTAssertEqual(catalog.object(id: "dso.IC359A")?.designations, ["IC 359A"])
         XCTAssertEqual(catalog.object(id: "dso.IC2431_NED02")?.designations, ["IC 2431 NED02"])
         XCTAssertEqual(catalog.object(id: "dso.HCG92")?.designations, ["HCG 92"])
         XCTAssertEqual(catalog.object(id: "dso.PGC143")?.designations, ["PGC 143"])
         XCTAssertEqual(catalog.object(id: "dso.UGC5373")?.designations, ["UGC 5373"])
         XCTAssertEqual(catalog.object(id: "dso.MWSC3171")?.designations, ["MWSC 3171"])
-        XCTAssertEqual(catalog.object(id: "dso.NGC2239")?.designations, ["NGC 2239", "NGC 2244"])
-        XCTAssertEqual(catalog.object(id: "dso.NGC281")?.designations, ["NGC 281", "IC 11"])
-        XCTAssertEqual(catalog.object(id: "dso.M8")?.designations, ["M 8", "NGC 6523", "NGC 6533"])
+        XCTAssertEqual(catalog.object(id: "dso.NGC2239")?.designations, ["NGC 2239", "NGC 2244", "Caldwell 50"])
+        XCTAssertEqual(catalog.object(id: "dso.NGC281")?.designations, ["NGC 281", "IC 11", "Sh2-184"])
+        XCTAssertEqual(catalog.object(id: "dso.M8")?.designations, ["M 8", "NGC 6523", "NGC 6533", "Sh2-25"])
     }
 
     func testListingRulesForEveryKindOfObject() throws {
         let catalog = try CatalogFixture.catalog()
-        for object in catalog.objects where !object.id.hasPrefix("star.") {
-            XCTAssertTrue(object.isListed, "\(object.id) is a solar-system, special or deep-sky object")
+        for object in catalog.objects where !object.id.hasPrefix("star.") && !object.isDeepSky {
+            XCTAssertTrue(object.isListed, "\(object.id) is a solar-system or special object")
         }
+        for object in catalog.deepSkyObjects {
+            XCTAssertEqual(object.isListed, object.prominence <= .notable, "\(object.id) is listed unless it is obscure")
+        }
+        XCTAssertTrue(catalog.deepSkyObjects.contains { !$0.isListed }, "the obscure deep-sky objects are not listed")
         let stars = try CatalogFixture.rawStars()
         func object(_ star: CatalogFixture.RawStar) throws -> CelestialObject {
             try XCTUnwrap(catalog.object(id: star.hip.map { "star.hip\($0)" } ?? "star.hr\(star.hr ?? 0)"))
@@ -356,7 +364,7 @@ final class CatalogLoadingTests: XCTestCase {
         XCTAssertTrue(try object(boundary).isListed, "magnitude 3.5 is still listed")
         let listedStars = catalog.listedObjects.filter { $0.id.hasPrefix("star.") }
         XCTAssertEqual(listedStars.count, stars.filter { $0.n != nil || $0.m <= 3.5 }.count)
-        XCTAssertEqual(catalog.listedObjects.count, 9 + 3 + (catalog.objects.count - 12 - catalog.renderStars.count) + listedStars.count)
+        XCTAssertEqual(catalog.listedObjects.count, 9 + 3 + catalog.deepSkyObjects.filter(\.isListed).count + listedStars.count)
     }
 
     func testCategoryMappingCoversEveryOpenNGCType() throws {

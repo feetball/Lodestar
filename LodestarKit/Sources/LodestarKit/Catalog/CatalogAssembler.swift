@@ -10,6 +10,9 @@ struct CatalogContents {
     let searchIndex: SearchIndex
     let indexByID: [String: Int]
     let listedByGroup: [ObjectGroup: [CelestialObject]]
+    let deepSky: [CelestialObject]
+    let deepSkyUpTo: [[CelestialObject]]
+    let byCatalogue: [DeepSkyCatalogue: [CelestialObject]]
 }
 
 /// Reads the data files, validates their records and builds the catalog's objects and search index.
@@ -56,8 +59,11 @@ enum CatalogAssembler {
         }
 
         var acronymAliases: [(alias: String, index: Int)] = []
+        var deepSkyObjects: [CelestialObject] = []
+        deepSkyObjects.reserveCapacity(distinctDeepSky.count)
         for entry in distinctDeepSky {
             let draft = CatalogFactory.deepSkyObject(entry, constellations: constellations)
+            deepSkyObjects.append(draft.object)
             for alternate in draft.object.alternateNames {
                 if let alias = CatalogFactory.acronymAlias(for: alternate) {
                     acronymAliases.append((alias, table.objects.count))
@@ -97,7 +103,36 @@ enum CatalogAssembler {
         return CatalogContents(
             objects: table.objects, constellations: constellations, milkyWay: milkyWay, renderStars: renderStars,
             report: report, searchIndex: table.search.finish(objectsByRank: objectsByRank),
-            indexByID: indexByID, listedByGroup: listedByGroup)
+            indexByID: indexByID, listedByGroup: listedByGroup, deepSky: deepSkyObjects,
+            deepSkyUpTo: deepSkyUpTo(deepSkyObjects), byCatalogue: byCatalogue(deepSkyObjects))
+    }
+
+    /// The deep-sky objects of each prominence and the more prominent ones, in the order of `deepSky`.
+    private static func deepSkyUpTo(_ deepSky: [CelestialObject]) -> [[CelestialObject]] {
+        Prominence.allCases.map { limit in deepSky.filter { $0.prominence <= limit } }
+    }
+
+    /// The deep-sky objects of each catalogue by catalogue number (then letter, then identifier). An
+    /// object with several numbers in one catalogue, such as NGC 6523 and NGC 6533, is listed once, at the
+    /// first.
+    private static func byCatalogue(_ deepSky: [CelestialObject]) -> [DeepSkyCatalogue: [CelestialObject]] {
+        var placed: [DeepSkyCatalogue: [(number: CatalogNumber, object: CelestialObject)]] = [:]
+        for object in deepSky {
+            var seen: Set<DeepSkyCatalogue> = []
+            for number in object.catalogNumbers where seen.insert(number.catalogue).inserted {
+                placed[number.catalogue, default: []].append((number, object))
+            }
+        }
+        var result: [DeepSkyCatalogue: [CelestialObject]] = [:]
+        for catalogue in DeepSkyCatalogue.allCases {
+            let entries = (placed[catalogue] ?? []).sorted { lhs, rhs in
+                if lhs.number.number != rhs.number.number { return lhs.number.number < rhs.number.number }
+                if lhs.number.suffix != rhs.number.suffix { return lhs.number.suffix < rhs.number.suffix }
+                return lhs.object.id < rhs.object.id
+            }
+            result[catalogue] = entries.map(\.object)
+        }
+        return result
     }
 
     /// How close a deep-sky record must be to a star to be that star, in degrees.

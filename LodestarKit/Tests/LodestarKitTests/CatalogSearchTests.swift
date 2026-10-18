@@ -175,13 +175,19 @@ final class CatalogSearchTests: XCTestCase {
     private func ids(_ results: [CatalogSearchResult]) -> [String] { results.map(\.object.id) }
 
     /// The ranking rules: kinds never get worse down the list, and results of one kind are ordered by
-    /// listed objects first, then brighter ones, then name.
+    /// listed objects first, then more prominent ones, then brighter ones, then name.
     private func assertRankingOrder(_ results: [CatalogSearchResult], _ query: String, file: StaticString = #filePath, line: UInt = #line) {
         for (first, second) in zip(results, results.dropFirst()) {
             XCTAssertLessThanOrEqual(first.kind, second.kind, "\(query): \(first.object.id) before \(second.object.id)", file: file, line: line)
             guard first.kind == second.kind else { continue }
             if first.object.isListed != second.object.isListed {
                 XCTAssertTrue(first.object.isListed, "\(query): unlisted \(first.object.id) before listed \(second.object.id)", file: file, line: line)
+                continue
+            }
+            if first.object.prominence != second.object.prominence {
+                XCTAssertLessThan(first.object.prominence, second.object.prominence,
+                                  "\(query): \(first.object.id) (\(first.object.prominence.rawValue)) before \(second.object.id) (\(second.object.prominence.rawValue))",
+                                  file: file, line: line)
                 continue
             }
             if first.object.rankingMagnitude != second.object.rankingMagnitude {
@@ -468,7 +474,7 @@ final class CatalogSearchTests: XCTestCase {
 
     // MARK: Ranking
 
-    func testResultsAreRankedByKindThenListingBrightnessAndName() throws {
+    func testResultsAreRankedByKindThenListingProminenceBrightnessAndName() throws {
         let catalog = try catalog()
         let queries = ["a", "m", "ngc", "hr", "hd 4", "alpha", "the", "cen", "1", "7", "ori", "sag", "nebula", "cluster", "m1",
                        "ic", "hip 3", "galaxy", "star", "gam", "eta car", "mu", "ngc 1", "orion", "andromeda", "alpha cen", "c1"]

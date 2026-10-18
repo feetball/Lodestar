@@ -38,6 +38,8 @@ public final class Catalog: Sendable {
     public let objects: [CelestialObject]
     /// The objects that browse lists show (`CelestialObject.isListed`), in the order of `objects`.
     public let listedObjects: [CelestialObject]
+    /// Every deep-sky object, listed or not, in the order of `objects`.
+    public let deepSkyObjects: [CelestialObject]
     /// The 88 constellations in alphabetical order of their names.
     public let constellations: [Constellation]
     /// The brightness outlines of the Milky Way.
@@ -51,10 +53,12 @@ public final class Catalog: Sendable {
     private let indexByID: [String: Int]
     private let constellationDirectory: ConstellationDirectory
     private let listedByGroup: [ObjectGroup: [CelestialObject]]
+    private let deepSkyUpTo: [[CelestialObject]]
+    private let byCatalogue: [DeepSkyCatalogue: [CelestialObject]]
 
     /// Loads the catalog from the data files bundled with the package.
     ///
-    /// This reads and checks about 1.4 MB of JSON and builds the search index, which takes a few
+    /// This reads and checks about 1.6 MB of JSON and builds the search index, which takes a few
     /// hundred milliseconds: call it off the main thread.
     ///
     /// - Throws: `CatalogError` when a file is missing, unreadable or unusable as a whole. Single
@@ -91,6 +95,7 @@ public final class Catalog: Sendable {
                                                      milkyWayData: milkyWayData)
         objects = contents.objects
         listedObjects = contents.objects.filter(\.isListed)
+        deepSkyObjects = contents.deepSky
         constellations = contents.constellations.constellations
         milkyWay = contents.milkyWay
         renderStars = contents.renderStars
@@ -99,6 +104,8 @@ public final class Catalog: Sendable {
         indexByID = contents.indexByID
         constellationDirectory = contents.constellations
         listedByGroup = contents.listedByGroup
+        deepSkyUpTo = contents.deepSkyUpTo
+        byCatalogue = contents.byCatalogue
     }
 
     /// The object with an identifier, in constant time.
@@ -112,6 +119,21 @@ public final class Catalog: Sendable {
     /// The listed objects of a group, sorted by name.
     public func objects(in group: ObjectGroup) -> [CelestialObject] {
         listedByGroup[group] ?? []
+    }
+
+    /// The deep-sky objects of a catalogue, listed or not, in the order of their catalogue numbers:
+    /// Caldwell 1 to 109, Sharpless 1 to 313, and so on. An object that has several numbers in the
+    /// catalogue (NGC 6523 and NGC 6533 are both M 8's) is listed once, at the first. Constant time; the
+    /// list is shared.
+    public func objects(in catalogue: DeepSkyCatalogue) -> [CelestialObject] {
+        byCatalogue[catalogue] ?? []
+    }
+
+    /// The deep-sky objects of `maximum` prominence or better, in the order of `deepSkyObjects`: the
+    /// showpieces for `.showpiece`, everything for `.obscure`. Constant time; the lists are shared. This is
+    /// the list a sky view draws, with a limit that grows as the field of view narrows.
+    public func deepSkyObjects(upTo maximum: Prominence) -> [CelestialObject] {
+        deepSkyUpTo[maximum.rawValue - 1]
     }
 
     /// The constellation with an IAU abbreviation, ignoring case ("cma" finds "CMa").

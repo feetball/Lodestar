@@ -29,7 +29,8 @@ enum BuiltInObjects {
                 position: .solarSystem(body), isListed: true,
                 notes: body == .sun
                     ? "Look at the Sun only through a certified solar filter. Pointing a camera or telescope at it without one can damage eyes and equipment."
-                    : nil)
+                    : nil,
+                prominence: .showpiece)
         }
     }
 
@@ -55,19 +56,22 @@ enum BuiltInObjects {
                 position: .fixed(EquatorialCoordinate(rightAscensionHours: sagittariusARightAscensionHours,
                                                       declination: sagittariusADeclination), nil),
                 isListed: true,
-                notes: "The direction of Sagittarius A*, the center of the Milky Way. The brightest part of the Milky Way band, and a favorite for wide-field astrophotography."),
+                notes: "The direction of Sagittarius A*, the center of the Milky Way. The brightest part of the Milky Way band, and a favorite for wide-field astrophotography.",
+                prominence: .showpiece),
             CelestialObject(
                 id: "special.ncp", name: "North Celestial Pole", designations: ["NCP"],
                 alternateNames: ["Celestial North Pole"], category: .celestialPole,
                 constellation: "UMi", constellationName: constellationName("UMi"),
                 position: .celestialPole(north: true), isListed: true,
-                notes: "The point in the sky that the Earth's axis points to; the stars appear to turn around it. Polaris lies within one degree of it."),
+                notes: "The point in the sky that the Earth's axis points to; the stars appear to turn around it. Polaris lies within one degree of it.",
+                prominence: .showpiece),
             CelestialObject(
                 id: "special.scp", name: "South Celestial Pole", designations: ["SCP"],
                 alternateNames: ["Celestial South Pole"], category: .celestialPole,
                 constellation: "Oct", constellationName: constellationName("Oct"),
                 position: .celestialPole(north: false), isListed: true,
-                notes: "The southern counterpart of the north celestial pole. No bright star marks it; the faint σ Octantis lies about one degree away."),
+                notes: "The southern counterpart of the north celestial pole. No bright star marks it; the faint σ Octantis lies about one degree away.",
+                prominence: .showpiece),
         ]
     }
 }

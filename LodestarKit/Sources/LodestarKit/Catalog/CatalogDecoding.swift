@@ -59,6 +59,7 @@ struct DeepSkyRecord: Decodable {
     let m: Int?
     let ngc: [Int]?
     let ic: [Int]?
+    let cat: [String]?
     let names: [String]?
     let t: String?
     let ra: Double?
@@ -71,9 +72,10 @@ struct DeepSkyRecord: Decodable {
     let pa: Double?
     let h: String?
     let sb: Double?
+    let p: Int?
 
     private enum CodingKeys: String, CodingKey {
-        case id, m, ngc, ic, names, t, ra, de, c, vm, bm, maj, pa, h, sb
+        case id, m, ngc, ic, cat, names, t, ra, de, c, vm, bm, maj, pa, h, sb, p
         case minorAxis = "min"
     }
 }
@@ -135,6 +137,7 @@ struct DeepSkyEntry {
     let messier: Int?
     let ngc: [Int]
     let ic: [Int]
+    let cat: [String]
     let names: [String]
     let typeCode: String
     let position: EquatorialCoordinate
@@ -146,6 +149,7 @@ struct DeepSkyEntry {
     let positionAngle: Double?
     let hubbleType: String?
     let surfaceBrightness: Double?
+    let prominence: Prominence?
 }
 
 struct ValidatedConstellation {
@@ -228,6 +232,7 @@ enum CatalogValidation {
         return DeepSkyEntry(
             id: id, messier: messier,
             ngc: try designationNumbers(record.ngc, "ngc"), ic: try designationNumbers(record.ic, "ic"),
+            cat: try crossDesignations(record.cat),
             names: try commonNames(record.names), typeCode: typeCode,
             position: try position(ra: record.ra, dec: record.de),
             constellation: try constellationAbbreviation(record.c),
@@ -236,7 +241,8 @@ enum CatalogValidation {
             majorAxis: major, minorAxis: minor,
             positionAngle: try number(record.pa, "pa", in: 0...360),
             hubbleType: try cleanedText(record.h, field: "h", maximumScalars: 16),
-            surfaceBrightness: try positiveNumber(record.sb, "sb", upTo: 40))
+            surfaceBrightness: try positiveNumber(record.sb, "sb", upTo: 40),
+            prominence: try prominence(record.p))
     }
 
     static func constellation(_ record: ConstellationRecord) throws -> ValidatedConstellation {
@@ -328,6 +334,32 @@ enum CatalogValidation {
             if !result.contains(value) { result.append(value) }
         }
         return result
+    }
+
+    /// The most cross-catalogue designations a record may carry.
+    static let maximumCrossDesignations = 16
+
+    /// The designations of other catalogues in compact form (`C20`, `Sh2-117`, `LDN1622`, see
+    /// `CatalogDesignation`), without repeats. A malformed one, or more than `maximumCrossDesignations`,
+    /// rejects the record.
+    private static func crossDesignations(_ values: [String]?) throws -> [String] {
+        var result: [String] = []
+        for value in values ?? [] {
+            guard let text = try cleanedText(value, field: "cat", maximumScalars: 16),
+                  CatalogDesignation.isCompact(text) else {
+                throw Rejection("cat entry \(String(value.prefix(16))) is not a catalogue designation")
+            }
+            if !result.contains(text) { result.append(text) }
+        }
+        guard result.count <= maximumCrossDesignations else { throw Rejection("cat has too many entries") }
+        return result
+    }
+
+    /// The prominence of a record: absent is `nil` (the default applies), a number outside 1 to 4 rejects it.
+    private static func prominence(_ value: Int?) throws -> Prominence? {
+        guard let value else { return nil }
+        guard let prominence = Prominence(rawValue: value) else { throw Rejection("p \(value) out of range") }
+        return prominence
     }
 
     private static func commonNames(_ values: [String]?) throws -> [String] {
