@@ -22,6 +22,8 @@ final class CatalogService {
     @ObservationIgnored private var base: Catalog?
     @ObservationIgnored private var bundledSmallBodies: [SmallBody] = []
     @ObservationIgnored private var downloadedSmallBodies: [SmallBody] = []
+    /// Called after `setDownloadedSmallBodies(_:)` replaced the catalog (the app model refreshes its target).
+    @ObservationIgnored var onSmallBodiesChange: (@MainActor () -> Void)?
 
     /// Decodes the catalog off the main actor. Safe to call repeatedly and from several places: callers that
     /// arrive while a load is running wait for it, a loaded catalog is kept, and a failed load is retried.
@@ -42,6 +44,7 @@ final class CatalogService {
         downloadedSmallBodies = bodies
         guard let base else { return }
         catalog = base.withSmallBodies(bundledSmallBodies + bodies)
+        onSmallBodiesChange?()
     }
 
     /// The object with a stable identifier such as `"dso.M31"`, or `nil` while the catalog is not loaded.
