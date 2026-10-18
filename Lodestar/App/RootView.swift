@@ -50,5 +50,6 @@ struct RootView: View {
         .task {
             await app.launch()
         }
+        .lodestarWidgets()
     }
 }
