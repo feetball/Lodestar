@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import LodestarKit
 
 /// Dot sizes and colours of the stars on the chart. Stars are drawn in batches that share a size
