@@ -12,7 +12,8 @@ enum ObjectDetailCalculator {
         let reusableNight = input.previousNight.flatMap { $0.expiry > input.date ? $0 : nil }
         let tonight = reusableNight ?? night(of: input.object, context: input.context, containing: input.date)
         return ObjectDetailSnapshot(
-            current: current(of: input.object, observer: observer, at: input.date),
+            current: current(of: input.object, observer: observer, skyline: ObjectsHorizon.skyline(of: input.context),
+                             at: input.date),
             night: tonight,
             moon: moonConditions(for: input.object, observer: observer, night: tonight, now: input.date))
     }
@@ -20,8 +21,14 @@ enum ObjectDetailCalculator {
     // MARK: Now
 
     /// Where the object is, how bright, how large and how lit at `date`.
-    static func current(of object: CelestialObject, observer: Observer, at date: Date) -> ObjectDetailCurrent {
+    static func current(of object: CelestialObject, observer: Observer, skyline: HorizonProfile? = nil,
+                        at date: Date) -> ObjectDetailCurrent {
         let frame = SkyFrame(date: date, observer: observer)
+        let horizontal = frame.horizontal(of: object, refraction: true)
+        let isBehindSkyline = skyline.map {
+            horizontal.altitude > 0 && !HorizonVisibility(profile: $0)
+                .isVisible(altitude: horizontal.altitude, azimuth: horizontal.azimuth, refracted: true)
+        } ?? false
         var distance = object.distanceLightYears.map(ObjectDetailDistance.lightYears)
         var illuminatedFraction: Double?
         var moonPhase: MoonPhaseInfo?
@@ -33,13 +40,14 @@ enum ObjectDetailCalculator {
         }
         return ObjectDetailCurrent(
             date: date,
-            horizontal: frame.horizontal(of: object, refraction: true),
+            horizontal: horizontal,
             equatorial: frame.apparentEquatorial(of: object),
             magnitude: frame.currentMagnitude(of: object),
             angularSize: frame.currentAngularSize(of: object),
             distance: distance,
             illuminatedFraction: illuminatedFraction,
-            moonPhase: moonPhase)
+            moonPhase: moonPhase,
+            isBehindSkyline: isBehindSkyline)
     }
 
     // MARK: Tonight
@@ -54,7 +62,11 @@ enum ObjectDetailCalculator {
         let chartEnd = max(twilight.sunrise ?? interval.end, chartStart)
         let chartRange = DateInterval(start: chartStart, end: chartEnd)
 
-        let events = RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: interval)
+        // With a recorded skyline a rise is the object clearing it and a set is the object sinking behind it.
+        let visibility = ObjectsHorizon.skyline(of: context).map(HorizonVisibility.init(profile:))
+        let events = visibility.map {
+            ObjectsHorizon.riseTransitSet(for: object, visibility: $0, observer: observer, within: interval)
+        } ?? RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: interval)
         let samples = altitudeSamples(of: object, observer: observer, over: chartRange)
         let darkness = twilight.astronomicalNight
         return ObjectDetailNight(
@@ -70,7 +82,8 @@ enum ObjectDetailCalculator {
             twilightBands: twilightBands(of: twilight, within: chartRange),
             hourTicks: hourTicks(in: chartRange, calendar: context.calendar),
             bestInDarkness: bestPoint(of: object, observer: observer, samples: samples, darkness: darkness,
-                                      transit: events.transit))
+                                      transit: events.transit, visibility: visibility),
+            appliesSkyline: visibility != nil)
     }
 
     /// The twilight of the night that contains `date`: the one that began at noon yesterday while it is still
@@ -103,8 +116,12 @@ enum ObjectDetailCalculator {
     /// the transit, so that a culmination between two samples is not missed.
     private static func bestPoint(of object: CelestialObject, observer: Observer,
                                   samples: [ObjectDetailAltitudeSample], darkness: DateInterval?,
-                                  transit: Date?) -> ObjectDetailPeak? {
+                                  transit: Date?, visibility: HorizonVisibility?) -> ObjectDetailPeak? {
         guard let darkness else { return nil }
+        if let visibility {
+            return bestVisiblePoint(of: object, observer: observer, samples: samples, darkness: darkness,
+                                    transit: transit, visibility: visibility)
+        }
         var candidates = samples.filter { darkness.contains($0.date) }
             .map { ObjectDetailPeak(date: $0.date, altitude: $0.altitude) }
         var extraDates = [darkness.start, darkness.end]
@@ -115,6 +132,27 @@ enum ObjectDetailCalculator {
             ObjectDetailPeak(date: $0, altitude: apparentAltitude(of: object, observer: observer, at: $0))
         }
         return candidates.max { $0.altitude < $1.altitude }
+    }
+
+    /// The same as `bestPoint` over a skyline: only the instants at which the object is above it count, so an object
+    /// that stays behind it all through the dark has no best point.
+    private static func bestVisiblePoint(of object: CelestialObject, observer: Observer,
+                                         samples: [ObjectDetailAltitudeSample], darkness: DateInterval,
+                                         transit: Date?, visibility: HorizonVisibility) -> ObjectDetailPeak? {
+        var dates = samples.filter { darkness.contains($0.date) }.map(\.date) + [darkness.start, darkness.end]
+        if let transit, darkness.contains(transit) {
+            dates.append(transit)
+        }
+        var best: ObjectDetailPeak?
+        for date in dates {
+            let position = SkyFrame(date: date, observer: observer).horizontal(of: object, refraction: true)
+            guard ObjectsHorizon.isVisible(altitude: position.altitude, azimuth: position.azimuth,
+                                           visibility: visibility) else { continue }
+            if best.map({ position.altitude > $0.altitude }) ?? true {
+                best = ObjectDetailPeak(date: date, altitude: position.altitude)
+            }
+        }
+        return best
     }
 
     /// Hourly labels for the time axis: every hour, every two hours or every four, depending on the length.

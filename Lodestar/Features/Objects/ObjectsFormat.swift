@@ -15,6 +15,29 @@ enum ObjectsFormat {
         return others.isEmpty ? nil : others.prefix(4).joined(separator: " \u{00B7} ")
     }
 
+    /// The catalogue designations after the first one that differ from the object's name, such as
+    /// "Caldwell 20 \u{00B7} Sh2-117" for the North America Nebula (whose first designation is "NGC 7000"); `nil` when
+    /// there are none. Only deep-sky objects have them.
+    static func moreDesignations(of object: CelestialObject) -> String? {
+        guard object.isDeepSky else { return nil }
+        let first = extraDesignation(of: object)
+        let others = object.designations.filter { !isName(of: object, $0) && $0 != first }
+        return others.isEmpty ? nil : others.prefix(3).joined(separator: " \u{00B7} ")
+    }
+
+    /// The third line of a row: how prominent a deep-sky object is (when `showsProminence`) and its further
+    /// catalogue designations, such as "Showpiece \u{00B7} Sh2-155"; `nil` when there is nothing to add.
+    static func catalogueLine(of object: CelestialObject, showsProminence: Bool) -> String? {
+        var parts: [String] = []
+        if showsProminence, object.isDeepSky {
+            parts.append(object.prominence.displayName)
+        }
+        if let more = moreDesignations(of: object) {
+            parts.append(more)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+    }
+
     private static func isName(of object: CelestialObject, _ designation: String) -> Bool {
         designation.compare(object.name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
     }
@@ -42,22 +65,28 @@ enum ObjectsFormat {
         return "\u{2191}\(altitude) \(direction)"
     }
 
-    /// When an object below the horizon next rises, such as "Rises 21:34" or "Rises tomorrow 02:10";
-    /// `nil` when no rising is known.
+    /// When an object below the horizon next rises, such as "Rises 21:34" or "Rises tomorrow 02:10"; with a recorded
+    /// skyline "Clears skyline 21:34". `nil` when no rising is known.
     static func risingText(for position: ObjectSkyPosition, in timeZone: TimeZone) -> String? {
         if position.neverRises {
-            return "Never rises here"
+            return position.usesSkyline ? "Never clears the skyline" : "Never rises here"
         }
         guard let rise = position.nextRise else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: position.computedAt),
                                            to: calendar.startOfDay(for: rise)).day ?? 0
+        let verb = position.usesSkyline ? "Clears skyline" : "Rises"
         switch days {
-        case ..<1: return "Rises \(AppFormat.time(rise, in: timeZone))"
-        case 1: return "Rises tomorrow \(AppFormat.time(rise, in: timeZone))"
-        default: return "Rises \(AppFormat.dateTime(rise, in: timeZone))"
+        case ..<1: return "\(verb) \(AppFormat.time(rise, in: timeZone))"
+        case 1: return "\(verb) tomorrow \(AppFormat.time(rise, in: timeZone))"
+        default: return "\(verb) \(AppFormat.dateTime(rise, in: timeZone))"
         }
+    }
+
+    /// What a row says of an object that is not visible: "Behind skyline" or "Below horizon".
+    static func hiddenText(for position: ObjectSkyPosition) -> String {
+        position.isBehindSkyline ? "Behind skyline" : "Below horizon"
     }
 
     /// The row's position as a spoken phrase, such as "34° above the horizon, southeast".
@@ -67,20 +96,24 @@ enum ObjectsFormat {
             let direction = AngleFormatter.compassPoint(azimuth: position.azimuth).fullName.lowercased()
             return "\(altitude) above the horizon, \(direction)"
         }
+        let hidden = position.isBehindSkyline ? "Behind the skyline" : "Below the horizon"
         if let rising = risingText(for: position, in: timeZone) {
-            return "Below the horizon, \(rising.lowercased())"
+            return "\(hidden), \(rising.lowercased())"
         }
-        return "Below the horizon"
+        return hidden
     }
 
     /// Everything a row shows, as one VoiceOver label.
     static func spokenSummary(of object: CelestialObject, position: ObjectSkyPosition?, isFavorite: Bool,
-                              in timeZone: TimeZone) -> String {
+                              in timeZone: TimeZone, showsProminence: Bool = false) -> String {
         var parts = [object.name]
         if let designation = extraDesignation(of: object) {
             parts.append(designation)
         }
         parts.append(subtitle(of: object, magnitude: position?.magnitude, spoken: true))
+        if let line = catalogueLine(of: object, showsProminence: showsProminence) {
+            parts.append(line.replacingOccurrences(of: " \u{00B7} ", with: ", "))
+        }
         if let position {
             parts.append(spokenPosition(position, in: timeZone))
         }

@@ -23,6 +23,9 @@ struct TonightTimelineCard: View {
             .accessibilityLabel("Darkness timeline")
             .accessibilityValue(spokenSummary)
             TonightSkyLegend()
+            if report.appliesSkyline {
+                TonightSkylineNote(detail: "the Moon and Milky Way core bars follow the skyline.")
+            }
             if !summary.hasAstronomicalDarkness {
                 TonightNote(text: "The Sun stays less than 18\u{00B0} below the horizon, so the sky never gets fully"
                             + " dark on this night.", style: .warning)
