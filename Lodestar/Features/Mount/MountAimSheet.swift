@@ -47,6 +47,9 @@ private struct MountControlPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 statusCard
+                if service.usesLodestarAlignment {
+                    MountSkyWatcherSetupCard(onSync: syncOnTarget)
+                }
                 targetCard
                 MountStopButton(minHeight: 56)
                 nudgeCard
@@ -80,6 +83,12 @@ private struct MountControlPanel: View {
 
     // MARK: Cards
 
+    /// Opens the sync confirmation for the Aim target, from the set-up card.
+    private var syncOnTarget: (() -> Void)? {
+        guard let target = model.guidanceTarget else { return nil }
+        return { confirmation = MountConfirmation(kind: .sync, object: target) }
+    }
+
     private var statusCard: some View {
         let status = service.status
         return VStack(alignment: .leading, spacing: 8) {
@@ -104,6 +113,29 @@ private struct MountControlPanel: View {
             }
             if let warning = service.alignmentWarning {
                 Label(warning, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let line = service.alignmentLine {
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(service.needsFirstSync ? palette.warning : palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let state = service.trackingAndPierLine, service.usesLodestarAlignment {
+                Text(state)
+                    .font(.footnote)
+                    .foregroundStyle(palette.secondaryText)
+            }
+            if service.needsFirstSync {
+                Label(MountAlignmentText.notAlignedYet, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if let stop = service.trackingStopText {
+                Label(stop, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
@@ -143,7 +175,7 @@ private struct MountControlPanel: View {
                 Button {
                     confirmation = MountConfirmation(kind: .goTo, object: target)
                 } label: {
-                    Label("GoTo \(target.name)", systemImage: "location.north.line.fill")
+                    Label("Go to \(target.name)", systemImage: "location.north.line.fill")
                         .frame(maxWidth: .infinity)
                         .lineLimit(1)
                 }

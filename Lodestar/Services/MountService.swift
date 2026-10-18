@@ -24,6 +24,10 @@ final class MountService {
     private static let nudgePollInterval: Duration = .milliseconds(500)
     /// Waits this long after a limit was changed before the controller is rebuilt with it.
     private static let reconfigureDelay: Duration = .seconds(1)
+    /// The phone has to move this far (degrees of latitude or longitude) before the driver is handed the new place.
+    private static let siteToleranceDegrees = 0.01
+    /// The names of at most this many synced objects are kept, to name the alignment stars.
+    private static let maximumRememberedObjects = 24
 
     enum Connection: Equatable {
         case disconnected
@@ -36,7 +40,7 @@ final class MountService {
     enum DiscoveryState: Equatable {
         case idle
         case searching
-        case finished(serverCount: Int, telescopeCount: Int)
+        case finished(serverCount: Int, deviceCount: Int)
     }
 
     // MARK: State for the screens
@@ -62,7 +66,13 @@ final class MountService {
     /// The name of the object of the last GoTo.
     private(set) var slewTargetName: String?
     private(set) var discoveryState = DiscoveryState.idle
-    private(set) var discovered: [MountAlpacaTelescope] = []
+    private(set) var discovered: [MountFoundDevice] = []
+    /// What the driver tells besides the status: the alignment of a Sky-Watcher mount, its pier side and start position.
+    private(set) var driverDetail: MountDriverDetail?
+    /// The objects the mount was synced to since it was connected, to give the alignment stars their names.
+    private(set) var syncedObjects: [MountSyncedObject] = []
+    /// How far the mount was from its home position at the first sync of this alignment, degrees.
+    private(set) var alignmentHomeError: Double?
     /// A connection has succeeded at some time (the simulated mount counts). Until then the Aim screen has no Mount button.
     private(set) var hasConnectedBefore = false
 
@@ -87,6 +97,8 @@ final class MountService {
     /// Changes whenever a session starts or ends; work that belongs to an older session sees the difference and stops.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var observer: Observer?
+    /// The place the Sky-Watcher driver was last given.
+    @ObservationIgnored private var handedLocation: GeographicLocation?
     @ObservationIgnored private var connectTask: Task<Void, Never>?
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var nudgeTask: Task<Void, Never>?
@@ -123,7 +135,15 @@ final class MountService {
 
     var selectedOptionID: String {
         get { selectedOption.id }
-        set { memory.selectedOptionID = newValue }
+        set {
+            // Search results belong to the kind of mount they were looked for.
+            if newValue != memory.selectedOptionID {
+                cancelDiscovery()
+                discovered = []
+                discoveryState = .idle
+            }
+            memory.selectedOptionID = newValue
+        }
     }
 
     /// The address typed for the selected kind of mount.
@@ -134,8 +154,8 @@ final class MountService {
 
     /// What to call the mount on screen.
     var displayName: String {
-        if isDemo { return "Demo mount" }
-        if let name = capabilities?.name, !name.isEmpty { return name }
+        if let name = capabilities?.name, !name.isEmpty { return name + (isDemo ? " (simulated)" : "") }
+        if isDemo { return connectedOption?.title ?? "Simulated mount" }
         return connectedOption?.title ?? selectedOption.title
     }
 
@@ -156,10 +176,85 @@ final class MountService {
         form = changed
     }
 
-    /// Why the mount's alignment should be done first, or `nil`.
+    /// Why the mount's alignment should be done first, or `nil`. A mount that Lodestar aligns itself says so in its own
+    /// alignment line instead.
     var alignmentWarning: String? {
-        guard isConnected, status.isAligned == false else { return nil }
+        guard isConnected, !usesLodestarAlignment, status.isAligned == false else { return nil }
         return "The mount is not aligned. Align it on the hand controller, then continue."
+    }
+
+    /// The connected mount knows nothing about the sky, so Lodestar aligns it on stars (Sky-Watcher Wi-Fi).
+    var usesLodestarAlignment: Bool { connectedOption?.usesLodestarAlignment == true }
+
+    /// The alignment stars with their names, oldest first.
+    var alignedStars: [MountAlignedStar] {
+        guard let stars = driverDetail?.alignment?.stars else { return [] }
+        return stars.enumerated().map { index, star in
+            let match = syncedObjects.min { $0.place.angularSeparation(to: star.place) < $1.place.angularSeparation(to: star.place) }
+            let name = match.flatMap { $0.place.angularSeparation(to: star.place) < 2 ? $0.name : nil } ?? "Star \(index + 1)"
+            return MountAlignedStar(index: index, name: name, residualDegrees: star.residualDegrees)
+        }
+    }
+
+    /// The mount is aligned by Lodestar and no star has been synced yet.
+    var needsFirstSync: Bool {
+        usesLodestarAlignment && isConnected && (driverDetail?.alignment?.stars.isEmpty ?? true)
+    }
+
+    /// Words for the alignment: "Aligned on 3 stars, 0.02° residual, ≈ 0.2° accuracy", or what to do first. `nil` for
+    /// mounts that Lodestar does not align.
+    var alignmentLine: String? {
+        guard usesLodestarAlignment, isConnected else { return nil }
+        return MountAlignmentText.line(driverDetail?.alignment)
+    }
+
+    /// The start-position check after connecting: all is well, or what to do.
+    var startPositionLine: String? {
+        guard usesLodestarAlignment, isConnected else { return nil }
+        if driverDetail?.startsAwayFromHome == true {
+            return "The mount is not at its home position. Switch it off and on at the home position, or move it there "
+                + "with the arrows and tap This is home."
+        }
+        return "The mount started at its home position."
+    }
+
+    var startsAwayFromHome: Bool { usesLodestarAlignment && isConnected && driverDetail?.startsAwayFromHome == true }
+
+    /// "Tracking" or "Tracking is off"; `nil` when the mount does not say.
+    var trackingLine: String? {
+        switch status.isTracking {
+        case true?: return "Tracking"
+        case false?: return "Tracking is off"
+        case nil: return nil
+        }
+    }
+
+    /// "Telescope east of the pier": equatorial mounts only.
+    var pierSideLine: String? {
+        guard usesLodestarAlignment, let side = driverDetail?.pierSide else { return nil }
+        return side == .east ? "Telescope east of the pier" : "Telescope west of the pier"
+    }
+
+    /// Tracking and pier side on one line: "Tracking \u{00B7} Telescope east of the pier".
+    var trackingAndPierLine: String? {
+        let parts = [trackingLine, pierSideLine].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// Why tracking stopped by itself, and what to do; `nil` while it has not.
+    var trackingStopText: String? {
+        guard usesLodestarAlignment, isConnected, status.isTracking != true,
+              let reason = driverDetail?.trackingStopReason else { return nil }
+        switch reason {
+        case .outsideMountLimits where driverDetail?.arrangement == .equatorial:
+            return "Tracking stopped at the meridian. Tap Go to to flip the mount"
+        case .outsideMountLimits:
+            return "Tracking stopped at a limit of the mount (cable wrap or near the zenith). Tap Go to to start again"
+        case .mountOverheadLimit:
+            return "Tracking stopped near the zenith, where this mount cannot follow"
+        default:
+            return "Tracking stopped: \(reason.userMessage)"
+        }
     }
 
     /// Why a GoTo to `object` cannot be started, or `nil` when it can.
@@ -175,7 +270,11 @@ final class MountService {
                                                     limit: settings.altitudeLimit).userMessage
             }
         }
-        if capabilities.gotoNeedsAlignment && status.isAligned == false { return MountError.notAligned.userMessage }
+        if usesLodestarAlignment {
+            if needsFirstSync { return MountAlignmentText.notAlignedYet }
+        } else if capabilities.gotoNeedsAlignment && status.isAligned == false {
+            return MountError.notAligned.userMessage
+        }
         switch status.phase {
         case .slewing: return MountError.slewInProgress.userMessage
         case .nudging: return MountError.busy.userMessage
@@ -194,6 +293,17 @@ final class MountService {
         case .nudging: return MountError.busy.userMessage
         case .idle, .disconnected: return nil
         }
+    }
+
+    /// The limits the controller runs with. A mount that Lodestar aligns checks every alignment star itself, and its first
+    /// sync is as far off as the home position is, so the limit for syncs does not apply to it.
+    private func engineSettings(for option: MountConnectionOption?) -> MountSettings {
+        let user = settings.engineSettings
+        guard option?.usesLodestarAlignment == true else { return user }
+        // The altitude limit is applied before each GoTo (`goTo`), with the engine's own words, so a changed limit never has
+        // to restart the controller: a new controller would forget the alignment.
+        return MountSettings(altitudeLimit: MountUserSettings.altitudeLimitRange.lowerBound,
+                             maximumSlewSeconds: user.maximumSlewSeconds)
     }
 
     // MARK: Messages
@@ -218,26 +328,26 @@ final class MountService {
     /// Connects to the mount chosen on the connection screen. Does nothing while connecting or connected.
     func connect(observer: Observer?) {
         let option = selectedOption
-        startConnection(option: option, form: form, observer: observer, isDemo: false)
+        startConnection(option: option, form: form, observer: observer)
     }
 
     /// Connects again after the connection was lost: to the simulated mount if that was the one, else to the mount chosen
     /// on the connection screen.
     func reconnect(observer: Observer?) {
-        if isDemo {
-            connectDemo(observer: observer)
+        if let option = connectedOption, option.isDemo {
+            connectDemo(option, observer: observer)
         } else {
             connect(observer: observer)
         }
     }
 
-    /// Connects to the simulated mount.
-    func connectDemo(observer: Observer?) {
-        startConnection(option: .demo, form: MountConnectionForm(option: .demo), observer: observer, isDemo: true)
+    /// Connects to a simulated mount.
+    func connectDemo(_ option: MountConnectionOption = .demo, observer: Observer?) {
+        startConnection(option: option, form: MountConnectionForm(option: option), observer: observer)
     }
 
-    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, observer: Observer?,
-                                 isDemo: Bool) {
+    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, observer: Observer?) {
+        let isDemo = option.isDemo
         switch connection {
         case .connecting, .connected: return
         case .disconnected, .lost: break
@@ -264,10 +374,15 @@ final class MountService {
         connectedOption = option
         connectedAddress = isDemo ? nil : form.addressText
         connection = .connecting
-        let engine = settings.engineSettings
-        var options = MountDriverOptions(epoch: option.supportsEpoch ? settings.epochChoice.epoch : nil,
-                                         reversesEastWest: option.supportsAxisReversal && settings.reversesEastWest,
+        let engine = engineSettings(for: option)
+        let fields = option.advancedFields
+        var options = MountDriverOptions(epoch: fields.contains(.epoch) ? settings.epochChoice.epoch : nil,
+                                         reversesEastWest: fields.contains(.swapEastWest) && settings.reversesEastWest,
                                          deviceNumber: form.deviceNumber)
+        options.location = observer.location
+        options.arrangement = fields.contains(.arrangement) ? settings.arrangement.mode : nil
+        options.reversesAxis1 = fields.contains(.reverseAxis1) && settings.reversesAxis1
+        options.reversesAxis2 = fields.contains(.reverseAxis2) && settings.reversesAxis2
         if isDemo { options.demoStart = Self.demoStart(for: observer) }
         let sendsSiteAndTime = settings.sendsSiteAndTime
         connectTask = Task { [weak self] in
@@ -282,7 +397,7 @@ final class MountService {
                                    sendsSiteAndTime: Bool, token: Int) async {
         var options = options
         var form = form
-        if option.supportsDiscovery {
+        if option.discovery == .alpaca {
             // The server may host several telescopes: use the one chosen in the search, else the first.
             let address = MountAddress(text: form.host, defaultPort: form.port)
             let lookup = await mountRunBlocking {
@@ -325,6 +440,10 @@ final class MountService {
         case .success(let found):
             capabilities = found
             status = result.status
+            driverDetail = result.detail
+            syncedObjects = []
+            alignmentHomeError = nil
+            handedLocation = observer.location
             connection = .connected
             if !hasConnectedBefore {
                 hasConnectedBefore = true
@@ -335,7 +454,8 @@ final class MountService {
                 memory.forms[option.id] = form
             }
             startPolling(session: session, token: token)
-            if sendsSiteAndTime && found.canSetSiteAndTime {
+            // A mount that Lodestar aligns has been given the location already: nothing is sent to it.
+            if sendsSiteAndTime && found.canSetSiteAndTime && !option.usesLodestarAlignment {
                 await sendSiteAndTime(location: observer.location, announceSuccess: false)
             }
         }
@@ -411,6 +531,10 @@ final class MountService {
         isWorking = false
         slewStartSeparation = nil
         slewTargetName = nil
+        driverDetail = nil
+        syncedObjects = []
+        alignmentHomeError = nil
+        handedLocation = nil
         if let reason {
             connection = .lost(reason)
         } else {
@@ -452,9 +576,10 @@ final class MountService {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 let began = ContinuousClock.now
-                let polled = await session.poll()
+                let outcome = await session.poll()
                 guard let self, self.generation == token, !Task.isCancelled else { return }
-                self.apply(polled)
+                let polled = outcome.status
+                self.apply(polled, detail: outcome.detail)
                 if polled.phase == .disconnected {
                     let reason = polled.lastError?.userMessage ?? MountError.connectionLost.userMessage
                     self.finishSession(lost: reason)
@@ -468,7 +593,8 @@ final class MountService {
     }
 
     /// Takes over a status from the worker, and announces what changed for VoiceOver.
-    private func apply(_ new: MountStatus) {
+    private func apply(_ new: MountStatus, detail: MountDriverDetail? = nil) {
+        if let detail, detail != driverDetail { driverDetail = detail }
         let old = status
         guard new != old else { return }
         status = new
@@ -499,7 +625,17 @@ final class MountService {
     ) async -> Result<Value, MountError> {
         guard let current = session else { return .failure(.notConnected) }
         let outcome = await current.run(urgent: urgent, work)
-        if session === current { apply(outcome.status) }
+        if session === current { apply(outcome.status, detail: outcome.detail) }
+        return outcome.result
+    }
+
+    /// Runs `work` on the mount's driver and takes over the status and the detail it leaves.
+    private func executeOnDriver<Value: Sendable>(
+        _ work: @escaping @Sendable (MountDriver) throws -> Value
+    ) async -> Result<Value, MountError> {
+        guard let current = session else { return .failure(.notConnected) }
+        let outcome = await current.runDriver(work)
+        if session === current { apply(outcome.status, detail: outcome.detail) }
         return outcome.result
     }
 
@@ -519,7 +655,12 @@ final class MountService {
         let result = await execute { controller in try controller.goto(place, properMotion: motion) }
         switch result {
         case .success: slewTargetName = object.name
-        case .failure(let error): errorText = error.userMessage
+        case .failure(let error):
+            if usesLodestarAlignment, case .notAligned = error {
+                errorText = MountAlignmentText.notAlignedYet
+            } else {
+                errorText = error.userMessage
+            }
         }
     }
 
@@ -536,10 +677,103 @@ final class MountService {
         let motion = target.properMotion
         isWorking = true
         defer { isWorking = false }
+        let wasEmpty = driverDetail?.alignment?.stars.isEmpty ?? true
         let result = await execute { controller in try controller.sync(place, properMotion: motion) }
         switch result {
         case .success(let synced):
-            noticeText = "Synced (was \(AppFormat.separation(synced.offsetDegrees)) off)."
+            if usesLodestarAlignment {
+                syncedObjects.append(MountSyncedObject(name: object.name, place: place))
+                if syncedObjects.count > Self.maximumRememberedObjects { syncedObjects.removeFirst() }
+                if wasEmpty { alignmentHomeError = synced.offsetDegrees }
+                noticeText = MountAlignmentText.syncNotice(name: object.name, offset: synced.offsetDegrees,
+                                                           starCount: driverDetail?.alignment?.stars.count ?? 1)
+            } else {
+                noticeText = "Synced (was \(AppFormat.separation(synced.offsetDegrees)) off)."
+            }
+        case .failure(let error):
+            if usesLodestarAlignment, case .rejected = error {
+                errorText = MountAlignmentText.rejectedText(name: object.name)
+            } else {
+                errorText = error.userMessage
+            }
+        }
+    }
+
+    /// The simulated Sky-Watcher mount stands where the person would have centred `object`.
+    func centreSimulatedMount(on object: CelestialObject, observer: Observer) async {
+        guard isConnected, isDemo, let current = session, !isWorking else { return }
+        clearMessages()
+        let place = MountTargets.resolve(object, observer: observer, date: Date()).j2000
+        isWorking = true
+        defer { isWorking = false }
+        let outcome = await current.centreSimulated(on: place)
+        guard session === current else { return }
+        apply(outcome.status, detail: outcome.detail)
+        if case .failure(let error) = outcome.result { errorText = error.userMessage }
+    }
+
+    // MARK: Alignment of a mount that Lodestar aligns
+
+    /// "This is home": the mount stands at its home position now, whatever the start position said.
+    func declareHomePosition() async {
+        guard isConnected, usesLodestarAlignment, !isWorking else { return }
+        clearMessages()
+        isWorking = true
+        defer { isWorking = false }
+        // Whatever the mount is doing stops first.
+        _ = await execute { controller in try controller.abort() }
+        let result = await executeOnDriver { driver in
+            guard let skyWatcher = driver as? SkyWatcherDriver else { throw MountError.notSupported(feature: .other) }
+            try skyWatcher.declareHomePosition()
+        }
+        switch result {
+        case .success:
+            syncedObjects = []
+            alignmentHomeError = nil
+            noticeText = "This is now the mount's home position. The star alignment was cleared."
+        case .failure(let error):
+            errorText = error.userMessage
+        }
+    }
+
+    /// Drops one alignment star and fits the model to the others.
+    func removeAlignedStar(at index: Int) async {
+        guard isConnected, usesLodestarAlignment, !isWorking, status.phase == .idle else { return }
+        clearMessages()
+        let name = alignedStars.first { $0.index == index }?.name ?? "the star"
+        isWorking = true
+        defer { isWorking = false }
+        let result = await executeOnDriver { driver in
+            guard let skyWatcher = driver as? SkyWatcherDriver else { throw MountError.notSupported(feature: .other) }
+            try skyWatcher.removeAlignmentPoint(index)
+        }
+        switch result {
+        case .success:
+            if driverDetail?.alignment?.stars.isEmpty ?? true {
+                syncedObjects = []
+                alignmentHomeError = nil
+            }
+            noticeText = "Removed \(name) from the alignment."
+        case .failure(let error):
+            errorText = error.userMessage
+        }
+    }
+
+    /// Forgets the whole alignment, to start over.
+    func clearAlignment() async {
+        guard isConnected, usesLodestarAlignment, !isWorking, status.phase == .idle else { return }
+        clearMessages()
+        isWorking = true
+        defer { isWorking = false }
+        let result = await executeOnDriver { driver in
+            guard let skyWatcher = driver as? SkyWatcherDriver else { throw MountError.notSupported(feature: .other) }
+            skyWatcher.clearAlignment()
+        }
+        switch result {
+        case .success:
+            syncedObjects = []
+            alignmentHomeError = nil
+            noticeText = "The star alignment was cleared."
         case .failure(let error):
             errorText = error.userMessage
         }
@@ -660,9 +894,28 @@ final class MountService {
     func updateObserver(_ new: Observer?) {
         guard let new, new != observer else { return }
         observer = new
-        guard isConnected, let current = session else { return }
+        guard isConnected else { return }
+        // The mount that Lodestar aligns points by the phone's location, which its driver is handed again when the phone has
+        // moved. The driver forgets the alignment once the place differs by about a quarter of a degree.
+        var handsOver = false
+        if usesLodestarAlignment, let handed = handedLocation, status.phase != .slewing {
+            let latitude = abs(new.location.latitude - handed.latitude)
+            let longitude = abs(AstroMath.normalizeSignedDegrees(new.location.longitude - handed.longitude))
+            handsOver = latitude > Self.siteToleranceDegrees || longitude > Self.siteToleranceDegrees
+        }
+        if handsOver { handedLocation = new.location }
+        let hadStars = !(driverDetail?.alignment?.stars.isEmpty ?? true)
+        let sendsPlace = handsOver
         Task {
-            _ = await current.run { controller in controller.observer = new }
+            _ = await execute { controller in
+                controller.observer = new
+                if sendsPlace { _ = try? controller.setSiteAndTime(location: new.location) }
+            }
+            if sendsPlace && hadStars && (driverDetail?.alignment?.stars.isEmpty ?? true) {
+                syncedObjects = []
+                alignmentHomeError = nil
+                noticeText = "Your location changed, so the star alignment was cleared. Align on a star again."
+            }
         }
     }
 
@@ -670,13 +923,14 @@ final class MountService {
     /// check before each GoTo uses the new altitude limit at once.
     private func scheduleReconfigure() {
         reconfigureTask?.cancel()
-        guard isConnected else { return }
+        // The altitude limit of a mount that Lodestar aligns is applied in `goTo`; its other limits apply at the next connection.
+        guard isConnected, !usesLodestarAlignment else { return }
         reconfigureTask = Task { [weak self] in
             try? await Task.sleep(for: Self.reconfigureDelay)
             for _ in 0..<60 {
                 guard let self, !Task.isCancelled, self.isConnected, let current = self.session else { return }
                 if self.status.phase == .idle {
-                    let result = await current.reconfigure(self.settings.engineSettings)
+                    let result = await current.reconfigure(self.engineSettings(for: self.connectedOption))
                     if self.session === current, case .failure(let error) = result.result, error != .busy {
                         self.errorText = "The new limits could not be sent to the mount's controller. \(error.userMessage)"
                     }
@@ -695,16 +949,21 @@ final class MountService {
     // MARK: Finding Alpaca devices
 
     func startDiscovery() {
-        guard discoveryState != .searching else { return }
+        guard discoveryState != .searching, let kind = selectedOption.discovery else { return }
         discoveryState = .searching
         discovered = []
         let flag = MountCancelFlag()
         discoveryFlag = flag
         discoveryTask = Task { [weak self] in
-            let found = await mountRunBlocking { MountAlpacaDiscovery.search(cancel: flag) }
+            let found = await mountRunBlocking {
+                switch kind {
+                case .alpaca: return MountAlpacaDiscovery.search(cancel: flag)
+                case .skyWatcher: return MountSkyWatcherProbe.search(cancel: flag)
+                }
+            }
             guard let self, !flag.isCancelled else { return }
-            self.discovered = found.telescopes
-            self.discoveryState = .finished(serverCount: found.serverCount, telescopeCount: found.telescopes.count)
+            self.discovered = found.devices
+            self.discoveryState = .finished(serverCount: found.serverCount, deviceCount: found.devices.count)
         }
     }
 
@@ -716,16 +975,14 @@ final class MountService {
         if discoveryState == .searching { discoveryState = .idle }
     }
 
-    /// Puts the address and the device of a search result into the Alpaca form.
-    func choose(_ telescope: MountAlpacaTelescope) {
-        guard let alpaca = MountConnectionOption.option(id: MountConnectionOption.alpaca.id) else { return }
-        var chosen = memory.form(for: alpaca)
-        chosen.host = telescope.host
-        chosen.port = telescope.port
-        chosen.deviceNumber = telescope.deviceNumber
-        chosen.deviceName = telescope.name
-        memory.forms[alpaca.id] = chosen
-        memory.selectedOptionID = alpaca.id
+    /// Puts the address and the device of a search result into the form of the selected kind of mount.
+    func choose(_ device: MountFoundDevice) {
+        updateForm { form in
+            form.host = device.host
+            form.port = device.port
+            form.deviceNumber = device.deviceNumber
+            form.deviceName = device.name
+        }
     }
 
     // MARK: Overlay
@@ -763,4 +1020,67 @@ struct MountMarkerCache {
 
     let key: Key
     let direction: Vector3
+}
+
+/// An object the mount was synced to, remembered to name the alignment stars.
+struct MountSyncedObject: Hashable, Sendable {
+    let name: String
+    let place: EquatorialCoordinate
+}
+
+/// One star of the alignment with its name and how well the fitted model explains it.
+struct MountAlignedStar: Identifiable, Hashable, Sendable {
+    /// The star's place in the driver's list, which `MountService.removeAlignedStar(at:)` counts in.
+    let index: Int
+    let name: String
+    let residualDegrees: Double?
+
+    var id: Int { index }
+}
+
+/// The words for the alignment of a mount that Lodestar aligns.
+enum MountAlignmentText {
+    /// What a Sky-Watcher mount says to Go to before the first sync.
+    static let notAlignedYet = "Not aligned yet. Centre a star with the nudge pad, then tap Sync."
+    /// Said in place of the usual "send location and time" explanation: this mount is sent nothing.
+    static let siteAndTime = "Uses your location and the phone's clock for pointing; nothing is sent to the mount."
+    /// A sync that moves the mount's idea of its position by more than this is suspicious, degrees.
+    private static let suspiciousOffsetDegrees = 0.5
+
+    /// "Aligned on 3 stars, 0.02° residual, ≈ 0.2° accuracy", "Aligned on 1 star, ≈ 1.0° accuracy" or what to do first.
+    static func line(_ alignment: MountAlignmentDetail?) -> String {
+        guard let alignment, !alignment.stars.isEmpty else { return "Not aligned: centre a star and tap Sync" }
+        let count = alignment.stars.count
+        var text = "Aligned on \(count) star\(count == 1 ? "" : "s")"
+        if count > 1, let residual = alignment.maximumResidualDegrees {
+            text += ", \(AngleFormatter.formatDegrees(residual, decimals: 2)) residual"
+        }
+        if let predicted = alignment.predictedErrorDegrees {
+            text += ", \u{2248} \(accuracy(predicted)) accuracy"
+        }
+        return text
+    }
+
+    /// An angle with the digits that mean something: 0.05°, 0.2°, 1.0°, 12°.
+    static func accuracy(_ degrees: Double) -> String {
+        if degrees < 0.095 { return AngleFormatter.formatDegrees(degrees, decimals: 2) }
+        if degrees < 9.5 { return AngleFormatter.formatDegrees(degrees, decimals: 1) }
+        return AngleFormatter.formatDegrees(degrees, decimals: 0)
+    }
+
+    /// After a sync: the home position error at the first star, the offset at the others.
+    static func syncNotice(name: String, offset: Double, starCount: Int) -> String {
+        let off = AppFormat.separation(offset)
+        if starCount <= 1 { return "Synced to \(name). The mount's home position was \(off) off." }
+        if offset > suspiciousOffsetDegrees {
+            return "Synced to \(name). The mount was \(off) off, which is a lot: check that you centred the right star "
+                + "and that the mount has not been bumped."
+        }
+        return "Synced to \(name). The mount was \(off) off."
+    }
+
+    /// When the alignment refused the star.
+    static func rejectedText(name: String) -> String {
+        "That does not fit the other stars. Check that you centred \(name)."
+    }
 }
