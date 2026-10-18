@@ -178,12 +178,8 @@ final class AppModel {
         startMaintenance()
         syncServices()
         await catalog.load()
-        if target == nil, let id = settings.recentObjectIDs.first {
-            if let object = catalog.object(id: id) {
-                target = object
-            } else {
-                restoreWhenCataloged(id)
-            }
+        if target == nil, let id = settings.recentObjectIDs.first, let object = catalog.object(id: id) {
+            target = object
         }
         #if DEBUG
         if let id = ScreenshotMode.current?.targetID, let object = catalog.object(id: id) {
@@ -191,25 +187,6 @@ final class AppModel {
         }
         #endif
         evaluateSun(force: true)
-    }
-
-    /// How long a recent target that is not in the catalog yet is waited for, in seconds.
-    private static let restoreWait: TimeInterval = 60
-
-    /// A recent target that is a downloaded comet is not in the catalog until the saved comet file has been applied
-    /// (`OnlineDataService`): sets it as soon as it resolves, unless a target was chosen meanwhile.
-    private func restoreWhenCataloged(_ id: String) {
-        Task { [weak self] in
-            let deadline = Date().addingTimeInterval(Self.restoreWait)
-            while Date() < deadline && !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(500))
-                guard let self else { return }
-                if let object = self.catalog.object(id: id) {
-                    if self.target == nil { self.target = object }
-                    return
-                }
-            }
-        }
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
