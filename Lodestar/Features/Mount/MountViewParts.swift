@@ -115,8 +115,11 @@ enum MountStatusText {
     static func connectionAdvice(for error: MountError) -> String? {
         switch error {
         case .timeout, .transport, .malformedReply, .connectionLost:
-            return "Is the iPhone on the mount's Wi-Fi network? Is the address and the port right? "
-                + "If iOS asked whether Lodestar may use the local network, it must be allowed."
+            return """
+                Is the iPhone on the mount's Wi-Fi network? Is the right address and port selected? iOS shows a refused \
+                Local Network permission as a timeout as well: allow Lodestar under Settings \u{25B8} Privacy & Security \u{25B8} \
+                Local Network.
+                """
         case .unsupportedCoordinateSystem:
             return "Set the telescope to JNow or J2000 in its driver and connect again."
         case .notAligned:
@@ -159,6 +162,7 @@ struct MountConfirmationSheet: View {
                             .font(.title3.weight(.semibold))
                             .accessibilityAddTraits(.isHeader)
                         details
+                        centreSimulated
                         notice
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -198,14 +202,49 @@ struct MountConfirmationSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
-                } else if let separation = plan.separation {
-                    InfoRow(label: "Mount is now off by", value: AngleFormatter.formatDegrees(separation, decimals: 2))
+                } else {
+                    Text(service.usesLodestarAlignment ? Self.alignmentSyncText(confirmation.object.name)
+                         : "Tells the mount that it points at \(confirmation.object.name) right now.")
+                        .font(.subheadline)
+                        .foregroundStyle(palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let separation = plan.separation {
+                        InfoRow(label: "Mount believes it is", value: "\(AppFormat.separation(separation)) away")
+                    }
+                    if service.usesLodestarAlignment {
+                        InfoRow(label: "Stars in the alignment",
+                                value: "\(service.driverDetail?.alignment?.stars.count ?? 0)")
+                    }
                 }
             }
             .card(palette)
         } else {
             Text("Lodestar needs your location first.")
                 .foregroundStyle(palette.warning)
+        }
+    }
+
+    private static func alignmentSyncText(_ name: String) -> String {
+        """
+        Adds \(name) to the star alignment: Lodestar learns from it where the mount really points. The first star also \
+        shows how far off the home position was.
+        """
+    }
+
+    /// The simulated Sky-Watcher can be put on the target, in place of the nudge arrows.
+    @ViewBuilder
+    private var centreSimulated: some View {
+        if confirmation.kind == .sync, service.connectedOption?.id == MountConnectionOption.demoSkyWatcher.id, let observer {
+            Button {
+                let object = confirmation.object
+                Task { await service.centreSimulatedMount(on: object, observer: observer) }
+            } label: {
+                Text("Centre the simulated mount on \(confirmation.object.name)")
+                    .frame(maxWidth: .infinity)
+                    .lineLimit(2)
+            }
+            .buttonStyle(.lodestarSecondary)
+            .disabled(service.isWorking)
         }
     }
 
@@ -230,8 +269,10 @@ struct MountConfirmationSheet: View {
                 + "a wide arc and does not stop for obstacles. Tap Stop at any time. Make sure the telescope or camera "
                 + "cannot end up pointing at the Sun."
         case .sync:
-            return "Only sync when \(confirmation.object.name) is in the middle of your camera or eyepiece. The mount "
-                + "takes its current pointing to be this object. A sync on the wrong star makes every later GoTo miss."
+            return """
+                Sync only when \(confirmation.object.name) is in the middle of your camera's frame. Syncing on the wrong \
+                star makes later slews miss.
+                """
         }
     }
 
@@ -240,7 +281,7 @@ struct MountConfirmationSheet: View {
             Button {
                 perform()
             } label: {
-                Text(confirmation.kind == .goTo ? "Slew to \(confirmation.object.name)" : "Sync the mount")
+                Text(confirmation.kind == .goTo ? "Slew to \(confirmation.object.name)" : "Sync mount")
                     .frame(maxWidth: .infinity)
                     .lineLimit(2)
             }
