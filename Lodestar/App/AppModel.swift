@@ -58,6 +58,16 @@ final class AppModel {
         didSet { if keepsMotionRunning != oldValue { syncServices() } }
     }
 
+    /// Keeps the camera picture running outside the Aim tab (the skyline recorder in Settings).
+    var keepsCameraRunning = false {
+        didSet { if keepsCameraRunning != oldValue { syncServices() } }
+    }
+
+    /// Keeps the screen from locking outside the Aim tab (the skyline recorder, whose sweep takes half a minute).
+    var keepsScreenAwake = false {
+        didSet { if keepsScreenAwake != oldValue { syncServices() } }
+    }
+
     /// Whether the Sun is below −6° at the observer (drives automatic night mode).
     private(set) var isSunBelowCivilTwilight = false
 
@@ -265,7 +275,8 @@ final class AppModel {
         let backCameraAlongLens = mountProfile.cameraAxis.dot(DeviceAttitude.backCameraAxis) > 0.99
         let wantsPreview = settings.cameraPreviewEnabled && backCameraAlongLens
             && (!isNightModeActive || settings.cameraPreviewAtNight)
-        if active && onboarded && selectedTab == .aim && wantsPreview && observerContext != nil {
+        let aimWantsCamera = selectedTab == .aim && wantsPreview && observerContext != nil
+        if active && onboarded && (aimWantsCamera || keepsCameraRunning) {
             camera.start(nightFilter: isNightModeActive ? settings.nightIntensity : nil)
         } else {
             camera.stop()
@@ -274,7 +285,7 @@ final class AppModel {
         // Screen: dim at night, keep awake while aiming.
         if active {
             screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
-            screen.setIdleTimerDisabled(selectedTab == .aim && settings.keepScreenAwake)
+            screen.setIdleTimerDisabled((selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
         } else {
             screen.restore()
         }

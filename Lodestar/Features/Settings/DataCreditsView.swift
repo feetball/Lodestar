@@ -36,7 +36,45 @@ extension DataCredit {
             notice: "Compiled from the NASA/IPAC Extragalactic Database (NED), HyperLEDA, SIMBAD (CDS, Strasbourg), "
                 + "HEASARC and Harold Corwin's NGC/IC notes. Changes for Lodestar: converted to compact JSON; "
                 + "selected the Messier objects, all named objects and the catalog objects brighter than "
-                + "magnitude 10; merged duplicates; coordinates in degrees; a few common names added."),
+                + "magnitude 10; merged duplicates; coordinates in degrees; a few common names added. The "
+                + "Caldwell numbers come from OpenNGC\u{2019}s identifiers."),
+        DataCredit(
+            id: "sharpless", name: "Sharpless 2 catalogue", usedFor: "Emission nebulae (H II regions)",
+            author: "S. Sharpless",
+            license: "Factual data (CDS/VizieR)", licenseURL: nil,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/20"),
+            notice: "S. Sharpless, Astrophysical Journal Supplement 4, 257 (1959). CDS catalogue VII/20, "
+                + "distributed by the Centre de Données astronomiques de Strasbourg (CDS) through VizieR."),
+        DataCredit(
+            id: "barnard", name: "Barnard dark nebulae", usedFor: "Dark nebulae",
+            author: "E. E. Barnard",
+            license: "Factual data (CDS/VizieR)", licenseURL: nil,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/220A"),
+            notice: "E. E. Barnard, A Photographic Atlas of Selected Regions of the Milky Way (1927). CDS catalogue "
+                + "VII/220A: machine-readable version by J. Takahashi and M. Ohishi (NAOJ), diameters and notes by "
+                + "Bill Gray, corrections by Mati Morel."),
+        DataCredit(
+            id: "lynds", name: "Lynds dark nebulae", usedFor: "Dark nebulae",
+            author: "B. T. Lynds",
+            license: "Factual data (CDS/VizieR)", licenseURL: nil,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/7A"),
+            notice: "B. T. Lynds, Astrophysical Journal Supplement 7, 1 (1962). CDS catalogue VII/7A, prepared by "
+                + "J. Marcout and F. Ochsenbein from T. Nagy\u{2019}s ADC version. Lodestar uses the clouds of opacity "
+                + "6, the clouds larger than 1 square degree and the named clouds."),
+        DataCredit(
+            id: "dias", name: "Open cluster catalogue", usedFor: "Open clusters (Collinder, Melotte, Trumpler, Stock)",
+            author: "W. S. Dias et al.",
+            license: "Factual data (CDS/VizieR)", licenseURL: nil,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/B/ocl"),
+            notice: "W. S. Dias et al., Astronomy & Astrophysics 389, 871 (2002), version 3.5. CDS catalogue B/ocl. "
+                + "Lodestar uses a selection of the Collinder, Melotte, Trumpler and Stock clusters."),
+        DataCredit(
+            id: "roman", name: "Constellation boundaries", usedFor: "The constellation of each deep-sky object",
+            author: "N. G. Roman, after E. Delporte",
+            license: "Factual data (CDS/VizieR)", licenseURL: nil,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VI/42"),
+            notice: "N. G. Roman, Publications of the Astronomical Society of the Pacific 99, 695 (1987), after "
+                + "Delporte (1930). CDS catalogue VI/42. Used for objects outside OpenNGC."),
         DataCredit(
             id: "d3-celestial", name: "d3-celestial", usedFor: "Constellation figures and Milky Way outlines",
             author: "Olaf Frohn",
@@ -65,8 +103,11 @@ struct DataCreditsView: View {
     /// The credit line from ATTRIBUTION.md, shown first.
     private static let creditLine = "Star data: HYG Database v4.1 (astronexus, CC BY-SA 4.0). Deep-sky data: OpenNGC "
         + "by Mattia Verga (CC BY-SA 4.0), compiled from NED, HyperLEDA, SIMBAD, HEASARC and H. Corwin's NGC/IC "
-        + "notes. Constellation figures and Milky Way outlines: d3-celestial by Olaf Frohn (BSD-3-Clause), the "
-        + "latter after Jose R. Vieira's Milky Way Outline Catalog. Geomagnetic model: WMM2025 by NOAA NCEI and "
+        + "notes. More deep-sky catalogues from CDS, Strasbourg: Sharpless 2 (S. Sharpless), Barnard (E. E. "
+        + "Barnard), Lynds (B. T. Lynds), open clusters (W. S. Dias et al.) and constellation boundaries "
+        + "(N. G. Roman). Constellation figures and Milky Way outlines: d3-celestial by Olaf Frohn "
+        + "(BSD-3-Clause), the latter after Jose R. Vieira's Milky Way Outline Catalog. Geomagnetic model: "
+        + "WMM2025 by NOAA NCEI and "
         + "the British Geological Survey (public domain). Planetary theory: VSOP87 (Bretagnon & Francou, IMCCE); "
         + "lunar theory after J. Meeus."
 
@@ -121,6 +162,19 @@ struct DataCreditsView: View {
                         Link(destination: sourceURL) {
                             Label("Open the source", systemImage: "arrow.up.right.square")
                         }
+                    }
+                }
+            }
+            SettingsSection(title: "VizieR") {
+                Text("This research has made use of the VizieR catalogue access tool, CDS, Strasbourg, France "
+                     + "(DOI: 10.26093/cds/vizier). The original description of the VizieR service was published in "
+                     + "2000, A&AS 143, 23.")
+                    .font(.subheadline)
+                    .foregroundStyle(palette.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let url = URL(string: "https://vizier.cds.unistra.fr") {
+                    Link(destination: url) {
+                        Label("Open VizieR", systemImage: "arrow.up.right.square")
                     }
                 }
             }

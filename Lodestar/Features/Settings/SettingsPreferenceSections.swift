@@ -35,6 +35,8 @@ struct SettingsSkyDisplaySection: View {
             Toggle("Constellation lines", isOn: $store.settings.showConstellationLines)
             Toggle("Constellation names", isOn: $store.settings.showConstellationNames)
             Toggle("Deep-sky objects", isOn: $store.settings.showDeepSkyObjects)
+            SettingsDeepSkyDetailRow(level: $store.settings.deepSkyProminence,
+                                     isEnabled: store.settings.showDeepSkyObjects)
             Toggle("Milky Way", isOn: $store.settings.showMilkyWay)
             VStack(alignment: .leading, spacing: 4) {
                 SettingsSliderRow(title: "Faintest stars",
@@ -57,6 +59,39 @@ struct SettingsSkyDisplaySection: View {
     }
 }
 
+/// Sky Display ▸ Deep-sky detail: how prominent a deep-sky object has to be to be drawn, from the showpieces only to
+/// everything in the catalog. The level is stored as the `Prominence` raw value, 1…4.
+private struct SettingsDeepSkyDetailRow: View {
+    private static let options = [
+        SettingsMenuOption(title: "Showpieces", value: 1),
+        SettingsMenuOption(title: "Prominent", value: 2),
+        SettingsMenuOption(title: "Notable", value: 3),
+        SettingsMenuOption(title: "Everything", value: 4),
+    ]
+
+    @Binding var level: Int
+    /// Whether deep-sky objects are drawn at all; the level has no effect while they are not.
+    let isEnabled: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            SettingsMenuPicker(title: "Deep-sky detail", selection: $level, options: Self.options)
+            SettingsCaption(caption)
+        }
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.4)
+    }
+
+    private var caption: String {
+        switch level {
+        case 1: return "Only the Messier and Caldwell objects and the best-known named targets."
+        case 2: return "Adds bright or well-known objects and the larger nebulae."
+        case 3: return "Adds everything else bright, large or named enough to be worth a place in a list."
+        default: return "Adds the faint, small and obscure objects. A wide sky gets crowded."
+        }
+    }
+}
+
 /// Settings ▸ Atmosphere: the weather values that decide how much the air lifts objects near the horizon.
 struct SettingsAtmosphereSection: View {
     @Environment(AppModel.self) private var app
@@ -75,7 +110,8 @@ struct SettingsAtmosphereSection: View {
     }
 }
 
-/// Settings ▸ Tools: links to the exposure calculator and the polar alignment helper.
+/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner and the polar alignment
+/// helper.
 struct SettingsToolsSection: View {
     var body: some View {
         SettingsSection(title: "Tools") {
@@ -83,6 +119,11 @@ struct SettingsToolsSection: View {
                 ExposureCalculatorView()
             } label: {
                 Label("Exposure Calculator", systemImage: "timer")
+            }
+            NavigationLink {
+                ToolsStarTrailsView()
+            } label: {
+                Label("Star Trails & Time-Lapse", systemImage: "timelapse")
             }
             NavigationLink {
                 PolarAlignmentView()

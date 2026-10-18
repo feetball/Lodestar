@@ -8,6 +8,7 @@ struct SettingsLocationSection: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
     @State private var editorTarget: SiteEditorTarget?
+    @State private var horizonFlow = HorizonFlowState()
 
     var body: some View {
         let store = app.settingsStore
@@ -25,13 +26,20 @@ struct SettingsLocationSection: View {
                 store.settings.locationSource = .device
                 app.location.requestAuthorization()
             }
+            .horizonFlow($horizonFlow)
             if settings.locationSource == .device {
                 accessPrompt
+                HorizonDeviceNote(canSave: app.location.fix != nil && !isFull) {
+                    if let fix = app.location.fix {
+                        editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
+                    }
+                }
             }
             ForEach(settings.savedSites) { site in
                 SettingsSavedSiteRow(
                     site: site,
                     isSelected: settings.locationSource == .site(site.id),
+                    horizonFlow: $horizonFlow,
                     onSelect: { store.settings.locationSource = .site(site.id) },
                     onEdit: { editorTarget = .existing(site) })
             }
@@ -154,6 +162,7 @@ private struct SettingsSavedSiteRow: View {
     @Environment(\.palette) private var palette
     let site: SavedSite
     let isSelected: Bool
+    @Binding var horizonFlow: HorizonFlowState
     let onSelect: () -> Void
     let onEdit: () -> Void
 
@@ -168,6 +177,9 @@ private struct SettingsSavedSiteRow: View {
                         Text(subtitle)
                             .font(.footnote)
                             .foregroundStyle(palette.secondaryText)
+                        Text(HorizonText.status(of: site.horizon))
+                            .font(.footnote)
+                            .foregroundStyle(palette.secondaryText)
                     }
                     Spacer(minLength: 0)
                 }
@@ -176,6 +188,7 @@ private struct SettingsSavedSiteRow: View {
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(isSelected ? .isSelected : [])
+            HorizonSiteMenu(site: site, flow: $horizonFlow)
             Button(action: onEdit) {
                 Image(systemName: "pencil.circle")
                     .font(.title3)

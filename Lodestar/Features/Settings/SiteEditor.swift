@@ -36,6 +36,7 @@ struct SiteEditor: View {
     @State private var isSaving = false
     @State private var isConfirmingDelete = false
     @State private var failureMessage: String?
+    @State private var horizonFlow = HorizonFlowState()
 
     /// - Parameters:
     ///   - target: The new site's starting point, or the site to edit.
@@ -66,10 +67,12 @@ struct SiteEditor: View {
                 nameSection
                 positionSection
                 timeZoneSection
+                HorizonSiteSection(siteID: existingSite?.id, flow: $horizonFlow)
                 if existingSite != nil {
                     deleteSection
                 }
             }
+            .horizonFlow($horizonFlow)
             .themedList(palette)
             .scrollDismissesKeyboard(.interactively)
             .disabled(isSaving)
@@ -260,9 +263,13 @@ struct SiteEditor: View {
         isSaving = false
         guard let location = draft.location else { return }
         let zone = timeZoneStatus.timeZone ?? TimeZoneResolver.nominalTimeZone(longitude: location.longitude)
+        // The skyline is recorded and saved on its own while the editor is open, so the stored one is the current one.
+        let horizon = existingSite.flatMap { existing in
+            app.settings.savedSites.first { $0.id == existing.id }?.horizon
+        }
         guard let site = SavedSite(id: existingSite?.id ?? UUID(), name: draft.name, latitude: location.latitude,
                                    longitude: location.longitude, elevation: location.elevation,
-                                   timeZoneIdentifier: zone.identifier) else {
+                                   timeZoneIdentifier: zone.identifier, horizon: horizon) else {
             failureMessage = "This position cannot be saved. Check the latitude, longitude and elevation."
             return
         }
