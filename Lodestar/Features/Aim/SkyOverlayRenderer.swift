@@ -25,6 +25,8 @@ struct SkyOverlayRenderer {
     let hudRotation: AimHUDRotation
     /// The step of the mosaic being shot, or `nil` without one.
     let mosaic: MosaicDisplay?
+    /// Where the connected GoTo mount points, or `nil` without one.
+    let mountMarker: AimMountMarker?
 
     let projector: AimProjector
     let frustum: AimFrustum
@@ -47,7 +49,7 @@ struct SkyOverlayRenderer {
     /// - Returns: `nil` when the screen is empty.
     init?(frame: AimFrame, content: AimSkyContent?, configuration: AimConfiguration, palette: Palette,
           camera: CameraGeometry?, virtualFieldOfView: Double, hudRotation: AimHUDRotation, time: TimeInterval,
-          mosaic: MosaicDisplay?, size: CGSize) {
+          mosaic: MosaicDisplay?, mountMarker: AimMountMarker?, size: CGSize) {
         guard let projection = AimProjectionFactory.projection(viewport: size, camera: camera,
                                                                virtualFieldOfView: virtualFieldOfView) else {
             return nil
@@ -74,6 +76,7 @@ struct SkyOverlayRenderer {
         self.time = time
         self.hudRotation = hudRotation
         self.mosaic = mosaic
+        self.mountMarker = mountMarker
         projector = AimProjector(projection: projection, attitude: eye, headingOffset: headingOffset)
         frustum = AimFrustum(projection: projection, attitude: eye, headingOffset: headingOffset,
                              margin: Self.clipMargin)
@@ -98,6 +101,7 @@ struct SkyOverlayRenderer {
         drawMosaic(in: context)
         drawDSLRFrame(in: context)
         drawTarget(in: context)
+        drawMountMarker(in: context)
         drawReticle(in: context)
         labels.draw(in: context, bounds: viewport, rotation: hudRotation)
     }

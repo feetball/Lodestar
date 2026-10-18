@@ -79,7 +79,7 @@ struct AimSkyInputs: Equatable, Sendable {
 
 /// The sheets the Aim screen presents.
 enum AimSheet: String, Identifiable {
-    case targetPicker, alignment, mosaic
+    case targetPicker, alignment, mosaic, mount
 
     var id: String { rawValue }
 }
