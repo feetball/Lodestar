@@ -2,7 +2,8 @@ import SwiftUI
 import LodestarKit
 
 /// Paints one frame of the sky overlay: Milky Way, grid, constellations, horizon, deep-sky objects, stars, planets,
-/// the DSLR frame, the target and the reticle, followed by their labels.
+/// the ground below the recorded skyline, the panels of a mosaic, the DSLR frame, the target (or the panel being
+/// aimed at) and the reticle, followed by their labels.
 ///
 /// Everything is projected with the phone's own back camera, the heading offset applied and the DSLR's device
 /// correction not; only the DSLR frame itself comes from the corrected pointing. (A phone that lies on top of the
@@ -22,6 +23,8 @@ struct SkyOverlayRenderer {
     /// Seconds on a continuous clock; drives the pulse of the target ring.
     let time: TimeInterval
     let hudRotation: AimHUDRotation
+    /// The step of the mosaic being shot, or `nil` without one.
+    let mosaic: MosaicDisplay?
 
     let projector: AimProjector
     let frustum: AimFrustum
@@ -44,7 +47,7 @@ struct SkyOverlayRenderer {
     /// - Returns: `nil` when the screen is empty.
     init?(frame: AimFrame, content: AimSkyContent?, configuration: AimConfiguration, palette: Palette,
           camera: CameraGeometry?, virtualFieldOfView: Double, hudRotation: AimHUDRotation, time: TimeInterval,
-          size: CGSize) {
+          mosaic: MosaicDisplay?, size: CGSize) {
         guard let projection = AimProjectionFactory.projection(viewport: size, camera: camera,
                                                                virtualFieldOfView: virtualFieldOfView) else {
             return nil
@@ -70,6 +73,7 @@ struct SkyOverlayRenderer {
         self.size = size
         self.time = time
         self.hudRotation = hudRotation
+        self.mosaic = mosaic
         projector = AimProjector(projection: projection, attitude: eye, headingOffset: headingOffset)
         frustum = AimFrustum(projection: projection, attitude: eye, headingOffset: headingOffset,
                              margin: Self.clipMargin)
@@ -90,6 +94,8 @@ struct SkyOverlayRenderer {
         drawDeepSky(in: context)
         drawStars(in: context)
         drawBodies(in: context)
+        drawSkyline(in: context)
+        drawMosaic(in: context)
         drawDSLRFrame(in: context)
         drawTarget(in: context)
         drawReticle(in: context)

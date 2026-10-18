@@ -148,8 +148,10 @@ struct SkyChartView: View {
         options.includeConstellations = settings.showConstellationLines || settings.showConstellationNames
         options.includeDeepSky = settings.showDeepSkyObjects
         options.includeMilkyWay = settings.showMilkyWay
+        options.deepSkyProminence = SkySnapshotOptions.prominence(forSetting: settings.deepSkyProminence)
         return SkyChartInputs(observer: observer, date: SkyChartModel.bucketed(app.clock.displayDate),
-                              options: options, target: app.target, isCatalogLoaded: app.catalog.catalog != nil)
+                              options: options, target: app.target, mosaic: MosaicSession.shared.plan,
+                              isCatalogLoaded: app.catalog.catalog != nil)
     }
 }
 

@@ -10,6 +10,8 @@ struct SkyChartInputs: Equatable, Sendable {
     let date: Date
     let options: SkySnapshotOptions
     let target: CelestialObject?
+    /// The mosaic being shot, whose panels are drawn.
+    let mosaic: MosaicPlan?
     /// Whether the catalog was loaded when these inputs were made (the chart cannot be built before).
     let isCatalogLoaded: Bool
 }
@@ -56,8 +58,9 @@ final class SkyChartModel {
 
         func build() -> (scene: SkyChartScene, paths: SkyChartPaths) {
             let snapshot = SkySnapshotBuilder.build(catalog: catalog, observer: inputs.observer.observer,
-                                                    date: inputs.date, options: inputs.options, target: inputs.target)
-            let scene = SkyChartSceneBuilder.build(from: snapshot)
+                                                    date: inputs.date, options: inputs.options, target: inputs.target,
+                                                    mosaic: inputs.mosaic)
+            let scene = SkyChartSceneBuilder.build(from: snapshot, horizon: inputs.observer.horizon)
             return (scene, SkyChartPaths(scene: scene))
         }
     }

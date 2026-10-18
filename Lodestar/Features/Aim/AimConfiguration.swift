@@ -12,6 +12,8 @@ struct AimConfiguration: Equatable {
     var showConstellationNames: Bool
     var showDeepSkyObjects: Bool
     var showMilkyWay: Bool
+    /// How much of the deep sky is drawn: 1 showpieces … 4 everything.
+    var deepSkyProminence: Int
     var starMagnitudeLimit: Double
     /// Whether the camera picture is wanted behind the sky (it also has to run). Never with a mount that points the
     /// phone's camera somewhere else than the lens.
@@ -29,6 +31,7 @@ struct AimConfiguration: Equatable {
         showConstellationNames = settings.showConstellationNames
         showDeepSkyObjects = settings.showDeepSkyObjects
         showMilkyWay = settings.showMilkyWay
+        deepSkyProminence = settings.deepSkyProminence
         starMagnitudeLimit = settings.starMagnitudeLimit
         isNight = app.isNightModeActive
         wantsCameraPreview = settings.cameraPreviewEnabled && (!isNight || settings.cameraPreviewAtNight)
@@ -58,6 +61,7 @@ struct AimConfiguration: Equatable {
         options.includeConstellations = showConstellationLines || showConstellationNames
         options.includeDeepSky = showDeepSkyObjects
         options.includeMilkyWay = showMilkyWay
+        options.deepSkyProminence = SkySnapshotOptions.prominence(forSetting: deepSkyProminence)
         return options
     }
 }
@@ -67,11 +71,15 @@ struct AimSkyInputs: Equatable, Sendable {
     var observer: Observer
     var options: SkySnapshotOptions
     var target: CelestialObject?
+    /// The site's recorded skyline; `nil` for an open horizon.
+    var horizon: HorizonProfile?
+    /// The mosaic being shot, whose panels are drawn.
+    var mosaic: MosaicPlan?
 }
 
 /// The sheets the Aim screen presents.
 enum AimSheet: String, Identifiable {
-    case targetPicker, alignment
+    case targetPicker, alignment, mosaic
 
     var id: String { rawValue }
 }
