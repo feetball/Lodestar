@@ -134,6 +134,7 @@ struct HorizonDeviceNote: View {
             Button(action: onSave) {
                 Label("Save This Place as a Site\u{2026}", systemImage: "mountain.2")
             }
+            .buttonStyle(.lodestarSecondary)
             .disabled(!canSave)
         }
     }
