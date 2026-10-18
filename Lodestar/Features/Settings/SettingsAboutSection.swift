@@ -16,9 +16,12 @@ struct SettingsAboutSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 CardTitle(title: "Privacy", systemImage: "hand.raised")
                 Text("Everything Lodestar does happens on your iPhone. There are no accounts, no analytics and no "
-                     + "tracking, and Lodestar never collects your location, sites or settings. The only network use "
-                     + "is Apple Maps, which loads map tiles when you open the site map, and Apple's geocoding "
-                     + "service, which receives a site's coordinates to look up its time zone while you add or edit it.")
+                     + "tracking, and Lodestar never collects your location, sites or settings. The network is used by "
+                     + "Apple Maps, which loads map tiles when you open the site map, by Apple's geocoding service, "
+                     + "which receives a site's coordinates to look up its time zone while you add or edit it, and by "
+                     + "the optional downloads in Online Data, which are off until you switch them on: CelesTrak, the "
+                     + "Minor Planet Center and MET Norway see your IP address, and MET Norway also your location "
+                     + "rounded to about 10 km. GoTo mount control talks to the mount on your local network only.")
                     .font(.subheadline)
                     .foregroundStyle(palette.primaryText)
                     .fixedSize(horizontal: false, vertical: true)

@@ -29,8 +29,14 @@ phone sits on the camera, then align on a star.
 ▸ Accessibility ▸ Display & Text Size ▸ Color Filters ▸ Color Tint, intensity and hue at maximum) and
 assign it to the Accessibility Shortcut (triple-click the side button).
 
-**Does it need an internet connection?** No. Only the site map and the time-zone lookup for a new site
-use the network.
+**Does it need an internet connection?** No. Everything works offline. The site map and the time-zone
+lookup for a new site use the network, and **Settings ▸ Online Data** has optional downloads (satellite
+passes, Starlink streak warnings, comets and a cloud forecast) that are all off until you switch them on.
+Each one tells you what it sends; see the [privacy policy](privacy.html).
+
+**Online Data: "The last update failed".** Lodestar keeps the data you already have. CelesTrak answers
+repeated requests for unchanged data with an error, so Lodestar asks for each satellite list at most every
+two hours; wait and try **Update now** later. The Starlink list (4.7 MB) downloads only on Wi-Fi.
 
 ## Contact
 
@@ -39,4 +45,6 @@ Report a problem or ask a question on the issue tracker: <https://github.com/fee
 ## Credits
 
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation figures
-and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025.
+and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025. Optional
+downloads: orbital data: CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather
+forecast from MET Norway (CC BY 4.0).

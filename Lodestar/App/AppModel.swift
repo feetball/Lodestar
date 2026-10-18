@@ -41,6 +41,10 @@ final class AppModel {
     let catalog: CatalogService
     let feedback: FeedbackService
     let screen: ScreenController
+    /// The optional downloads (satellites, comets, cloud forecast); everything in it is off until switched on.
+    let online: OnlineDataService
+    /// The satellite Aim follows or waits for, if one was chosen from a pass.
+    let satelliteAim: SatelliteAimSession
 
     /// The selected tab. Changing it starts/stops the sensors that tab needs.
     var selectedTab: AppTab = .aim {
@@ -88,6 +92,9 @@ final class AppModel {
         catalog = CatalogService()
         feedback = FeedbackService()
         screen = ScreenController()
+        online = OnlineDataService(catalog: catalog)
+        satelliteAim = SatelliteAimSession()
+        online.locationProvider = { [weak self] in self?.observerContext?.location }
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
@@ -171,8 +178,12 @@ final class AppModel {
         startMaintenance()
         syncServices()
         await catalog.load()
-        if target == nil, let id = settings.recentObjectIDs.first, let object = catalog.object(id: id) {
-            target = object
+        if target == nil, let id = settings.recentObjectIDs.first {
+            if let object = catalog.object(id: id) {
+                target = object
+            } else {
+                restoreWhenCataloged(id)
+            }
         }
         #if DEBUG
         if let id = ScreenshotMode.current?.targetID, let object = catalog.object(id: id) {
@@ -182,12 +193,32 @@ final class AppModel {
         evaluateSun(force: true)
     }
 
+    /// How long a recent target that is not in the catalog yet is waited for, in seconds.
+    private static let restoreWait: TimeInterval = 60
+
+    /// A recent target that is a downloaded comet is not in the catalog until the saved comet file has been applied
+    /// (`OnlineDataService`): sets it as soon as it resolves, unless a target was chosen meanwhile.
+    private func restoreWhenCataloged(_ id: String) {
+        Task { [weak self] in
+            let deadline = Date().addingTimeInterval(Self.restoreWait)
+            while Date() < deadline && !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self else { return }
+                if let object = self.catalog.object(id: id) {
+                    if self.target == nil { self.target = object }
+                    return
+                }
+            }
+        }
+    }
+
     func handleScenePhase(_ phase: ScenePhase) {
         scenePhase = phase
         switch phase {
         case .active:
             clock.start()
             startMaintenance()
+            online.onForeground()
         case .background:
             settingsStore.saveNow()
             clock.stop()
@@ -218,6 +249,7 @@ final class AppModel {
 
     /// Makes `object` the aiming target without changing tabs.
     func select(target object: CelestialObject) {
+        satelliteAim.stop()
         target = object
         if !object.id.hasPrefix("custom.") {
             settingsStore.noteRecent(object.id)

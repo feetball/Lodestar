@@ -7,6 +7,8 @@ struct TonightReportCards: View {
     var body: some View {
         Group {
             TonightTimelineCard(report: report)
+            TonightCloudCard(place: report.summary.observer.location, night: report.timeline.range,
+                             timeZone: report.timeZone)
             TonightSunCard(summary: report.summary, timeZone: report.timeZone)
             TonightMoonCard(summary: report.summary, timeZone: report.timeZone, appliesSkyline: report.appliesSkyline)
             TonightMilkyWayCard(summary: report.summary, timeZone: report.timeZone,
@@ -15,6 +17,8 @@ struct TonightReportCards: View {
                                appliesSkyline: report.appliesSkyline)
             TonightTargetsCard(outcome: report.targets, timeZone: report.timeZone,
                                appliesSkyline: report.appliesSkyline)
+            TonightSatelliteCard(observer: report.summary.observer, night: report.timeline.range,
+                                 timeZone: report.timeZone)
         }
     }
 }

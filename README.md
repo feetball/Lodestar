@@ -32,8 +32,9 @@ tilt the tripod head until it is in your frame.
 - **Night mode** — a pure red-on-black interface (no green or blue light at all), automatic after
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
-- **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected
-  or sent anywhere.
+- **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected.
+  Optional downloads (Settings ▸ Online Data) are off by default: ISS and bright-satellite passes and
+  Starlink streak warnings (CelesTrak), comets (Minor Planet Center) and a cloud forecast (MET Norway).
 
 ## Requirements
 
@@ -142,9 +143,12 @@ confirmed on hardware. *Settings ▸ About ▸ Sensor Diagnostics* helps with th
 ## Privacy
 
 Lodestar has no accounts, analytics, ads or tracking, and it never collects your data: location, motion
-and camera data are processed on the device. The only network use is Apple's: map tiles in the site
-picker, and Apple's geocoding service, which receives a site's coordinates to look up its time zone while
-you add or edit a site. See `Lodestar/Resources/PrivacyInfo.xcprivacy`.
+and camera data are processed on the device. The network is used by Apple (map tiles in the site picker,
+and the geocoding service, which receives a site's coordinates to look up its time zone while you add or
+edit a site) and by the optional downloads in Settings ▸ Online Data, which are off until switched on:
+CelesTrak, the Minor Planet Center and MET Norway see the IP address, and MET Norway also the location
+rounded to about 10 km. GoTo mount control talks to the mount on the local network only. See
+`docs/privacy.md` and `Lodestar/Resources/PrivacyInfo.xcprivacy`.
 
 ## Data and credits
 

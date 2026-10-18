@@ -28,7 +28,7 @@ struct AimControlsBar: View {
         let mosaic = model.mosaicSession
         control("Target", systemImage: "scope") { sheet = .targetPicker }
             .accessibilityLabel("Choose target")
-            .accessibilityValue(model.guidanceTarget?.name ?? "None")
+            .accessibilityValue(model.guidanceTarget?.name ?? model.satelliteSource?.title ?? "None")
         control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) { sheet = .alignment }
             .accessibilityLabel("Align on a star")
             .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
