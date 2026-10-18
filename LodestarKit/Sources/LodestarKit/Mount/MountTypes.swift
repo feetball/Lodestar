@@ -8,6 +8,9 @@ public enum MountProtocol: String, CaseIterable, Codable, Hashable, Sendable {
     case nexstar
     /// ASCOM Alpaca Telescope interface, REST over HTTP.
     case alpaca
+    /// Sky-Watcher motor controller protocol over UDP, as spoken by the built-in Wi-Fi of the AZ-GTi, the Star Adventurer GTi and
+    /// the Wi-Fi dongles of EQ mounts (see `SkyWatcherDriver`); "Sky-Watcher Wi-Fi (AZ-GTi, Star Adventurer GTi)" in menus.
+    case skywatcher
 }
 
 /// Something a mount may not be able to do, named in `MountError.notSupported`.
