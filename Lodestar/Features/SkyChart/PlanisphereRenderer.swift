@@ -31,6 +31,9 @@ struct PlanisphereRenderer {
     /// The step of the mosaic being shot, or `nil` without one.
     let mosaic: MosaicDisplay?
 
+    /// The zoom from which the chart draws obscure deep-sky objects (prominence 4).
+    private static let obscureMinimumZoom: CGFloat = 2
+
     /// Opacity of the ground's shade over the sky behind the skyline.
     private static let groundShade = 0.7
 
@@ -130,11 +133,13 @@ struct PlanisphereRenderer {
     }
 
     /// Galaxies are drawn as ellipses, nebulae as rounded squares and clusters as circles; dark nebulae are dashed and
-    /// fainter. The scene holds the objects up to the prominence chosen in Settings.
+    /// fainter. The scene holds the objects up to the prominence chosen in Settings; the least prominent wait for zoom.
     private func drawDeepSky(_ context: inout GraphicsContext) {
         let bounds = visibleBounds
         var galaxies = Path(), nebulae = Path(), clusters = Path(), darkNebulae = Path()
-        for object in scene.deepSky {
+        // Obscure objects (prominence 4) appear once the chart is zoomed in.
+        let showsObscure = viewport.zoom >= Self.obscureMinimumZoom
+        for object in scene.deepSky where showsObscure || object.prominence < 4 {
             let center = viewport.screen(object.point)
             guard bounds.contains(center) else { continue }
             let extent = (object.extent ?? 0) * Double(viewport.pointsPerRadian(at: object.point))

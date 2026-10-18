@@ -132,15 +132,6 @@ enum AimMosaicPlanner {
         return "\(plan.panelCount) panels in \(plural(plan.rows, "row"))"
     }
 
-    /// The same grid for VoiceOver.
-    static func spokenGridText(_ plan: MosaicPlan) -> String {
-        if plan.panelCount == 1 { return "1 panel" }
-        if plan.isRectangular {
-            return "\(plural(plan.rows, "row")) by \(plural(plan.columns, "column")), \(plan.panelCount) panels"
-        }
-        return "\(plan.panelCount) panels in \(plural(plan.rows, "row"))"
-    }
-
     /// What a warning of the plan means for the photographer.
     static func text(for warning: MosaicWarning) -> String {
         switch warning {

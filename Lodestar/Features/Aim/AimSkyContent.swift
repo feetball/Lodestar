@@ -13,6 +13,9 @@ struct AimSkyContent: Sendable {
     let deepSky: [AimDeepSkyMarker]
     /// The directions of `deepSky`, in the same order, so a frame projects them in one batch.
     let deepSkyDirections: [Vector3]
+    /// The directions of the first markers of `deepSky`, those of prominence 3 or better (a wide view leaves out the
+    /// rest).
+    let deepSkyCommonDirections: [Vector3]
     /// One layer per Milky Way brightness level, faintest first.
     let milkyWay: [AimMilkyWayLayer]
     /// The site's recorded skyline; `nil` for an open horizon.
@@ -60,6 +63,7 @@ struct AimSkyContent: Sendable {
             .sorted { ($0.prominence, $0.magnitude ?? .infinity, $0.name) < ($1.prominence, $1.magnitude ?? .infinity, $1.name) }
         deepSky = markers
         deepSkyDirections = markers.map(\.direction)
+        deepSkyCommonDirections = markers.prefix { $0.prominence <= 3 }.map(\.direction)
         milkyWay = AimMilkyWayLayer.layers(from: snapshot.milkyWay, frame: snapshot.frame)
     }
 }

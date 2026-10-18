@@ -89,21 +89,25 @@ private struct AimMosaicCard: View {
 
 /// The advice on turning the camera about its axis so that the panel's edges line up with the plan.
 enum AimMosaicRoll {
-    /// Turns smaller than this, in degrees, count as matching.
+    /// Turns up to this size, in degrees, count as matching.
     static let tolerance = 1.0
 
     static func matches(_ delta: Double) -> Bool { abs(delta) <= tolerance }
 
+    private static func direction(_ delta: Double) -> String {
+        delta > 0 ? "clockwise" : "counterclockwise"
+    }
+
     /// "Rotate the camera 12° clockwise", or the note that nothing is left to do.
     static func text(delta: Double) -> String {
-        guard !matches(delta) else { return "Camera rotation matches" }
-        return "Rotate the camera \(AimFormat.angle(delta)) \(delta > 0 ? "clockwise" : "counter-clockwise")"
+        guard !matches(delta) else { return "Camera roll matches the panel" }
+        return "Rotate the camera \(AngleFormatter.formatDegrees(abs(delta), decimals: 0)) \(direction(delta))"
     }
 
     /// The same advice for VoiceOver.
     static func spokenText(delta: Double) -> String {
-        guard !matches(delta) else { return "Camera rotation matches" }
-        return "Rotate the camera \(AimFormat.spoken(delta)) \(delta > 0 ? "clockwise" : "counter-clockwise")"
+        guard !matches(delta) else { return "Camera roll matches the panel" }
+        return "Rotate the camera \(AimFormat.spoken(delta)) \(direction(delta))"
     }
 }
 

@@ -3,7 +3,7 @@ import LodestarKit
 
 /// Plans a mosaic and starts it: the area to cover (the target, the Milky Way arch or a custom rectangle), the overlap,
 /// how the camera is held and the lens from Settings, with the resulting grid, panel count and warnings. While a mosaic
-/// is running the sheet shows its progress instead.
+/// is running its progress is shown on top, and the plan below can replace it ("Restart with this plan").
 struct AimMosaicSheet: View {
     let model: AimViewModel
     @Environment(AppModel.self) private var app
@@ -41,15 +41,12 @@ struct AimMosaicSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if model.mosaicSession.isActive {
                         runningCard
-                    } else {
-                        plannerContent
                     }
+                    plannerContent
                 }
                 .padding(16)
             }
-            if !model.mosaicSession.isActive {
-                footer
-            }
+            footer
         }
         .background(palette.background)
         .foregroundStyle(palette.primaryText)
@@ -85,7 +82,8 @@ struct AimMosaicSheet: View {
             Button {
                 start()
             } label: {
-                Label("Start", systemImage: "play.fill")
+                Label(model.mosaicSession.isActive ? "Restart with this plan" : "Start",
+                      systemImage: model.mosaicSession.isActive ? "arrow.counterclockwise" : "play.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.lodestarPrimary)
@@ -129,9 +127,6 @@ struct AimMosaicSheet: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.lodestarSecondary)
-            Text("The buttons under the readout on the Aim screen move on to the next panel and back.")
-                .font(.footnote)
-                .foregroundStyle(palette.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(palette)
@@ -305,9 +300,8 @@ struct AimMosaicSheet: View {
     @ViewBuilder
     private func planRows(_ planned: AimMosaicPlanResult) -> some View {
         let plan = planned.plan
-        Text(AimMosaicPlanner.gridText(plan))
-            .font(.title3.weight(.semibold))
-            .accessibilityLabel(AimMosaicPlanner.spokenGridText(plan))
+        InfoRow(label: "Rows \u{00D7} columns", value: rowsByColumnsText(plan))
+        InfoRow(label: "Panels", value: "\(plan.panelCount)")
         InfoRow(label: "Covers", value: "\(AngleFormatter.formatDegrees(plan.coverage.widthDegrees, decimals: 0)) \u{00D7} \(AngleFormatter.formatDegrees(plan.coverage.heightDegrees, decimals: 0))")
         InfoRow(label: "Panel", value: "\(AngleFormatter.formatDegrees(plan.frame.horizontal, decimals: 1)) \u{00D7} \(AngleFormatter.formatDegrees(plan.frame.vertical, decimals: 1)) as held")
         InfoRow(label: "Overlap", value: overlapText(plan))
@@ -319,6 +313,11 @@ struct AimMosaicSheet: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(palette.warning)
         }
+    }
+
+    /// "2 \u{00D7} 3", or "3 \u{00D7} up to 4" when the rows differ in length.
+    private func rowsByColumnsText(_ plan: MosaicPlan) -> String {
+        plan.isRectangular ? "\(plan.rows) \u{00D7} \(plan.columns)" : "\(plan.rows) \u{00D7} up to \(plan.columns)"
     }
 
     private func overlapText(_ plan: MosaicPlan) -> String {
@@ -382,7 +381,7 @@ struct AimMosaicSheet: View {
 
     /// Plans for the current request off the main actor; restarted whenever the request changes.
     private func plan() async {
-        guard !model.mosaicSession.isActive, let request else {
+        guard let request else {
             result = nil
             isPlanning = false
             return

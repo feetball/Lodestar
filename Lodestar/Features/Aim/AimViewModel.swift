@@ -214,7 +214,7 @@ final class AimViewModel {
         engine.setMosaic(active: true, aim: AimMosaicAim(
             panelIndex: panel.index, horizontal: pointing.direction, roll: pointing.roll,
             orientation: plan.orientation, isAboveHorizon: pointing.isAboveHorizon,
-            lowestAltitude: pointing.lowestAltitude))
+            lowestAltitude: pointing.lowestAltitude, onTargetThreshold: AimMosaicAim.onTargetThreshold(for: plan)))
     }
 
     // MARK: Zoom

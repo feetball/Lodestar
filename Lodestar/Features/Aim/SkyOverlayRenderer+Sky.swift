@@ -47,28 +47,40 @@ extension SkyOverlayRenderer {
     // MARK: Deep-sky objects
 
     /// The least prominent objects that get a name at this field of view (degrees along the long side of the screen):
-    /// showpieces and prominent objects are named in every view, the rest only as the view narrows, so a wide
-    /// view stays readable.
+    /// none in the widest views, then the showpieces, the prominent objects, the notable ones and finally all of them as
+    /// the view narrows, so a wide view stays readable.
     static func deepSkyNameProminence(forFieldOfView fieldOfView: Double) -> Int {
         switch fieldOfView {
-        case 35...: return 2
-        case 15...: return 3
+        case 70...: return 0
+        case 45...: return 1
+        case 30...: return 2
+        case 22...: return 3
         default: return 4
         }
     }
 
+    /// Obscure objects (prominence 4) are left out of views at least this wide, in degrees.
+    static let obscureHiddenFieldOfView = 70.0
+    /// The most deep-sky symbols drawn in one frame.
+    static let deepSkySymbolLimit = 300
     /// The most deep-sky names shown at once.
     static let deepSkyNameLimit = 16
 
     mutating func drawDeepSky(in context: GraphicsContext) {
         guard configuration.showDeepSkyObjects, let content, !content.deepSky.isEmpty else { return }
         let nameProminence = Self.deepSkyNameProminence(forFieldOfView: fieldOfView)
+        let leavesOutObscure = fieldOfView >= Self.obscureHiddenFieldOfView
+        let directions = leavesOutObscure ? content.deepSkyCommonDirections : content.deepSkyDirections
         var outlines = Path()
         var darkOutlines = Path()
+        var symbols = 0
         var namesShown = 0
         let nameStyle = AimLabelStyle(size: 11, weight: .regular, color: palette.deepSkyMarker)
-        for (marker, point) in zip(content.deepSky, projector.points(content.deepSkyDirections)) {
+        // The markers are ordered by prominence, so the symbol limit keeps the most prominent ones.
+        for (marker, point) in zip(content.deepSky, projector.points(directions)) {
             guard let point, isVisible(point, margin: 16) else { continue }
+            guard symbols < Self.deepSkySymbolLimit else { break }
+            symbols += 1
             let extent = min(max(marker.diameter * pointsPerDegree, 8), 44)
             if marker.isDark {
                 darkOutlines.addPath(symbol(for: marker.shape, at: point, extent: extent))

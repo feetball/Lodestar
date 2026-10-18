@@ -14,6 +14,14 @@ struct AimMosaicAim: Equatable, Sendable {
     let isAboveHorizon: Bool
     /// The lowest altitude among the panel's centre and corners.
     let lowestAltitude: Double
+    /// Separation in degrees within which the camera counts as on the panel: a third of the overlap, so a panel placed
+    /// at the edge of this still overlaps its neighbours.
+    let onTargetThreshold: Double
+
+    /// The threshold for a plan: a third of its overlap, as a fraction of the shorter side of the panel.
+    static func onTargetThreshold(for plan: MosaicPlan) -> Double {
+        max(0.5, plan.overlap / 3 * min(plan.frame.horizontal, plan.frame.vertical))
+    }
 }
 
 /// The mosaic part of a frame: the panel and how far the camera is turned from the roll it asks for.
@@ -48,6 +56,8 @@ final class AimFrameEngine {
     private let motion: MotionService
     private var configuration: AimConfiguration
     private var tracker: GuidanceTracker
+    /// Tracks the mosaic panel, with a tolerance that follows the plan's overlap.
+    private var mosaicTracker = GuidanceTracker(onTargetThreshold: 1)
     private var targetID: String?
     private var target: SkySnapshot.Target?
     /// Whether a mosaic is being shot (its panel replaces the target) and the panel to aim at, once known.
@@ -80,8 +90,10 @@ final class AimFrameEngine {
     /// once a second; `active` is `false` when no mosaic runs, and with `true` and no `aim` there is no guidance (the
     /// mosaic is finished). The on-target state starts afresh when the panel changes.
     func setMosaic(active: Bool, aim: AimMosaicAim?) {
-        if aim?.panelIndex != mosaicAim?.panelIndex || active != isMosaicActive {
-            tracker.reset()
+        if let aim, aim.onTargetThreshold != mosaicTracker.onTargetThreshold {
+            mosaicTracker = GuidanceTracker(onTargetThreshold: aim.onTargetThreshold)
+        } else if aim?.panelIndex != mosaicAim?.panelIndex || active != isMosaicActive {
+            mosaicTracker.reset()
         }
         isMosaicActive = active
         mosaicAim = active ? aim : nil
@@ -102,7 +114,7 @@ final class AimFrameEngine {
         var mosaic: AimMosaicFrame?
         if isMosaicActive {
             if let aim = mosaicAim {
-                guidance = tracker.update(solution: pointing, target: aim.horizontal)
+                guidance = mosaicTracker.update(solution: pointing, target: aim.horizontal)
                 mosaic = AimMosaicFrame(aim: aim, rollDelta: Self.rollDelta(for: aim, pointing: pointing))
             }
         } else if let target {
@@ -112,23 +124,15 @@ final class AimFrameEngine {
                         mosaic: mosaic)
     }
 
-    /// How far the camera has to turn clockwise to take the roll `aim` asks for.
+    /// How far the camera has to turn clockwise to take the roll `aim` asks for, folded into ±90°.
     ///
-    /// A camera held in landscape has the top of its picture along `cameraUpVector`. Held in portrait, the long side
-    /// of the sensor is the panel's "up", which is the camera's right or left depending on which way it was turned:
-    /// the smaller turn of the two is reported.
+    /// A panel is the same rectangle turned half a circle, so the smaller turn of the two is reported. A camera held in
+    /// landscape has the top of its picture along `cameraUpVector`; held in portrait, the long side of the sensor is
+    /// the panel's "up", which is the camera's right.
     static func rollDelta(for aim: AimMosaicAim, pointing: PointingSolution) -> Double {
-        let forward = pointing.boresightVector
-        func delta(up: Vector3) -> Double {
-            AstroMath.normalizeSignedDegrees(aim.roll - MosaicGuidance.roll(forward: forward, up: up))
-        }
-        switch aim.orientation {
-        case .landscape:
-            return delta(up: pointing.cameraUpVector)
-        case .portrait:
-            let right = delta(up: pointing.cameraRightVector)
-            let left = delta(up: pointing.cameraRightVector * -1)
-            return abs(right) <= abs(left) ? right : left
-        }
+        let up = aim.orientation == .landscape ? pointing.cameraUpVector : pointing.cameraRightVector
+        let delta = AstroMath.normalizeSignedDegrees(aim.roll - MosaicGuidance.roll(forward: pointing.boresightVector, up: up))
+        if delta > 90 { return delta - 180 }
+        return delta <= -90 ? delta + 180 : delta
     }
 }
