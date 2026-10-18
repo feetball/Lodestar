@@ -6,10 +6,13 @@ import LodestarKit
 struct MountJobResult<Value: Sendable>: Sendable {
     let result: Result<Value, MountError>
     let status: MountStatus
+    /// What the driver can tell besides the status (alignment, pier side), as the job left it; `nil` for most drivers.
+    let detail: MountDriverDetail?
 
-    init(_ result: Result<Value, MountError>, status: MountStatus) {
+    init(_ result: Result<Value, MountError>, status: MountStatus, detail: MountDriverDetail? = nil) {
         self.result = result
         self.status = status
+        self.detail = detail
     }
 }
 
@@ -61,8 +64,36 @@ final class MountSession: @unchecked Sendable {
     }
 
     /// One refresh cycle of the controller.
-    func poll() async -> MountStatus {
-        await run { controller in controller.poll() }.status
+    func poll() async -> MountJobResult<MountStatus> {
+        await run { controller in controller.poll() }
+    }
+
+    /// Runs `work` on the driver itself, for what only one kind of driver can do (declare the home position, remove an
+    /// alignment star). The controller's status after the job comes with the result.
+    func runDriver<Value: Sendable>(
+        urgent: Bool = false, _ work: @escaping @Sendable (MountDriver) throws -> Value
+    ) async -> MountJobResult<Value> {
+        await withCheckedContinuation { (continuation: CheckedContinuation<MountJobResult<Value>, Never>) in
+            let accepted = queue.submit(urgent: urgent) { [self] in
+                continuation.resume(returning: executeOnDriver(work))
+            }
+            if !accepted {
+                continuation.resume(returning: MountJobResult(.failure(.notConnected), status: .disconnected))
+            }
+        }
+    }
+
+    /// The simulated Sky-Watcher turns its telescope to `place`, as if the person had centred it with the nudge arrows, and the
+    /// driver forgets what it was doing.
+    func centreSimulated(on place: EquatorialCoordinate) async -> MountJobResult<Void> {
+        await withCheckedContinuation { (continuation: CheckedContinuation<MountJobResult<Void>, Never>) in
+            let accepted = queue.submit(urgent: true) { [self] in
+                continuation.resume(returning: performCentre(on: place))
+            }
+            if !accepted {
+                continuation.resume(returning: MountJobResult(.failure(.notConnected), status: .disconnected))
+            }
+        }
     }
 
     /// Runs the controller on new limits. The mount is asked for its state again, so only call it while idle.
@@ -108,7 +139,7 @@ final class MountSession: @unchecked Sendable {
             made.prepare?()
             let capabilities = try created.connect()
             controller = created
-            return MountJobResult(.success(capabilities), status: created.status)
+            return MountJobResult(.success(capabilities), status: created.status, detail: made.detail?())
         } catch {
             return MountJobResult(.failure(Self.mountError(error)), status: .disconnected)
         }
@@ -127,7 +158,7 @@ final class MountSession: @unchecked Sendable {
         do {
             _ = try fresh.connect()
             controller = fresh
-            return MountJobResult(.success(()), status: fresh.status)
+            return MountJobResult(.success(()), status: fresh.status, detail: bundle.detail?())
         } catch {
             return MountJobResult(.failure(Self.mountError(error)), status: current.status)
         }
@@ -137,9 +168,37 @@ final class MountSession: @unchecked Sendable {
         guard let controller else { return MountJobResult(.failure(.notConnected), status: .disconnected) }
         bundle?.prepare?()
         do {
-            return MountJobResult(.success(try work(controller)), status: controller.status)
+            let value = try work(controller)
+            return MountJobResult(.success(value), status: controller.status, detail: bundle?.detail?())
         } catch {
-            return MountJobResult(.failure(Self.mountError(error)), status: controller.status)
+            return MountJobResult(.failure(Self.mountError(error)), status: controller.status, detail: bundle?.detail?())
+        }
+    }
+
+    private func performCentre(on place: EquatorialCoordinate) -> MountJobResult<Void> {
+        guard let controller, let bundle, let centre = bundle.centreSimulated else {
+            return MountJobResult(.failure(.notSupported(feature: .other)), status: controller?.status ?? .disconnected)
+        }
+        bundle.prepare?()
+        do {
+            try controller.abort()
+            centre(place)
+            // Tracking resumes from where the telescope stands now.
+            try controller.abort()
+            return MountJobResult(.success(()), status: controller.status, detail: bundle.detail?())
+        } catch {
+            return MountJobResult(.failure(Self.mountError(error)), status: controller.status, detail: bundle.detail?())
+        }
+    }
+
+    private func executeOnDriver<Value: Sendable>(_ work: (MountDriver) throws -> Value) -> MountJobResult<Value> {
+        guard let controller, let bundle else { return MountJobResult(.failure(.notConnected), status: .disconnected) }
+        bundle.prepare?()
+        do {
+            let value = try work(bundle.driver)
+            return MountJobResult(.success(value), status: controller.status, detail: bundle.detail?())
+        } catch {
+            return MountJobResult(.failure(Self.mountError(error)), status: controller.status, detail: bundle.detail?())
         }
     }
 

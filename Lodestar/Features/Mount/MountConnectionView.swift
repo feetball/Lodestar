@@ -14,14 +14,24 @@ struct MountConnectionView: View {
             MountStatusSection()
             switch service.connection {
             case .connected:
+                if service.usesLodestarAlignment {
+                    SettingsSection(title: "Set up this mount", footer: MountSkyWatcherSetupRows.footer) {
+                        MountSkyWatcherSetupRows(onSync: nil)
+                    }
+                }
                 MountControlsSection()
             case .connecting:
                 EmptyView()
             case .disconnected, .lost:
                 MountTypeSection()
                 MountAddressSection()
-                if service.selectedOption.supportsDiscovery {
+                if service.selectedOption.discovery != nil {
                     MountDiscoverySection()
+                }
+                if service.selectedOption.usesLodestarAlignment {
+                    SettingsSection(title: "Home Position") {
+                        MountHomeGuide(arrangement: service.settings.arrangement)
+                    }
                 }
                 MountConnectSection()
             }
@@ -126,8 +136,23 @@ private struct MountStatusSection: View {
             InfoRow(label: "Pointing", value: MountStatusText.pointing(position, style: app.settings.coordinateStyle))
         }
         InfoRow(label: "State", value: MountStatusText.phaseLine(status, targetName: service.slewTargetName))
-        if let warning = service.alignmentWarning {
+        if let line = service.alignmentLine {
+            InfoRow(label: "Alignment", value: line)
+        }
+        if let side = service.pierSideLine {
+            InfoRow(label: "Pier side", value: side)
+        }
+        if service.usesLodestarAlignment, let tracking = service.trackingLine {
+            InfoRow(label: "Tracking", value: tracking)
+        }
+        if let warning = service.alignmentWarning ?? (service.needsFirstSync ? MountAlignmentText.notAlignedYet : nil) {
             Label(warning, systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if let stop = service.trackingStopText {
+            Label(stop, systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
@@ -309,44 +334,49 @@ private struct MountDiscoverySection: View {
     private var service: MountService { MountService.shared }
 
     var body: some View {
-        SettingsSection(title: "Alpaca Devices",
-                        footer: "Lodestar asks every address of the Wi-Fi network it is on. Servers on another network, or "
-                            + "behind a firewall, are not found: type their address above.") {
-            Button {
-                service.startDiscovery()
-            } label: {
-                HStack {
-                    Label("Find Alpaca devices", systemImage: "magnifyingglass")
-                    Spacer(minLength: 0)
-                    if service.discoveryState == .searching {
-                        ProgressView()
-                            .tint(palette.accent)
+        if let kind = service.selectedOption.discovery {
+            SettingsSection(title: kind.sectionTitle, footer: kind.footer) {
+                Button {
+                    service.startDiscovery()
+                } label: {
+                    HStack {
+                        Label(kind.buttonTitle, systemImage: "magnifyingglass")
+                        Spacer(minLength: 0)
+                        if service.discoveryState == .searching {
+                            ProgressView()
+                                .tint(palette.accent)
+                        }
                     }
                 }
-            }
-            .disabled(service.discoveryState == .searching)
-            ForEach(service.discovered) { telescope in
-                telescopeRow(telescope)
-            }
-            if case .finished(let servers, let telescopes) = service.discoveryState {
-                SettingsCaption(summary(servers: servers, telescopes: telescopes))
+                .disabled(service.discoveryState == .searching)
+                ForEach(service.discovered) { device in
+                    deviceRow(device, kind: kind)
+                }
+                if case .finished(let servers, let devices) = service.discoveryState {
+                    SettingsCaption(kind.summary(servers: servers, devices: devices))
+                }
             }
         }
     }
 
-    private func telescopeRow(_ telescope: MountAlpacaTelescope) -> some View {
+    private func deviceRow(_ device: MountFoundDevice, kind: MountDiscoveryKind) -> some View {
         let form = service.form
-        let isSelected = form.host == telescope.host && form.port == telescope.port
-            && form.deviceNumber == telescope.deviceNumber && form.deviceName != nil
+        let isSelected = form.host == device.host && form.port == device.port
+            && form.deviceNumber == device.deviceNumber && form.deviceName != nil
+        let detail: String
+        switch kind {
+        case .alpaca: detail = "\(device.addressText) \u{00B7} device \(device.deviceNumber)"
+        case .skyWatcher: detail = device.addressText
+        }
         return Button {
-            service.choose(telescope)
+            service.choose(device)
         } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(telescope.name)
+                    Text(device.name)
                         .font(.body.weight(.medium))
                         .foregroundStyle(palette.primaryText)
-                    Text("\(telescope.addressText) \u{00B7} device \(telescope.deviceNumber)")
+                    Text(detail)
                         .font(.footnote)
                         .foregroundStyle(palette.secondaryText)
                 }
@@ -361,24 +391,17 @@ private struct MountDiscoverySection: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
-
-    private func summary(servers: Int, telescopes: Int) -> String {
-        if telescopes > 0 {
-            return "Found \(telescopes) telescope\(telescopes == 1 ? "" : "s"). Tap one to use it."
-        }
-        if servers > 0 {
-            return "Found \(servers) Alpaca server\(servers == 1 ? "" : "s"), but no telescope is set up on "
-                + "\(servers == 1 ? "it" : "them")."
-        }
-        return "No Alpaca server answered. Is the iPhone on the same Wi-Fi network as the server? Is Local Network "
-            + "allowed for Lodestar in the iOS Settings app? You can also type the address by hand."
-    }
 }
 
 /// The Connect button, and the way to try everything without a mount.
 private struct MountConnectSection: View {
     @Environment(AppModel.self) private var app
     private var service: MountService { MountService.shared }
+
+    private static let demoCaption = """
+        A mount without hardware, to see how Go to, Sync and the nudge arrows work. The Sky-Watcher one also shows the \
+        set-up and the alignment on stars.
+        """
 
     var body: some View {
         let form = service.form
@@ -398,13 +421,14 @@ private struct MountConnectSection: View {
             }
             .buttonStyle(.lodestarPrimary)
             .disabled(!canConnect)
-            Button {
-                service.connectDemo(observer: app.observerContext?.observer)
-            } label: {
-                Label("Try a simulated mount", systemImage: "play.circle")
+            ForEach(MountConnectionOption.demos) { demo in
+                Button {
+                    service.connectDemo(demo, observer: app.observerContext?.observer)
+                } label: {
+                    Label(demo.title, systemImage: "play.circle")
+                }
             }
-            SettingsCaption("The simulated mount slews, syncs and tracks in memory. It needs no hardware, to see how "
-                            + "the Aim screen works.")
+            SettingsCaption(Self.demoCaption)
         }
     }
 }
@@ -466,6 +490,7 @@ private struct MountLimitsSection: View {
 
     var body: some View {
         @Bindable var service = MountService.shared
+        let option = service.connectedOption ?? service.selectedOption
         SettingsSection(title: "Limits") {
             SettingsSliderRow(title: "Altitude limit", valueText: AppFormat.altitude(service.settings.altitudeLimit),
                               value: $service.settings.altitudeLimit, range: MountUserSettings.altitudeLimitRange,
@@ -475,16 +500,25 @@ private struct MountLimitsSection: View {
                             + "has limits of its own as well.")
             SettingsMenuPicker(title: "Largest sync correction", selection: $service.settings.maximumSyncOffset,
                                options: Self.syncOptions)
-            SettingsCaption("A sync that would move the mount by more than this is refused. It catches a sync on the "
-                            + "wrong star.")
+            SettingsCaption("""
+                A sync that would move the mount's idea of its position by more than this is refused, which catches a \
+                wrong star. Sky-Watcher Wi-Fi mounts ignore this: they judge a star by how well it fits the others.
+                """)
             SettingsMenuPicker(title: "Nudge speed", selection: $service.settings.nudgeRate, options: Self.rateOptions)
             SettingsMenuPicker(title: "Stop a slew after", selection: $service.settings.slewTimeout,
                                options: Self.timeoutOptions)
-            SettingsToggleRow(
-                title: "Send location and time when connecting",
-                caption: "Sends your location and the iPhone's clock (UTC) to the mount, for mounts that work out their "
-                    + "own sky, such as OnStep and hand controls without GPS.",
-                isOn: $service.settings.sendsSiteAndTime)
+            if option.usesLodestarAlignment {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Location and time")
+                    SettingsCaption(MountAlignmentText.siteAndTime)
+                }
+            } else {
+                SettingsToggleRow(
+                    title: "Send location and time when connecting",
+                    caption: "Sends your location and the iPhone's clock (UTC) to the mount, for mounts that work out their "
+                        + "own sky, such as OnStep and hand controls without GPS.",
+                    isOn: $service.settings.sendsSiteAndTime)
+            }
         }
     }
 }
@@ -493,13 +527,19 @@ private struct MountLimitsSection: View {
 private struct MountAdvancedSection: View {
     @State private var isExpanded = false
 
+    private static let axisSenseCaption = """
+        Check after the first star, with tracking on: tap East on the nudge pad. The view must move east, so the stars \
+        drift west in the camera. Tap North: the view must move north. If East and North are swapped, or one of them runs \
+        backwards, reverse an axis here. Changing these applies the next time you connect and clears the alignment.
+        """
+
     var body: some View {
         @Bindable var service = MountService.shared
-        let option = service.connectedOption ?? service.selectedOption
-        if option.supportsEpoch || option.supportsAxisReversal {
+        let fields = (service.connectedOption ?? service.selectedOption).advancedFields
+        if !fields.isEmpty {
             SettingsSection(title: "Advanced", footer: "These apply the next time you connect.") {
                 DisclosureGroup("Advanced options", isExpanded: $isExpanded) {
-                    if option.supportsEpoch {
+                    if fields.contains(.epoch) {
                         VStack(alignment: .leading, spacing: 4) {
                             SettingsMenuPicker(
                                 title: "Coordinate system", selection: $service.settings.epochChoice,
@@ -508,15 +548,52 @@ private struct MountAdvancedSection: View {
                                             + "unless GoTo always lands a fraction of a degree off.")
                         }
                     }
-                    if option.supportsAxisReversal {
+                    if fields.contains(.swapEastWest) {
                         SettingsToggleRow(
                             title: "Reverse east and west",
                             caption: "For a mount whose nudges to the east and west go the wrong way.",
                             isOn: $service.settings.reversesEastWest)
                     }
+                    if fields.contains(.arrangement) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            SettingsMenuPicker(
+                                title: "Mount arrangement", selection: $service.settings.arrangement,
+                                options: MountArrangementChoice.allCases.map { SettingsMenuOption(title: Self.title(of: $0), value: $0) })
+                            SettingsCaption("""
+                                Automatic takes it from the mount model when it connects: the AZ-GTi and AZ-GTe are \
+                                alt-azimuth, the Star Adventurer GTi and EQ mounts equatorial. Choose Equatorial for an \
+                                AZ-GTi on a wedge. Applies the next time you connect.
+                                """)
+                        }
+                    }
+                    if fields.contains(.reverseAxis1) || fields.contains(.reverseAxis2) {
+                        SettingsCaption(Self.axisSenseCaption)
+                    }
+                    if fields.contains(.reverseAxis1) {
+                        SettingsToggleRow(
+                            title: "Reverse axis 1",
+                            caption: """
+                                The azimuth axis of an alt-azimuth mount, the right ascension axis of an equatorial one. \
+                                Turn on if East and West move the view the wrong way.
+                                """,
+                            isOn: $service.settings.reversesAxis1)
+                    }
+                    if fields.contains(.reverseAxis2) {
+                        SettingsToggleRow(
+                            title: "Reverse axis 2",
+                            caption: """
+                                The altitude axis of an alt-azimuth mount, the declination axis of an equatorial one. \
+                                Turn on if North and South move the view the wrong way.
+                                """,
+                            isOn: $service.settings.reversesAxis2)
+                    }
                 }
             }
         }
+    }
+
+    private static func title(of choice: MountArrangementChoice) -> String {
+        choice.mode.map(mountArrangementTitle) ?? choice.title
     }
 }
 

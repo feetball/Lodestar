@@ -76,6 +76,11 @@ struct MountUserSettings: Codable, Equatable, Sendable {
     var slewTimeout = 300.0
     var epochChoice = MountEpochChoice.automatic
     var reversesEastWest = false
+    /// Sky-Watcher Wi-Fi: how the mount is set up, for mounts that can be either.
+    var arrangement = MountArrangementChoice.automatic
+    /// Sky-Watcher Wi-Fi: an axis counts the other way round.
+    var reversesAxis1 = false
+    var reversesAxis2 = false
 
     /// The limits and timings the engine's controller runs with.
     var engineSettings: MountSettings {
@@ -87,6 +92,7 @@ struct MountUserSettings: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case altitudeLimit, nudgeRate, sendsSiteAndTime, maximumSyncOffset, slewTimeout, epochChoice, reversesEastWest
+        case arrangement, reversesAxis1, reversesAxis2
     }
 
     /// Missing or invalid values fall back to the defaults, so a new setting never loses the others.
@@ -105,6 +111,9 @@ struct MountUserSettings: Codable, Equatable, Sendable {
         slewTimeout = timeout.isFinite ? min(max(timeout, 10), 3_600) : defaults.slewTimeout
         epochChoice = (try? container.decode(MountEpochChoice.self, forKey: .epochChoice)) ?? defaults.epochChoice
         reversesEastWest = (try? container.decode(Bool.self, forKey: .reversesEastWest)) ?? defaults.reversesEastWest
+        arrangement = (try? container.decode(MountArrangementChoice.self, forKey: .arrangement)) ?? defaults.arrangement
+        reversesAxis1 = (try? container.decode(Bool.self, forKey: .reversesAxis1)) ?? defaults.reversesAxis1
+        reversesAxis2 = (try? container.decode(Bool.self, forKey: .reversesAxis2)) ?? defaults.reversesAxis2
     }
 }
 
