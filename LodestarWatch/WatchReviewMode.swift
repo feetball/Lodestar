@@ -1,6 +1,5 @@
 #if DEBUG
 import SwiftUI
-import WidgetKit
 
 /// Launch arguments for the visual review of the watch app in the Simulator, which has no location and a clock of its
 /// own. Compiled into Debug builds only. Example:
@@ -50,7 +49,12 @@ struct WatchReviewMode {
     }
 }
 
-/// The complication views drawn at the sizes of an Apple Watch, over the face colour, in several states.
+#if REVIEW_WIDGETS
+import WidgetKit
+
+/// The complication views drawn at the sizes of an Apple Watch, over the face colour, in several states. Needs the review
+/// build of `.github/workflows/review.yml`, which gives the views an environment value for the family that this can set
+/// (WidgetKit's own `widgetFamily` can only be read).
 struct WatchComplicationsReview: View {
     let mode: WatchReviewMode
 
@@ -89,7 +93,7 @@ struct WatchComplicationsReview: View {
                                         .font(.system(size: 9))
                                         .foregroundStyle(.secondary)
                                     TonightAccessoryView(entry: row.entry)
-                                        .environment(\.widgetFamily, size.family)
+                                        .environment(\.reviewWidgetFamily, size.family)
                                         .frame(width: size.width, height: size.height)
                                         .background(size.family == .accessoryRectangular ? Color.white.opacity(0.1) : Color.clear)
                                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -120,4 +124,14 @@ struct WatchComplicationsReview: View {
         }
     }
 }
+#else
+/// The complication views are drawn only in the review build.
+struct WatchComplicationsReview: View {
+    let mode: WatchReviewMode
+
+    var body: some View {
+        Text("The complications are not part of this build.")
+    }
+}
+#endif
 #endif

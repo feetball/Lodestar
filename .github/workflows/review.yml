@@ -35,6 +35,28 @@ jobs:
           xcodebuild -version
           xcrun simctl list runtimes
 
+      # WidgetKit's widgetFamily can be read but not set, so the review build gives the views a value of its own to read.
+      # This changes the checkout of this run only; the widget views of the repository stay as they are.
+      - name: Let the review set the widget family (review build only)
+        run: |
+          perl -pi -e 's/\\\.widgetFamily/\\.reviewWidgetFamily/g' WidgetShared/TonightAccessoryView.swift LodestarWidgets/TonightWidget.swift
+          cat >> WidgetShared/TonightStyle.swift <<'SWIFT'
+
+          import WidgetKit
+
+          private struct ReviewWidgetFamilyKey: EnvironmentKey {
+              static let defaultValue = WidgetFamily.systemSmall
+          }
+
+          extension EnvironmentValues {
+              var reviewWidgetFamily: WidgetFamily {
+                  get { self[ReviewWidgetFamilyKey.self] }
+                  set { self[ReviewWidgetFamilyKey.self] = newValue }
+              }
+          }
+          SWIFT
+          grep -n "reviewWidgetFamily" WidgetShared/*.swift LodestarWidgets/*.swift
+
       - name: Add the widget views to the app (review build only)
         run: |
           mkdir -p Lodestar/ReviewWidgetSources

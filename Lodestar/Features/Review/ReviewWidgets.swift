@@ -13,6 +13,9 @@ import LodestarKit
 /// Home Screen families get the app's background and the default content margin; the Lock Screen families sit on a
 /// grey wallpaper, as they do on the Lock Screen. The widgets have no night palette (they follow the system, and the
 /// extension cannot know that the app is in night mode), so the red variant shows them under a red filter.
+///
+/// WidgetKit's `widgetFamily` environment value can be read but not set, so the review build changes the views to read
+/// `reviewWidgetFamily` instead and adds that value (see the workflow).
 struct ReviewWidgetsScreen: View {
     let screen: ReviewScreen
 
@@ -80,7 +83,7 @@ struct ReviewWidgetsScreen: View {
                     .font(.caption2)
                     .foregroundStyle(Color(white: 0.75))
                 TonightWidgetView(entry: entry)
-                    .environment(\.widgetFamily, family)
+                    .environment(\.reviewWidgetFamily, family)
                     .padding(isHomeScreen ? 16 : 0)
                     .frame(width: size.width, height: size.height)
                     .background {
