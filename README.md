@@ -29,6 +29,11 @@ tilt the tripod head until it is in your frame.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night, and a polar-scope clock for star trackers.
+- **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
+  rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
+  at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
+  worked out on the device for where you are (Core Location in the widget, no App Group, no network),
+  and a tap opens the Tonight tab. The watch app adds a small Tonight screen.
 - **Night mode** — a pure red-on-black interface (no green or blue light at all), automatic after
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
@@ -38,7 +43,8 @@ tilt the tripod head until it is in your frame.
 
 ## Requirements
 
-- Xcode 16 or newer (tested design targets Xcode 16 and Xcode 26), iOS 17.0+ deployment target.
+- Xcode 16 or newer (tested design targets Xcode 16 and Xcode 26), iOS 17.0+ deployment target
+  (watchOS 10.0+ for the watch app and its complications).
 - An iPhone with gyroscope and magnetometer (every iPhone that runs iOS 17). The simulator has no
   motion sensors, so aiming only works on a device.
 - A bracket that holds the phone rigidly on the camera (hot-shoe phone mount, L-bracket clamp, …).
@@ -77,7 +83,12 @@ Lodestar/            iOS app (SwiftUI, Observation, Swift 5 mode with complete c
   App/ Model/ Theme/ Shared/     app state, settings, palette (normal + red night), shared views
   Services/          location, device motion (CoreMotion), camera (AVFoundation + CoreImage),
                      haptics/audio, screen brightness, catalog loading, time-zone lookup
-  Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools
+  Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools, Widgets (links, watch link)
+LodestarWidgets/     iOS widget extension: the Home Screen layouts of the Tonight widget
+LodestarWatch/       Apple Watch app (watchOS 10, embedded in the iPhone app): the Tonight screen
+LodestarWatchWidgets/  watch complications
+WidgetShared/        what the three share: tonight's entries from LodestarKit (no catalog), the location,
+                     the timeline provider, the Lock Screen / complication views and the widget look
 LodestarKit/         Swift package, Foundation only, builds and tests on macOS and Linux
   Foundation/        time scales, coordinates, precession/nutation/aberration, refraction, SkyFrame
   Ephemeris/         Sun & planets (VSOP87), Moon (ELP-2000/82 after Meeus), rise/set, twilight, phases
@@ -110,6 +121,7 @@ Key design points:
 
 ```
 cd LodestarKit && swift test          # 700+ tests: worked examples from Meeus and Skyfield/JPL fixtures
+cd WidgetTests && swift test          # the widgets' entries and wording (WidgetShared/Core, no Xcode needed)
 ```
 
 The `Lodestar` scheme's Test action runs the same package tests in Xcode.
@@ -117,7 +129,9 @@ The `Lodestar` scheme's Test action runs the same package tests in Xcode.
 ## Continuous integration and releases
 
 - **GitHub Actions** (`.github/workflows/ci.yml`) compiles the app with the newest Xcode for the
-  simulator and for devices, and runs the LodestarKit tests, on every push and pull request.
+  simulator and for devices, and runs the LodestarKit tests, on every push and pull request. The
+  `Lodestar` scheme also builds the widget extension, the watch app and the complications, and
+  `Tools/check-embedded-products.sh` checks that all three end up inside the app.
 - **Xcode Cloud** (workflow "Default") builds and archives the app on every push to `main` and
   delivers each build to TestFlight's internal testing group. Xcode Cloud signs the builds and
   assigns the build numbers; workflows are managed in App Store Connect under the app's

@@ -140,9 +140,13 @@ struct ObjectsView: View {
                         row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone,
                             showsProminence: showsProminence)
                     }
+                    // Favorite comets and asteroids without a current orbit stay in the list.
+                    ForEach(section.unavailable, id: \.self) { id in
+                        SmallBodyNoOrbitRow(id: id) { app.settingsStore.toggleFavorite(id) }
+                    }
                 } header: {
                     ObjectsSectionHeader(title: section.title, systemImage: section.systemImage,
-                                         count: section.objects.count)
+                                         count: section.objects.count + section.unavailable.count)
                 }
             }
         }
@@ -205,7 +209,7 @@ struct ObjectsView: View {
             ObjectsSwipeGlyph.image(systemName: "scope", color: palette.onAccent)
         }
         .tint(palette.accent)
-        .accessibilityLabel("Aim at \(object.name)")
+        .accessibilityLabel("Aim at \(SmallBodyText.displayName(object))")
     }
 
     @ViewBuilder

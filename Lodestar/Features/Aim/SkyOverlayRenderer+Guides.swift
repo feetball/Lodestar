@@ -99,7 +99,7 @@ extension SkyOverlayRenderer {
         } else if let satellite = frame.satellite {
             aim = (satellite.direction, satellite.label)
         } else if let target = frame.target {
-            aim = (target.direction, target.object.name)
+            aim = (target.direction, SmallBodyText.displayName(target.object))
         } else {
             return
         }

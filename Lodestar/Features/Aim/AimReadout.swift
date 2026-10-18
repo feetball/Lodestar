@@ -51,19 +51,22 @@ private struct AimTargetCard: View {
     let object: CelestialObject
     let horizontal: HorizontalCoordinate?
     let belowHorizonNote: String?
+    @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    /// A comet's or asteroid's magnitude estimate and elongation, kept current; unused for other objects.
+    @State private var smallBody = SmallBodyLive.pending
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 ObjectIcon(category: object.category, size: 16)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(object.name)
+                    Text(SmallBodyText.displayName(object))
                         .font(.headline)
                         .foregroundStyle(palette.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text(subtitle)
+                    Text(object.smallBody == nil ? subtitle : smallBody.subtitle(of: object))
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
                         .lineLimit(1)
@@ -83,6 +86,7 @@ private struct AimTargetCard: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.warning)
             }
+            SmallBodyAimNotes(live: smallBody)
             if object.category == .sun {
                 Label("Never point at the Sun without a certified solar filter", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
@@ -91,6 +95,9 @@ private struct AimTargetCard: View {
         }
         .aimPanel(palette)
         .accessibilityElement(children: .combine)
+        .task(id: object.id) {
+            await SmallBodyLive.keepCurrent(of: object, clock: app.clock) { smallBody = $0 }
+        }
     }
 
     private var subtitle: String {
