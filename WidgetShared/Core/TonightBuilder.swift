@@ -4,13 +4,26 @@ import LodestarKit
 /// Works out what the widgets, the complications and the watch app show. Pure, so it runs on any thread, and it
 /// uses only the ephemeris, the twilight and the events engine of LodestarKit: no star catalog is loaded.
 ///
+/// The content is that of the Android widgets: the dark windows, the Moon, the Milky Way core and the next event.
 /// A whole day's timeline costs one night summary for each night it touches (two, as a rule), one events search and a
 /// little bookkeeping; the entries themselves are looked up from those.
 enum TonightBuilder {
     /// How far ahead a timeline reaches.
     static let timelineSpan: TimeInterval = 24 * 3_600
-    /// How far ahead the events are searched, in days.
+    /// How far ahead the events are searched first, in days.
     static let eventLookaheadDays = 60
+    /// The longer search when nothing worthwhile comes within `eventLookaheadDays`.
+    static let eventFarLookaheadDays = 366
+    /// The events the app's Upcoming card considers: the first `upcomingCount` within `upcomingDays` days, else the
+    /// next `upcomingFarCount`, however far.
+    static let upcomingDays = 56
+    static let upcomingCount = 4
+    static let upcomingFarCount = 3
+    /// The largest geocentric separation of the Moon from a planet or star that can still be an occultation from
+    /// somewhere on Earth, in degrees; Moon conjunctions are looked for up to this and kept if they are occultations.
+    static let moonConjunctionSearchThreshold = 1.5
+    /// A Milky Way core window shorter than this is not worth announcing.
+    static let minimumCoreDuration: TimeInterval = 900
     /// Entries closer together than this are merged, the later one winning.
     static let minimumSpacing: TimeInterval = 60
     /// The most entries a timeline gets.
@@ -64,13 +77,19 @@ private struct Workspace {
             hour += 3_600
         }
         let events = eventFacts(from: start)
-        var changes: [Date] = events.map { $0.relevantUntil.addingTimeInterval(1) }
+        // An event passing changes the next event, and so does midnight (it changes how far away the event is said to be).
+        var changes: [Date] = events.map(\.date)
         var nightsSeen = Set<Date>()
         for instant in instants {
             let facts = night(at: instant)
             if nightsSeen.insert(facts.summary.night.start).inserted {
                 changes += facts.changeInstants
             }
+        }
+        var midnight = calendar.startOfDay(for: start)
+        while midnight < end {
+            midnight = calendar.date(byAdding: .day, value: 1, to: midnight) ?? midnight.addingTimeInterval(86_400)
+            changes.append(midnight)
         }
         instants += changes.filter { $0 > start && $0 < end }
         instants.sort()
@@ -97,25 +116,22 @@ private struct Workspace {
 
     // MARK: One entry
 
-    mutating func entry(at date: Date, events: [EventFacts]) -> TonightEntry {
+    mutating func entry(at date: Date, events: [TonightNight.Event]) -> TonightEntry {
         let facts = night(at: date)
         let night = TonightNight(
             timeZone: timeZone, isSouthernHemisphere: observer.location.latitude < 0,
-            darkness: facts.darkness(at: date), moon: facts.moon(at: date), core: facts.core,
-            event: Self.event(in: events, at: date, night: facts.summary.night))
+            darkness: facts.darkness, moon: facts.moon, core: facts.core, event: Self.event(in: events, at: date))
         return TonightEntry(date: date, content: .night(night))
     }
 
-    /// The first listed event that is still worth a look at `date`: a sky event, or failing that a season that is
-    /// near.
-    private static func event(in events: [EventFacts], at date: Date, night: DateInterval) -> TonightNight.Event? {
-        let relevant = events.filter { $0.relevantUntil >= date }
-        let chosen = relevant.first { !$0.isSeason }
-            ?? relevant.first { $0.isSeason && $0.date.timeIntervalSince(date) < 21 * 86_400 }
-        return chosen.map {
-            TonightNight.Event(title: $0.title, symbolName: $0.symbolName, date: $0.date,
-                               isTonight: night.contains($0.date))
-        }
+    /// The event the Android widgets (and the Upcoming card) pick: of the first few events from `date` on, the first
+    /// that can be seen from here, else the first.
+    private static func event(in events: [TonightNight.Event], at date: Date) -> TonightNight.Event? {
+        let ahead = events.filter { $0.date >= date }
+        let horizon = date.addingTimeInterval(Double(TonightBuilder.upcomingDays) * 86_400)
+        let soon = Array(ahead.filter { $0.date <= horizon }.prefix(TonightBuilder.upcomingCount))
+        let candidates = soon.isEmpty ? Array(ahead.prefix(TonightBuilder.upcomingFarCount)) : soon
+        return candidates.first { $0.isVisibleFromHere != false } ?? candidates.first
     }
 
     // MARK: Nights
@@ -144,26 +160,39 @@ private struct Workspace {
 
     // MARK: Events
 
-    /// The events worth showing from a day before `start` on: those with a viewing window from here, and the
-    /// equinoxes and solstices. The Moon's own conjunctions are left out (there are several a month, and searching
-    /// for them is most of the cost); the planets' conjunctions, oppositions, elongations, meteor showers, special
-    /// full Moons and eclipses stay.
-    func eventFacts(from start: Date) -> [EventFacts] {
-        let from = start.addingTimeInterval(-86_400)
-        let to = start.addingTimeInterval(Double(TonightBuilder.eventLookaheadDays) * 86_400)
-        let options = EventOptions(planetConjunctionThreshold: 3, moonConjunctionThreshold: 0, timeZone: timeZone)
-        let events = EventCalculator.events(from: from, to: to, observer: observer, options: options)
-        var facts: [EventFacts] = []
-        for event in events {
-            if case .season = event.details {
-                facts.append(EventFacts(title: event.title, symbolName: Self.symbolName(for: event),
-                                        date: event.date, relevantUntil: event.date, isSeason: true))
-            } else if let window = event.visibility?.bestWindow {
-                facts.append(EventFacts(title: event.title, symbolName: Self.symbolName(for: event),
-                                        date: window.start, relevantUntil: window.end, isSeason: false))
-            }
+    /// The events from `start` on that the Upcoming card would list, in time order: 60 days ahead, and a year when
+    /// that finds nothing. The Moon's conjunctions come every few days; only those where it covers the other body
+    /// from here are kept.
+    func eventFacts(from start: Date) -> [TonightNight.Event] {
+        for days in [TonightBuilder.eventLookaheadDays, TonightBuilder.eventFarLookaheadDays] {
+            let options = EventOptions(planetConjunctionThreshold: 3,
+                                       moonConjunctionThreshold: TonightBuilder.moonConjunctionSearchThreshold,
+                                       timeZone: timeZone)
+            let events = EventCalculator.events(from: start, to: start.addingTimeInterval(Double(days) * 86_400),
+                                                observer: observer, options: options)
+            let facts = events.filter(Self.isWorthTheCard).map(Self.fact(for:)).sorted { $0.date < $1.date }
+            if !facts.isEmpty { return facts }
         }
-        return facts.sorted { $0.date < $1.date }
+        return []
+    }
+
+    private static func isWorthTheCard(_ event: AstronomicalEvent) -> Bool {
+        guard case .conjunction(let conjunction) = event.details, conjunction.involvesMoon else { return true }
+        return conjunction.topocentric?.isOccultation == true
+    }
+
+    private static func fact(for event: AstronomicalEvent) -> TonightNight.Event {
+        var date = event.date
+        if case .solarEclipse(let eclipse) = event.details, let maximum = eclipse.local?.maximum {
+            date = maximum
+        }
+        var rate: Int?
+        if case .meteorShower(let peak) = event.details {
+            rate = peak.shower.zhr
+        }
+        return TonightNight.Event(title: event.title, symbolName: symbolName(for: event), date: date,
+                                  isVisibleFromHere: event.visibility?.isObservable,
+                                  bestWindow: event.visibility?.bestWindow, showerRate: rate)
     }
 
     /// The SF Symbol for an event kind (the same ones the app's events screens use).
@@ -184,116 +213,45 @@ private struct Workspace {
 
 // MARK: - Facts
 
-/// An event reduced to what the widgets need.
-struct EventFacts: Sendable {
-    let title: String
-    let symbolName: String
-    /// The day it is about: the start of the viewing window, or the event's own time for a season.
-    let date: Date
-    /// Until when it is still worth showing: the end of the viewing window.
-    let relevantUntil: Date
-    let isSeason: Bool
-}
-
 /// A night summary with what the entries are looked up from.
 struct NightFacts: Sendable {
-    /// A change of the Moon's horizon state.
-    struct MoonTransition: Sendable {
-        let date: Date
-        let isRising: Bool
-    }
-
-    /// A moon-free core window must last this long to be preferred over a moonlit one.
-    static let minimumMoonFreeCoreDuration: TimeInterval = 1_800
-    /// A core window shorter than this is not worth announcing.
-    static let minimumCoreDuration: TimeInterval = 900
-
     let summary: NightSummary
-    /// The stretch from the first to the last moment of astronomical darkness; `nil` without any.
-    let darkWindow: DateInterval?
-    let isDarkAllNight: Bool
-    let moonUpIntervals: [DateInterval]
-    let moonTransitions: [MoonTransition]
+    let darkness: TonightNight.Darkness
+    let moon: TonightNight.Moon
     let core: TonightNight.Core
 
     init(summary: NightSummary) {
         self.summary = summary
-        let intervals = summary.astronomicalDarknessIntervals
-        if let first = intervals.first, let last = intervals.last, last.end >= first.start {
-            let window = DateInterval(start: first.start, end: last.end)
-            darkWindow = window
-            isDarkAllNight = window.start <= summary.night.start.addingTimeInterval(60)
-                && window.end >= summary.night.end.addingTimeInterval(-60)
-        } else {
-            darkWindow = nil
-            isDarkAllNight = false
+        let windows = summary.astronomicalDarknessIntervals
+        var isAllNight = false
+        if let first = windows.first, let last = windows.last {
+            isAllNight = first.start <= summary.night.start.addingTimeInterval(60)
+                && last.end >= summary.night.end.addingTimeInterval(-60)
         }
-        let up = summary.moon.upIntervals
-        moonUpIntervals = up
-        var transitions: [MoonTransition] = []
-        for interval in up {
-            if interval.start > summary.night.start.addingTimeInterval(60) {
-                transitions.append(MoonTransition(date: interval.start, isRising: true))
-            }
-            if interval.end < summary.night.end.addingTimeInterval(-60) {
-                transitions.append(MoonTransition(date: interval.end, isRising: false))
-            }
-        }
-        moonTransitions = transitions
-        core = Self.coreWindow(of: summary.milkyWayCore)
+        darkness = TonightNight.Darkness(windows: windows, hours: summary.astronomicalDarkHours,
+                                         moonFreeHours: summary.moonFreeDarkHours, isAllNight: isAllNight)
+        let moon = summary.moon
+        self.moon = TonightNight.Moon(
+            phase: moon.phase.name, illuminatedFraction: moon.phase.illuminatedFraction, isWaxing: moon.phase.isWaxing,
+            rise: moon.riseTransitSet.rise, set: moon.riseTransitSet.set,
+            circumstance: moon.riseTransitSet.circumstance, upIntervals: moon.upIntervals)
+        let core = summary.milkyWayCore
+        self.core = TonightNight.Core(
+            hasDarkness: summary.hasAstronomicalDarkness,
+            windows: core.visibleIntervals.filter { $0.duration >= TonightBuilder.minimumCoreDuration },
+            bestTime: core.bestTime, maxAltitude: core.maxAltitude, bestAzimuth: core.bestAzimuth)
     }
 
-    /// The core's window: the moon-free stretches if they add up to half an hour, otherwise all the dark time it
-    /// is up; of several, the one that holds its best moment, or else the longest. `none` when that is too short.
-    private static func coreWindow(of core: MilkyWayCoreVisibility) -> TonightNight.Core {
-        let moonFree = core.moonFreeVisibleIntervals
-        let moonFreeDuration = moonFree.reduce(0) { $0 + $1.duration }
-        let isMoonFree = moonFreeDuration >= minimumMoonFreeCoreDuration
-        let intervals = isMoonFree ? moonFree : core.visibleIntervals
-        let best = core.bestTime.flatMap { time in intervals.first { $0.contains(time) } }
-        guard let chosen = best ?? intervals.max(by: { $0.duration < $1.duration }),
-              chosen.duration >= minimumCoreDuration else { return .none }
-        return .window(chosen, isMoonFree: isMoonFree)
-    }
-
-    func darkness(at date: Date) -> TonightNight.Darkness {
-        if isDarkAllNight { return .allNight }
-        guard let window = darkWindow else { return .none }
-        let phase: TonightNight.Darkness.Phase
-        if date < window.start {
-            phase = .upcoming
-        } else if date < window.end {
-            phase = .inProgress
-        } else {
-            phase = .over
-        }
-        return .window(window, phase)
-    }
-
-    func moon(at date: Date) -> TonightNight.Moon {
-        let isUp = moonUpIntervals.contains { $0.start <= date && date < $0.end }
-        let horizon: TonightNight.Moon.Horizon
-        if let next = moonTransitions.first(where: { $0.date > date }) {
-            horizon = next.isRising ? .rises(next.date) : .sets(next.date)
-        } else {
-            horizon = isUp ? .up : .down
-        }
-        let phase = summary.moon.phase
-        return TonightNight.Moon(phase: phase.name, illuminatedFraction: phase.illuminatedFraction,
-                                 isWaxing: phase.isWaxing, horizon: horizon)
-    }
-
-    /// The moments the picture changes by itself: the darkness, the Moon, the core, and the night itself ending.
+    /// The moments the picture changes by itself: the darkness, the Moon and the core starting or ending, and the
+    /// night itself ending. Intervals are cut off at the ends of the night, and those cuts are no changes of the sky.
     var changeInstants: [Date] {
-        var instants: [Date] = []
-        if let window = darkWindow {
-            instants += [window.start, window.end]
+        let night = summary.night
+        var instants: [Date] = [summary.twilight.sunrise ?? night.end]
+        for interval in darkness.windows + moon.upIntervals + core.windows {
+            for moment in [interval.start, interval.end] where moment > night.start && moment < night.end {
+                instants.append(moment)
+            }
         }
-        instants += moonTransitions.map(\.date)
-        if case .window(let interval, _) = core {
-            instants += [interval.start, interval.end]
-        }
-        instants.append(summary.twilight.sunrise ?? summary.night.end)
         return instants
     }
 }

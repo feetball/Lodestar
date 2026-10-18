@@ -1,150 +1,164 @@
 import SwiftUI
 import WidgetKit
 
-/// The Home Screen layouts: small (the dark window, the Moon, the core) and medium (the same, with the core and the
-/// next event in a second column).
+/// The Home Screen layouts, as on Android: small shows the Moon and the dark window, medium shows the four items
+/// (dark, Moon, Milky Way core, next event) as tiles of a label line, a main line and a detail line.
 struct TonightSystemView: View {
     let entry: TonightEntry
     let isMedium: Bool
+
+    /// The four things a widget shows.
+    private enum Slot {
+        case dark, moon, core, event
+
+        var symbolName: String {
+            switch self {
+            case .dark: return "moon.stars"
+            case .moon: return "moonphase.full.moon"
+            case .core: return "sparkles"
+            case .event: return "calendar"
+            }
+        }
+    }
 
     var body: some View {
         switch entry.content {
         case .needsLocation:
             needsLocation
         case .night(let night):
-            content(TonightLines(night: night, now: entry.date))
-        }
-    }
-
-    // MARK: Night
-
-    private func content(_ lines: TonightLines) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                header
-                darkness(lines)
-                Spacer(minLength: 0)
-                moon(lines)
-                if !isMedium {
-                    core(lines)
+            let lines = TonightLines(night: night, now: entry.date)
+            Group {
+                if isMedium {
+                    grid(lines)
+                } else {
+                    small(lines)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if isMedium {
-                VStack(alignment: .leading, spacing: 8) {
-                    coreBlock(lines)
-                    eventBlock(lines)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(lines.spoken(includingCore: true, includingEvent: isMedium))
-    }
-
-    private var header: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "moon.stars")
-            Text("Tonight")
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(TonightStyle.accent)
-        .widgetAccentable()
-    }
-
-    @ViewBuilder
-    private func darkness(_ lines: TonightLines) -> some View {
-        if let window = lines.darkWindow {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(lines.darkTitle)
-                    .font(.caption2)
-                    .foregroundStyle(TonightStyle.secondaryText)
-                Text(window)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundStyle(TonightStyle.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-        } else {
-            Text(lines.darkTitle)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(TonightStyle.primaryText)
-                .lineLimit(2)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(lines.spoken(includingCore: isMedium, includingEvent: isMedium))
         }
     }
 
-    private func moon(_ lines: TonightLines) -> some View {
-        HStack(spacing: 5) {
-            TonightMoonGlyph(symbolName: lines.moonSymbol, isSouthernHemisphere: lines.isSouthernHemisphere)
-                .font(.callout)
-                .foregroundStyle(TonightStyle.accent)
-                .widgetAccentable()
-            Text("\(lines.moonPercent) \u{00B7} \(lines.moonHorizon)")
-                .font(.caption)
-                .foregroundStyle(TonightStyle.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+    private func item(_ slot: Slot, in lines: TonightLines) -> TonightItem {
+        switch slot {
+        case .dark: return lines.dark
+        case .moon: return lines.moon
+        case .core: return lines.core
+        case .event: return lines.event
         }
     }
 
-    private func core(_ lines: TonightLines) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: "sparkles")
-                .font(.caption)
-                .foregroundStyle(TonightStyle.accent)
-                .widgetAccentable()
-            Text(lines.coreWindow.map { "Core \($0)" } ?? "Core \(lines.coreNote.lowercased())")
-                .font(.caption2)
-                .foregroundStyle(TonightStyle.secondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
+    private func disc(_ lines: TonightLines, size: CGFloat) -> some View {
+        TonightMoonDisc(fraction: lines.moonFraction, isWaxing: lines.moonIsWaxing,
+                        isSouthernHemisphere: lines.isSouthernHemisphere, size: size)
+            .foregroundStyle(TonightStyle.primaryText)
     }
 
-    private func coreBlock(_ lines: TonightLines) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("Milky Way core")
-                .font(.caption2)
-                .foregroundStyle(TonightStyle.secondaryText)
-            Text(lines.coreWindow ?? lines.coreNote)
-                .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                .foregroundStyle(TonightStyle.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            if lines.coreWindow != nil {
-                Text(lines.coreNote)
-                    .font(.caption2)
-                    .foregroundStyle(TonightStyle.tertiaryText)
-            }
-        }
-    }
+    // MARK: Small
 
-    @ViewBuilder
-    private func eventBlock(_ lines: TonightLines) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("Next event")
-                .font(.caption2)
-                .foregroundStyle(TonightStyle.secondaryText)
-            if let title = lines.eventTitle, let symbol = lines.eventSymbol, let when = lines.eventWhen {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Image(systemName: symbol)
-                        .font(.caption)
-                        .foregroundStyle(TonightStyle.accent)
-                        .widgetAccentable()
-                    Text(title)
-                        .font(.footnote.weight(.semibold))
+    /// The Moon, drawn, with its phase and lit part; the dark window under it.
+    private func small(_ lines: TonightLines) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                disc(lines, size: 40)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(lines.moon.value)
+                        .font(.footnote.weight(.bold))
                         .foregroundStyle(TonightStyle.primaryText)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.8)
+                    Text("\(lines.moon.trailing ?? "") lit")
+                        .font(.caption)
+                        .foregroundStyle(TonightStyle.secondaryText)
+                        .lineLimit(1)
                 }
-                Text(when)
-                    .font(.caption)
+            }
+            Spacer(minLength: 4)
+            labelLine(.dark, lines: lines, short: true)
+            Text(lines.dark.value)
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(TonightStyle.accent)
+                .widgetAccentable()
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+            if let detail = lines.dark.detail {
+                Text(detail)
+                    .font(.caption2)
                     .foregroundStyle(TonightStyle.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: Medium
+
+    private func grid(_ lines: TonightLines) -> some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                tile(.dark, lines: lines)
+                tile(.moon, lines: lines)
+            }
+            HStack(spacing: 6) {
+                tile(.core, lines: lines)
+                tile(.event, lines: lines)
+            }
+        }
+    }
+
+    private func tile(_ slot: Slot, lines: TonightLines) -> some View {
+        let item = item(slot, in: lines)
+        return VStack(alignment: .leading, spacing: 1) {
+            labelLine(slot, lines: lines, short: true)
+            Text(item.value)
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(slot == .dark ? TonightStyle.accent : TonightStyle.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            if let detail = item.detail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(TonightStyle.secondaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.07)))
+    }
+
+    /// An item's label line: its picture (the Moon's phase for the Moon), the label, a mark for what is happening
+    /// now, and its figure at the end.
+    private func labelLine(_ slot: Slot, lines: TonightLines, short: Bool) -> some View {
+        let item = item(slot, in: lines)
+        return HStack(spacing: 4) {
+            if slot == .moon {
+                disc(lines, size: 12)
             } else {
-                Text("None listed for the coming weeks")
-                    .font(.caption)
+                Image(systemName: slot == .event ? (lines.eventSymbol ?? slot.symbolName) : slot.symbolName)
+                    .font(.system(size: 11))
                     .foregroundStyle(TonightStyle.secondaryText)
-                    .lineLimit(2)
+                    .accessibilityHidden(true)
+            }
+            Text(short ? item.shortLabel : item.label)
+                .font(.caption2)
+                .foregroundStyle(TonightStyle.secondaryText)
+                .lineLimit(1)
+            if let badge = item.badge {
+                Text("\u{00B7} \(badge)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(TonightStyle.accent)
+                    .widgetAccentable()
+                    .lineLimit(1)
+            }
+            if let trailing = item.trailing {
+                Spacer(minLength: 2)
+                Text(trailing)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(TonightStyle.primaryText)
+                    .lineLimit(1)
             }
         }
     }
@@ -152,20 +166,18 @@ struct TonightSystemView: View {
     // MARK: Without a place
 
     private var needsLocation: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            header
-            Spacer(minLength: 0)
+        VStack(spacing: 6) {
             Image(systemName: "location.slash")
                 .font(.title2)
                 .foregroundStyle(TonightStyle.accent)
                 .widgetAccentable()
             Text(TonightNeedsLocationText.full)
-                .font(.callout.weight(.semibold))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(TonightStyle.primaryText)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(TonightNeedsLocationText.spoken)
     }

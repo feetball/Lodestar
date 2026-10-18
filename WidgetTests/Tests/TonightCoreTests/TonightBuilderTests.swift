@@ -36,7 +36,7 @@ final class TonightBuilderTests: XCTestCase {
         var hour = (start.timeIntervalSince1970 / 3_600).rounded(.down) * 3_600 + 3_600
         while hour < start.timeIntervalSince1970 + TonightBuilder.timelineSpan {
             let moment = Date(timeIntervalSince1970: hour)
-            // A change within a minute of the hour takes its place, so look for an entry in [hour - 60, hour + 60).
+            // A change within a minute of the hour takes its place, so look for an entry in (hour - 60, hour + 60).
             XCTAssertTrue(entries.contains { abs($0.date.timeIntervalSince(moment)) < 60 },
                           "no entry near \(moment)")
             hour += 3_600
@@ -60,53 +60,46 @@ final class TonightBuilderTests: XCTestCase {
         let entries = TonightBuilder.entries(for: boulder, from: start)
         let seconds = Date().timeIntervalSince(began)
         XCTAssertFalse(entries.isEmpty)
-        // About 35 ms in an optimized build; this is a Debug build on a shared machine.
-        XCTAssertLessThan(seconds, 3.0, "a day of entries took \(seconds) s")
+        // About 50 ms in an optimized build; this is a Debug build on a shared machine.
+        XCTAssertLessThan(seconds, 4.0, "a day of entries took \(seconds) s")
     }
 
     // MARK: Darkness
 
-    func testTheDarkWindowIsTheAstronomicalNightOfThePlanner() throws {
+    func testTheDarknessIsTheAstronomicalNightOfThePlanner() throws {
         let start = try afternoon()
         let night = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: start))
         let summary = TonightTestSupport.summary(startingOn: start, in: boulder)
-        let expected = try XCTUnwrap(summary.astronomicalDarknessIntervals.first)
-        guard case .window(let window, let phase) = night.darkness else {
-            return XCTFail("expected a dark window, got \(night.darkness)")
-        }
-        XCTAssertEqual(window.start, expected.start)
-        XCTAssertEqual(window.end, expected.end)
-        XCTAssertEqual(phase, .upcoming)
+        XCTAssertEqual(night.darkness.windows, summary.astronomicalDarknessIntervals)
+        XCTAssertEqual(night.darkness.hours, summary.astronomicalDarkHours, accuracy: 1e-12)
+        XCTAssertEqual(night.darkness.moonFreeHours, summary.moonFreeDarkHours, accuracy: 1e-12)
+        XCTAssertFalse(night.darkness.isAllNight)
         XCTAssertEqual(night.timeZone.identifier, "America/Denver")
         XCTAssertFalse(night.isSouthernHemisphere)
     }
 
-    func testThePhaseChangesAtDuskAndAtDawn() throws {
+    func testTheWordsFollowTheNightHourByHour() throws {
         let start = try afternoon()
         let entries = TonightBuilder.entries(for: boulder, from: start)
         let summary = TonightTestSupport.summary(startingOn: start, in: boulder)
         let dark = try XCTUnwrap(summary.astronomicalDarknessIntervals.first)
-
-        func phase(_ entry: TonightEntry) throws -> TonightNight.Darkness.Phase {
-            guard case .window(_, let phase) = try TonightTestSupport.night(entry).darkness else {
-                throw XCTSkip("no window")
-            }
-            return phase
-        }
         // Once the Sun has risen the entries describe the next night.
         let rollover = summary.twilight.sunrise ?? summary.night.end
         for entry in entries where entry.date < rollover {
-            let expected: TonightNight.Darkness.Phase
+            let lines = TonightLines(night: try TonightTestSupport.night(entry), now: entry.date)
             if entry.date < dark.start {
-                expected = .upcoming
+                XCTAssertNil(lines.dark.badge, "at \(entry.date)")
+                XCTAssertTrue(lines.darkInline.hasPrefix("Dark ") && !lines.darkInline.hasPrefix("Dark until")
+                    && !lines.darkInline.hasPrefix("Dark ended"), lines.darkInline)
             } else if entry.date < dark.end {
-                expected = .inProgress
+                XCTAssertEqual(lines.dark.badge, "now", "at \(entry.date)")
+                XCTAssertTrue(lines.darkInline.hasPrefix("Dark until "), lines.darkInline)
             } else {
-                expected = .over
+                XCTAssertNil(lines.dark.badge, "at \(entry.date)")
+                XCTAssertTrue(lines.darkInline.hasPrefix("Dark ended "), lines.darkInline)
             }
-            XCTAssertEqual(try phase(entry), expected, "at \(entry.date)")
         }
-        // The change itself has an entry, at the instant (or within a minute after the nearest other entry).
+        // The changes themselves have entries.
         XCTAssertTrue(entries.contains { abs($0.date.timeIntervalSince(dark.start)) < 60 })
         XCTAssertTrue(entries.contains { abs($0.date.timeIntervalSince(dark.end)) < 60 })
     }
@@ -124,9 +117,7 @@ final class TonightBuilderTests: XCTestCase {
         var sawBefore = false
         var sawAfter = false
         for entry in entries {
-            guard case .window(let window, _) = try TonightTestSupport.night(entry).darkness else {
-                return XCTFail("expected a window at \(entry.date)")
-            }
+            let window = try XCTUnwrap(TonightTestSupport.night(entry).darkness.windows.first)
             if entry.date < sunrise {
                 XCTAssertEqual(window.start, previousDusk, "before sunrise at \(entry.date)")
                 sawBefore = true
@@ -143,27 +134,32 @@ final class TonightBuilderTests: XCTestCase {
     func testThePolarCases() throws {
         let midsummer = try TonightTestSupport.date(2026, 6, 21, 12, in: TonightTestSupport.tromso)
         let tromso = try TonightTestSupport.night(TonightBuilder.entry(for: TonightTestSupport.tromso, at: midsummer))
-        XCTAssertEqual(tromso.darkness, .none)
-        XCTAssertEqual(tromso.core, .none)
+        XCTAssertTrue(tromso.darkness.windows.isEmpty)
+        XCTAssertFalse(tromso.core.hasDarkness)
+        let words = TonightLines(night: tromso, now: midsummer)
+        XCTAssertEqual(words.dark.value, "No full darkness")
+        XCTAssertEqual(words.core.value, "No darkness")
 
         let midwinter = try TonightTestSupport.date(2026, 12, 21, 12, in: TonightTestSupport.nearPole)
         let pole = try TonightTestSupport.night(TonightBuilder.entry(for: TonightTestSupport.nearPole, at: midwinter))
-        XCTAssertEqual(pole.darkness, .allNight)
+        XCTAssertTrue(pole.darkness.isAllNight)
+        XCTAssertEqual(TonightLines(night: pole, now: midwinter).dark.value, "All night")
         // Both still produce a whole timeline.
         XCTAssertGreaterThanOrEqual(TonightBuilder.entries(for: TonightTestSupport.tromso, from: midsummer).count, 24)
         XCTAssertGreaterThanOrEqual(TonightBuilder.entries(for: TonightTestSupport.nearPole, from: midwinter).count, 24)
     }
 
-    func testTheSouthernHemisphereMirrorsTheMoonSymbols() throws {
+    func testTheSouthernHemisphereIsMarked() throws {
         let sydney = TonightTestSupport.sydney
         let night = try TonightTestSupport.night(
             TonightBuilder.entry(for: sydney, at: try TonightTestSupport.date(2026, 10, 18, 15, in: sydney)))
         XCTAssertTrue(night.isSouthernHemisphere)
+        XCTAssertEqual(night.timeZone.identifier, "Australia/Sydney")
     }
 
     // MARK: Moon
 
-    func testTheMoonHorizonCountsDownThroughTheRiseAndTheSet() throws {
+    func testTheMoonIsThePlannersAndTheCompactLineCountsDownToItsRiseAndSet() throws {
         let start = try afternoon()
         let summary = TonightTestSupport.summary(startingOn: start, in: boulder)
         // The Moon is down at the start of the night, rises in the afternoon and sets after midnight.
@@ -173,31 +169,47 @@ final class TonightBuilderTests: XCTestCase {
         let entries = TonightBuilder.entries(for: boulder, from: start)
         let rollover = summary.twilight.sunrise ?? summary.night.end
         for entry in entries where entry.date < rollover {
-            let moon = try TonightTestSupport.night(entry).moon
-            if entry.date < interval.start {
-                XCTAssertEqual(moon.horizon, .rises(interval.start), "at \(entry.date)")
-            } else if entry.date < interval.end {
-                XCTAssertEqual(moon.horizon, .sets(interval.end), "at \(entry.date)")
-            } else {
-                XCTAssertEqual(moon.horizon, .down, "at \(entry.date)")
-            }
+            let night = try TonightTestSupport.night(entry)
+            let moon = night.moon
+            XCTAssertEqual(moon.rise, summary.moon.riseTransitSet.rise)
+            XCTAssertEqual(moon.set, summary.moon.riseTransitSet.set)
+            XCTAssertEqual(moon.circumstance, summary.moon.riseTransitSet.circumstance)
+            XCTAssertEqual(moon.upIntervals, summary.moon.upIntervals)
             XCTAssertEqual(moon.illuminatedFraction, summary.moon.illuminatedFraction, accuracy: 1e-12)
             XCTAssertEqual(moon.phase, summary.moon.phase.name)
+
+            let lines = TonightLines(night: night, now: entry.date)
+            if entry.date < interval.start {
+                XCTAssertNil(lines.moon.badge, "at \(entry.date)")
+                XCTAssertTrue(lines.moonCompact.contains("Rises "), lines.moonCompact)
+            } else if entry.date < interval.end {
+                XCTAssertEqual(lines.moon.badge, "up", "at \(entry.date)")
+                XCTAssertTrue(lines.moonCompact.contains("Sets "), lines.moonCompact)
+            } else {
+                XCTAssertNil(lines.moon.badge, "at \(entry.date)")
+                XCTAssertTrue(lines.moonCompact.contains("Below horizon"), lines.moonCompact)
+            }
         }
     }
 
     // MARK: Milky Way core
 
-    func testTheCoreWindowIsInsideTheDarkAndAtLeastTenMinutesLong() throws {
-        let place = boulder
-        let start = try TonightTestSupport.date(2026, 7, 14, 15, in: place)
-        let night = try TonightTestSupport.night(TonightBuilder.entry(for: place, at: start))
-        guard case .window(let core, _) = night.core, case .window(let dark, _) = night.darkness else {
-            return XCTFail("the core is up in the July dark: \(night.core) \(night.darkness)")
+    func testTheCoreWindowsAreInsideTheDarkAndAtLeastAQuarterOfAnHourLong() throws {
+        let start = try TonightTestSupport.date(2026, 7, 14, 15, in: boulder)
+        let night = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: start))
+        let dark = try XCTUnwrap(night.darkness.windows.first)
+        XCTAssertFalse(night.core.windows.isEmpty, "the core is up in the July dark")
+        for window in night.core.windows {
+            XCTAssertGreaterThanOrEqual(window.duration, TonightBuilder.minimumCoreDuration)
+            XCTAssertGreaterThanOrEqual(window.start, dark.start)
+            XCTAssertLessThanOrEqual(window.end, dark.end)
         }
-        XCTAssertGreaterThanOrEqual(core.duration, TonightBuilderCoreLimit.minimum)
-        XCTAssertGreaterThanOrEqual(core.start, dark.start)
-        XCTAssertLessThanOrEqual(core.end, dark.end)
+        let summary = TonightTestSupport.summary(startingOn: start, in: boulder)
+        XCTAssertEqual(night.core.bestTime, summary.milkyWayCore.bestTime)
+        XCTAssertEqual(night.core.maxAltitude, summary.milkyWayCore.maxAltitude)
+        XCTAssertEqual(night.core.bestAzimuth, summary.milkyWayCore.bestAzimuth)
+        let words = TonightLines(night: night, now: start).core
+        XCTAssertTrue(words.detail?.hasPrefix("Best ") == true, words.detail ?? "nil")
     }
 
     func testNoCoreWindowShorterThanTheLimitIsAnnounced() throws {
@@ -207,11 +219,14 @@ final class TonightBuilderTests: XCTestCase {
         for (month, day) in [(9, 1), (9, 20), (10, 8), (10, 18), (11, 5), (11, 25)] {
             let start = try TonightTestSupport.date(2026, month, day, 15, in: boulder)
             let night = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: start))
-            if case .window(let core, _) = night.core {
-                XCTAssertGreaterThanOrEqual(core.duration, TonightBuilderCoreLimit.minimum, "on \(month)/\(day)")
-                announced += 1
-            } else {
+            if night.core.windows.isEmpty {
                 skipped += 1
+                XCTAssertEqual(TonightLines(night: night, now: start).core.value, "Low in the dark")
+            } else {
+                announced += 1
+            }
+            for window in night.core.windows {
+                XCTAssertGreaterThanOrEqual(window.duration, TonightBuilder.minimumCoreDuration, "on \(month)/\(day)")
             }
         }
         XCTAssertGreaterThan(announced, 0)
@@ -220,31 +235,48 @@ final class TonightBuilderTests: XCTestCase {
 
     // MARK: Events
 
-    func testTheNextEventIsAListedOneAndStopsBeingShownWhenItsWindowEnds() throws {
+    func testTheNextEventIsTheFirstListedOneThatCanBeSeen() throws {
         let start = try afternoon()
         let entries = TonightBuilder.entries(for: boulder, from: start)
         let first = try XCTUnwrap(TonightTestSupport.night(try XCTUnwrap(entries.first)).event)
         XCTAssertFalse(first.title.isEmpty)
         XCTAssertFalse(first.symbolName.isEmpty)
-        XCTAssertGreaterThan(first.date, start.addingTimeInterval(-86_400))
+        XCTAssertGreaterThanOrEqual(first.date, start)
         XCTAssertLessThan(first.date, start.addingTimeInterval(Double(TonightBuilder.eventLookaheadDays) * 86_400))
-        // Two days before the Orionids peak, that is the event.
+        XCTAssertNotEqual(first.isVisibleFromHere, false)
+        // Three days before the Orionids' peak, that is the event.
         XCTAssertEqual(first.title, "Orionids peak")
-        XCTAssertFalse(first.isTonight)
+        XCTAssertEqual(first.showerRate, 20)
+        let words = TonightLines(night: try TonightTestSupport.night(try XCTUnwrap(entries.first)), now: start).event
+        XCTAssertEqual(words.label, "Next event")
+        XCTAssertEqual(words.value, "Orionids peak")
+        XCTAssertEqual(words.badge, "in 3 days")
+        XCTAssertTrue(words.extra?.hasPrefix("Up to 20 an hour") == true, words.extra ?? "nil")
     }
 
-    func testAnEventWithAWindowTonightIsMarkedTonight() throws {
-        // The night of the Orionids' peak (21 October 2026).
-        let start = try TonightTestSupport.date(2026, 10, 21, 15, in: boulder)
-        let night = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: start))
-        let event = try XCTUnwrap(night.event)
-        XCTAssertEqual(event.title, "Orionids peak")
-        XCTAssertTrue(event.isTonight)
-        XCTAssertEqual(TonightText.when(of: event, now: start, in: boulder.timeZone), "Tonight")
+    func testTheEventChangesOnceItHasHappened() throws {
+        let start = try afternoon()
+        let entries = TonightBuilder.entries(for: boulder, from: start)
+        let first = try XCTUnwrap(TonightTestSupport.night(try XCTUnwrap(entries.first)).event)
+        // Show the event of the first entry until the event itself, then the one after it.
+        let later = try TonightTestSupport.night(
+            TonightBuilder.entry(for: boulder, at: first.date.addingTimeInterval(3_600))).event
+        XCTAssertNotNil(later)
+        XCTAssertNotEqual(later?.title, first.title)
+        XCTAssertGreaterThan(try XCTUnwrap(later).date, first.date)
     }
-}
 
-/// The least a core window may last to be announced (`NightFacts.minimumCoreDuration`).
-private enum TonightBuilderCoreLimit {
-    static let minimum = NightFacts.minimumCoreDuration
+    func testTheMoonsConjunctionsAreOnlyListedWhenItCoversTheOtherBody() throws {
+        // The Moon passes a planet or a bright star every few days; unfiltered, a sample of two months would show
+        // several of those. Only the rare occultations are kept.
+        var titles = Set<String>()
+        for offset in stride(from: 0, to: 60, by: 3) {
+            let start = try TonightTestSupport.date(2026, 10, 18, 12, in: boulder).addingTimeInterval(Double(offset) * 86_400)
+            if let event = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: start)).event {
+                titles.insert(event.title)
+            }
+        }
+        XCTAssertGreaterThan(titles.count, 4, "\(titles)")
+        XCTAssertLessThanOrEqual(titles.filter { $0.hasPrefix("Moon and") }.count, 1, "\(titles)")
+    }
 }

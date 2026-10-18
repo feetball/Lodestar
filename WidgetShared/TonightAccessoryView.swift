@@ -2,9 +2,9 @@ import SwiftUI
 import WidgetKit
 
 /// The lock-screen widgets of the iPhone and the complications of the Apple Watch: circular (the Moon's phase),
-/// rectangular (the dark window and the Moon, then the core on the iPhone and the next event on the watch), inline
-/// and, on the watch, corner. The system draws them in vibrant or tinted colours, so they use the default styles and
-/// mark the one accent with `widgetAccentable()`.
+/// rectangular (the dark window and the Moon, then the Milky Way core on the iPhone and the next event on the watch),
+/// inline and, on the watch, corner. The system draws them in vibrant or tinted colours, so they use the default
+/// styles and mark the one accent with `widgetAccentable()`.
 struct TonightAccessoryView: View {
     let entry: TonightEntry
 
@@ -31,20 +31,23 @@ struct TonightAccessoryView: View {
         }
     }
 
+    private func disc(_ lines: TonightLines, size: CGFloat) -> some View {
+        TonightMoonDisc(fraction: lines.moonFraction, isWaxing: lines.moonIsWaxing,
+                        isSouthernHemisphere: lines.isSouthernHemisphere, size: size)
+    }
+
     // MARK: Night
 
     private func circular(_ lines: TonightLines) -> some View {
         Gauge(value: lines.moonFraction) {
             Text("Moon")
         } currentValueLabel: {
-            TonightMoonGlyph(symbolName: lines.moonSymbol, isSouthernHemisphere: lines.isSouthernHemisphere)
-                .font(.title3)
+            disc(lines, size: 24)
         }
         .gaugeStyle(.accessoryCircularCapacity)
         .widgetAccentable()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Moon, \(lines.moonName.lowercased()), \(lines.moonPercent) lit. "
-                            + lines.spoken(includingCore: false, includingEvent: false))
+        .accessibilityLabel(lines.moon.spoken)
     }
 
     private func rectangular(_ lines: TonightLines) -> some View {
@@ -55,8 +58,8 @@ struct TonightAccessoryView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             HStack(spacing: 4) {
-                TonightMoonGlyph(symbolName: lines.moonSymbol, isSouthernHemisphere: lines.isSouthernHemisphere)
-                Text("\(lines.moonPercent) \u{00B7} \(lines.moonHorizon)")
+                disc(lines, size: 12)
+                Text(lines.moonCompact)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -72,22 +75,17 @@ struct TonightAccessoryView: View {
     @ViewBuilder
     private func thirdLine(_ lines: TonightLines) -> some View {
         if Self.showsEvent {
-            if let title = lines.eventTitle, let symbol = lines.eventSymbol, let when = lines.eventWhen {
-                HStack(spacing: 4) {
-                    Image(systemName: symbol)
-                    Text("\(title) \u{00B7} \(when)")
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                .foregroundStyle(.secondary)
-            } else {
-                Text("No events listed soon")
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Image(systemName: lines.eventSymbol ?? "calendar")
+                Text(lines.eventCompact ?? lines.event.value)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .foregroundStyle(.secondary)
         } else {
             HStack(spacing: 4) {
                 Image(systemName: "sparkles")
-                Text(lines.coreWindow.map { "Core \($0)" } ?? "Core \(lines.coreNote.lowercased())")
+                Text(lines.coreCompact)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -99,12 +97,12 @@ struct TonightAccessoryView: View {
         #if os(watchOS)
         let text = lines.darkInline
         #else
-        let text = "\(lines.darkInline) \u{00B7} \(lines.moonPercent)"
+        let text = "\(lines.darkInline) \u{00B7} \(lines.moon.trailing ?? "")"
         #endif
         return Label {
             Text(text)
         } icon: {
-            TonightMoonGlyph(symbolName: lines.moonSymbol, isSouthernHemisphere: lines.isSouthernHemisphere)
+            disc(lines, size: 14)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(lines.spoken(includingCore: false, includingEvent: false))
@@ -112,8 +110,7 @@ struct TonightAccessoryView: View {
 
     #if os(watchOS)
     private func corner(_ lines: TonightLines) -> some View {
-        TonightMoonGlyph(symbolName: lines.moonSymbol, isSouthernHemisphere: lines.isSouthernHemisphere)
-            .font(.title2)
+        disc(lines, size: 28)
             .widgetAccentable()
             .widgetLabel {
                 Text(lines.darkCompactWindow.map { "Dark \($0)" } ?? lines.darkInline)
@@ -139,7 +136,7 @@ struct TonightAccessoryView: View {
             .accessibilityLabel(TonightNeedsLocationText.spoken)
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
-                Label("Lodestar", systemImage: "moon.stars")
+                Label(TonightLines.title, systemImage: "moon.stars")
                     .font(.headline)
                     .widgetAccentable()
                 Text(TonightNeedsLocationText.full)
