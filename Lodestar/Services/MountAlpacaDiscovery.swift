@@ -40,6 +40,8 @@ enum MountAlpacaDiscovery {
     /// The largest host mask the sweep covers (a /22 network has 1,022 hosts).
     private static let maximumSweepHostMask: UInt32 = 1_023
     private static let lookupTimeoutSeconds = 4.0
+    /// All the lookups together take at most about this long.
+    private static let maximumLookupSeconds = 10.0
 
     private struct LocalNetwork {
         /// This device's address and the network mask, in host byte order.
@@ -52,7 +54,8 @@ enum MountAlpacaDiscovery {
         let servers = findServers(cancel: cancel)
         var result = MountAlpacaSearchResult()
         result.serverCount = servers.count
-        for server in servers.prefix(maximumServers) where !cancel.isCancelled {
+        let lookupDeadline = Date(timeIntervalSinceNow: maximumLookupSeconds)
+        for server in servers.prefix(maximumServers) where !cancel.isCancelled && Date() < lookupDeadline {
             if let found = try? telescopes(host: server.host, port: server.port) {
                 result.telescopes.append(contentsOf: found)
             }

@@ -18,17 +18,17 @@ enum MountTargets {
     /// The engine also checks that the target is still above the limit this long from now (the slew takes time).
     static let lookaheadSeconds = MountSettings.standard.horizonLookaheadSeconds
 
-    /// The J2000 place of `object` at `date`. Planets, the Moon and the celestial poles have no catalog place, so their
-    /// place now is taken from where they appear in the sky.
+    /// The J2000 place of `object` at `date`; for a moving object, its place at that moment.
     static func resolve(_ object: CelestialObject, observer: Observer, date: Date) -> MountResolvedTarget {
         let frame = SkyFrame(date: date, observer: observer)
         let j2000: EquatorialCoordinate
         let properMotion: ProperMotion?
-        switch object.position {
-        case .fixed(let coordinate, let motion):
+        if case .fixed(let coordinate, let motion) = object.position {
             j2000 = coordinate
             properMotion = motion
-        case .solarSystem, .celestialPole:
+        } else {
+            // Planets, the Moon, comets, asteroids and the celestial poles have no catalog place: take the place they
+            // have in the sky now.
             j2000 = frame.j2000(fromHorizontal: frame.horizontal(of: object, refraction: false), refracted: false)
             properMotion = nil
         }
