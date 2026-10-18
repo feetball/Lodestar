@@ -66,7 +66,7 @@ struct MountUserSettings: Codable, Equatable, Sendable {
     static let altitudeLimitRange: ClosedRange<Double> = -10...60
 
     /// Targets below this geometric altitude are never sent to the mount, degrees.
-    var altitudeLimit = 0.0
+    var altitudeLimit = 5.0
     var nudgeRate = MountNudgeRate.center
     /// Send the phone's location and clock to the mount when connecting.
     var sendsSiteAndTime = true
