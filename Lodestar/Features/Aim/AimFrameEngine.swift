@@ -44,6 +44,8 @@ struct AimFrame {
     let target: SkySnapshot.Target?
     /// The panel being aimed at while a mosaic is being shot.
     let mosaic: AimMosaicFrame?
+    /// The satellite, or the peak of its pass, being aimed at: the guidance leads to it instead of the target.
+    let satellite: SatelliteAimFix?
 }
 
 /// Turns the newest motion sample into an `AimFrame`.
@@ -63,6 +65,9 @@ final class AimFrameEngine {
     /// Whether a mosaic is being shot (its panel replaces the target) and the panel to aim at, once known.
     private var isMosaicActive = false
     private var mosaicAim: AimMosaicAim?
+    /// The satellite (or the peak of its pass) the guidance leads to, as of the last refresh, and which source it is from.
+    private var satelliteFix: SatelliteAimFix?
+    private(set) var satelliteSourceID: UUID?
 
     init(motion: MotionService, configuration: AimConfiguration) {
         self.motion = motion
@@ -99,6 +104,15 @@ final class AimFrameEngine {
         mosaicAim = active ? aim : nil
     }
 
+    /// Leads the guidance to a satellite, or to the peak of its pass, instead of the target. `fix` is its place as of now,
+    /// refreshed with every sensor tick for a followed satellite; `nil` ends it. The on-target state starts afresh when
+    /// the source changes.
+    func setSatellite(_ fix: SatelliteAimFix?, sourceID: UUID?) {
+        if sourceID != satelliteSourceID { tracker.reset() }
+        satelliteSourceID = sourceID
+        satelliteFix = fix
+    }
+
     /// The target's position from a freshly built snapshot; ignored if it belongs to another object.
     func update(target: SkySnapshot.Target?) {
         guard let target, target.object.id == targetID else { return }
@@ -117,11 +131,15 @@ final class AimFrameEngine {
                 guidance = mosaicTracker.update(solution: pointing, target: aim.horizontal)
                 mosaic = AimMosaicFrame(aim: aim, rollDelta: Self.rollDelta(for: aim, pointing: pointing))
             }
+        } else if let satelliteFix {
+            guidance = tracker.update(solution: pointing, target: satelliteFix.horizontal)
         } else if let target {
             guidance = tracker.update(solution: pointing, target: target.horizontal)
         }
-        return AimFrame(sample: sample, pointing: pointing, guidance: guidance, target: isMosaicActive ? nil : target,
-                        mosaic: mosaic)
+        let isSatellite = !isMosaicActive && satelliteFix != nil
+        return AimFrame(sample: sample, pointing: pointing, guidance: guidance,
+                        target: isMosaicActive || isSatellite ? nil : target, mosaic: mosaic,
+                        satellite: isSatellite ? satelliteFix : nil)
     }
 
     /// How far the camera has to turn clockwise to take the roll `aim` asks for, folded into ±90°.

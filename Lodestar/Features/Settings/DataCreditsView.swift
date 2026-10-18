@@ -119,6 +119,38 @@ extension DataCredit {
                 + "meteor showers are entered by hand from the 2026 Meteor Shower Calendar (IMO INFO 3-25, "
                 + "\u{00A9} International Meteor Organization). The radiant drift rates are least-squares fits to the "
                 + "calendar's radiant tables."),
+        DataCredit(
+            id: "celestrak", name: "CelesTrak orbital data",
+            usedFor: "Satellite passes and Starlink streak warnings (optional download)",
+            author: "Dr. T. S. Kelso, CelesTrak",
+            license: "Free to use with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://celestrak.org"),
+            notice: "Orbital data: CelesTrak, T. S. Kelso. General-perturbations element sets derived from the US "
+                + "Space Force's public tracking data, downloaded only if you switch on Satellite passes or Starlink "
+                + "streak warnings in Settings \u{25B8} Online Data. Positions are computed on the phone with SGP4, a "
+                + "port of the reference implementation by D. A. Vallado, P. Crawford, R. Hujsak and T. S. Kelso "
+                + "(AIAA 2006-6753). The brightness of the ISS, Tiangong and Hubble follows the intrinsic magnitudes "
+                + "published by Heavens-Above."),
+        DataCredit(
+            id: "mpc", name: "IAU Minor Planet Center comet elements",
+            usedFor: "Comets (optional download)",
+            author: "IAU Minor Planet Center, Smithsonian Astrophysical Observatory",
+            license: "Free to use with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://minorplanetcenter.net"),
+            notice: "Orbital elements: IAU Minor Planet Center. The comet orbit file (CometEls.txt) is downloaded "
+                + "only if you switch on Comets in Settings \u{25B8} Online Data. Lodestar computes the positions "
+                + "on the phone from the elements; the magnitudes are the observers' estimates published with them."),
+        DataCredit(
+            id: "met-norway", name: "MET Norway weather forecast",
+            usedFor: "Cloud forecast (optional download)",
+            author: "The Norwegian Meteorological Institute (MET Norway)",
+            license: "CC BY 4.0", licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/"),
+            sourceURL: URL(string: "https://api.met.no/"),
+            notice: "Weather forecast from MET Norway (Locationforecast 2.0), downloaded only if you switch on Cloud "
+                + "forecast in Settings \u{25B8} Online Data, for your location rounded to about 10 km. MET Norway "
+                + "licenses its data under CC BY 4.0 and the Norwegian Licence for Open Government Data 2.0. Lodestar "
+                + "shows the cloud-cover values as forecast; the clear-spell summary is its own, and MET Norway does "
+                + "not endorse Lodestar."),
     ]
 }
 
@@ -134,7 +166,9 @@ struct DataCreditsView: View {
         + "by Olaf Frohn (BSD-3-Clause), the latter after Jose R. Vieira's Milky Way Outline Catalog. Meteor "
         + "showers: IMO Meteor Shower Calendar 2026 (\u{00A9} International Meteor Organization). Geomagnetic "
         + "model: WMM2025 by NOAA NCEI and the British Geological Survey (public domain). Planetary theory: "
-        + "VSOP87 (Bretagnon & Francou, IMCCE); lunar theory after J. Meeus."
+        + "VSOP87 (Bretagnon & Francou, IMCCE); lunar theory after J. Meeus. Optional downloads: orbital data: "
+        + "CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather forecast from MET Norway "
+        + "(CC BY 4.0)."
 
     private static let bsdLicense = """
         Copyright (c) 2015, Olaf Frohn

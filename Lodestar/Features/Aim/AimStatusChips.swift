@@ -38,6 +38,7 @@ struct AimStatusChips: View {
                     StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
                 }
             }
+            SatelliteStreakChip(model: model)
         }
         .frame(maxWidth: .infinity)
     }

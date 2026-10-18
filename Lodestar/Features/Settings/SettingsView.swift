@@ -16,6 +16,7 @@ struct SettingsView: View {
                 SettingsFeedbackSection()
                 SettingsSkyDisplaySection()
                 SettingsAtmosphereSection()
+                SettingsOnlineDataSection()
                 SettingsToolsSection()
                 SettingsAboutSection()
             }

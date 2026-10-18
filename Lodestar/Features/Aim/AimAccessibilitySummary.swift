@@ -25,6 +25,9 @@ struct AimAccessibilitySummary: View {
         if session.isActive {
             return mosaicSummary(session: session, frame: frame) + skyline
         }
+        if let source = model.satelliteSource {
+            return SatelliteAimText.spoken(source, frame: frame) + skyline
+        }
         guard let target = model.guidanceTarget else { return "No target. Use the Target button to choose one." + skyline }
         guard let guidance = frame.guidance else { return "Locating \(target.name)." + skyline }
         let summary = AimGuidanceSummary(guidance)

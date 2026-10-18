@@ -41,6 +41,10 @@ final class AppModel {
     let catalog: CatalogService
     let feedback: FeedbackService
     let screen: ScreenController
+    /// The optional downloads (satellites, comets, cloud forecast); everything in it is off until switched on.
+    let online: OnlineDataService
+    /// The satellite Aim follows or waits for, if one was chosen from a pass.
+    let satelliteAim: SatelliteAimSession
 
     /// The selected tab. Changing it starts/stops the sensors that tab needs.
     var selectedTab: AppTab = .aim {
@@ -90,6 +94,9 @@ final class AppModel {
         catalog = CatalogService()
         feedback = FeedbackService()
         screen = ScreenController()
+        online = OnlineDataService(catalog: catalog)
+        satelliteAim = SatelliteAimSession()
+        online.locationProvider = { [weak self] in self?.observerContext?.location }
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
@@ -191,6 +198,7 @@ final class AppModel {
         case .active:
             clock.start()
             startMaintenance()
+            online.onForeground()
         case .background:
             settingsStore.saveNow()
             clock.stop()
@@ -221,6 +229,7 @@ final class AppModel {
 
     /// Makes `object` the aiming target without changing tabs.
     func select(target object: CelestialObject) {
+        satelliteAim.stop()
         pendingTargetID = nil
         target = object
         if !object.id.hasPrefix("custom.") {
