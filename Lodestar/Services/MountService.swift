@@ -63,6 +63,8 @@ final class MountService {
     private(set) var slewTargetName: String?
     private(set) var discoveryState = DiscoveryState.idle
     private(set) var discovered: [MountAlpacaTelescope] = []
+    /// A connection has succeeded at some time (the simulated mount counts). Until then the Aim screen has no Mount button.
+    private(set) var hasConnectedBefore = false
 
     var settings = MountUserSettings() {
         didSet {
@@ -98,6 +100,7 @@ final class MountService {
     private init() {
         settings = MountPreferences.loadSettings()
         memory = MountPreferences.loadMemory()
+        hasConnectedBefore = MountPreferences.loadConnectedBefore()
         lifecycle = MountLifecycle { [weak self] in
             self?.handleEnteredBackground()
         }
@@ -106,6 +109,10 @@ final class MountService {
     // MARK: Derived state
 
     var isConnected: Bool { connection == .connected }
+
+    /// Whether the Aim screen shows its Mount button: once a mount has been connected, and while one is connecting,
+    /// connected or lost. Most people shoot from a plain tripod and never see it.
+    var showsAimButton: Bool { hasConnectedBefore || connection != .disconnected }
 
     /// A slew or a nudge is running.
     var isMoving: Bool { status.phase == .slewing || status.phase == .nudging }
@@ -319,6 +326,10 @@ final class MountService {
             capabilities = found
             status = result.status
             connection = .connected
+            if !hasConnectedBefore {
+                hasConnectedBefore = true
+                MountPreferences.saveConnectedBefore()
+            }
             if !isDemo {
                 memory.selectedOptionID = option.id
                 memory.forms[option.id] = form

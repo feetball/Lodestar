@@ -112,6 +112,16 @@ struct MountUserSettings: Codable, Equatable, Sendable {
 enum MountPreferences {
     private static let settingsKey = "lodestar.mount.settings"
     private static let connectionKey = "lodestar.mount.connection"
+    private static let connectedBeforeKey = "lodestar.mount.connectedBefore"
+
+    /// Whether a connection to a mount (the simulated one included) has ever succeeded.
+    static func loadConnectedBefore(from defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: connectedBeforeKey)
+    }
+
+    static func saveConnectedBefore(to defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: connectedBeforeKey)
+    }
 
     static func loadSettings(from defaults: UserDefaults = .standard) -> MountUserSettings {
         load(MountUserSettings.self, key: settingsKey, from: defaults) ?? MountUserSettings()

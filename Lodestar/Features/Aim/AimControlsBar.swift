@@ -35,11 +35,14 @@ struct AimControlsBar: View {
         control("Mosaic", systemImage: "square.grid.3x3", isOn: mosaic.isActive) { sheet = .mosaic }
             .accessibilityLabel("Plan a mosaic")
             .accessibilityValue(mosaic.isActive ? mosaic.progressText : "Off")
-        control("Mount", systemImage: "antenna.radiowaves.left.and.right", isOn: MountService.shared.isConnected) {
-            sheet = .mount
+        // Only for people who have a GoTo mount: the first connection is made in Settings.
+        if MountService.shared.showsAimButton {
+            control("Mount", systemImage: "antenna.radiowaves.left.and.right", isOn: MountService.shared.isConnected) {
+                sheet = .mount
+            }
+            .accessibilityLabel("Mount control")
+            .accessibilityValue(MountService.shared.isConnected ? MountService.shared.displayName : "Not connected")
         }
-        .accessibilityLabel("Mount control")
-        .accessibilityValue(MountService.shared.isConnected ? MountService.shared.displayName : "Not connected")
         control("Camera", systemImage: previewOn ? "camera.fill" : "video.slash", isOn: previewOn) {
             model.toggleCameraPreview()
         }

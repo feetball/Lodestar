@@ -5,10 +5,15 @@ struct SettingsMountControlSection: View {
     @Environment(\.palette) private var palette
     private var service: MountService { MountService.shared }
 
+    private static let footer = """
+        Send a computerised GoTo mount to the Aim target, sync it on a centred star and nudge it. \
+        Connects over Wi-Fi. After the first connection, Aim shows a Mount button.
+        """
+
     var body: some View {
         SettingsSection(
             title: "GoTo Mount",
-            footer: "Drive a computerised telescope mount over Wi-Fi from the Aim screen: GoTo, sync, nudge and stop.") {
+            footer: Self.footer) {
             NavigationLink {
                 MountConnectionView()
             } label: {
