@@ -91,11 +91,13 @@ extension SkyOverlayRenderer {
     private static let edgeTopInset: CGFloat = 96
     private static let edgeBottomInset: CGFloat = 240
 
-    /// Draws the ring on what the guidance leads to: the panel of a mosaic being shot, else the target.
+    /// Draws the ring on what the guidance leads to: the panel of a mosaic being shot, else the satellite, else the target.
     mutating func drawTarget(in context: GraphicsContext) {
         let aim: (direction: Vector3, name: String)
         if let panel = frame.mosaic, let mosaic {
             aim = (panel.aim.horizontal.unitVector, "Panel \(min(mosaic.step + 1, mosaic.count))")
+        } else if let satellite = frame.satellite {
+            aim = (satellite.direction, satellite.label)
         } else if let target = frame.target {
             aim = (target.direction, SmallBodyText.displayName(target.object))
         } else {

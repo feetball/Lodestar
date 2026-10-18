@@ -33,6 +33,8 @@ final class AimViewModel {
     var alignmentTarget: CelestialObject?
 
     @ObservationIgnored private var hasHUDRotation = false
+    /// Whether the engine is leading the guidance to a satellite.
+    @ObservationIgnored private var hadSatellite = false
     @ObservationIgnored private var pinchStartFieldOfView: Double?
     @ObservationIgnored private var wasOnTarget: Bool?
     /// The session revision and clock second the mosaic guidance was last refreshed for.
@@ -53,8 +55,16 @@ final class AimViewModel {
     /// The mosaic being shot, shared with the Sky chart.
     var mosaicSession: MosaicSession { MosaicSession.shared }
 
-    /// The object guidance leads to: the alignment sheet's choice, else the app's target.
-    var guidanceTarget: CelestialObject? { alignmentTarget ?? app.target }
+    /// The object guidance leads to: the alignment sheet's choice, else the app's target. There is none while a satellite
+    /// is the target (`satelliteSource`).
+    var guidanceTarget: CelestialObject? { alignmentTarget ?? (app.satelliteAim.source == nil ? app.target : nil) }
+
+    /// The satellite, or the peak of its pass, that guidance leads to instead of an object. The alignment sheet's choice
+    /// of a star comes first, and a mosaic in progress replaces it as it replaces the target.
+    var satelliteSource: SatelliteAimSource? { alignmentTarget == nil ? app.satelliteAim.source : nil }
+
+    /// The Starlink streak warning for the framing: worked out about once a second.
+    let streak = SatelliteStreakMonitor()
 
     /// The optics of the camera picture behind the sky, or `nil` when the virtual lens is in use: whenever the
     /// picture is not wanted or not running.
@@ -131,6 +141,8 @@ final class AimViewModel {
 
     private func step() {
         refreshMosaicGuidance(force: false)
+        refreshSatelliteGuidance()
+        streak.tick(model: self)
         guard let frame = engine.frame() else { return }
         updateHUDRotation(gravity: frame.sample.gravity)
         guard let guidance = frame.guidance else {
@@ -215,6 +227,26 @@ final class AimViewModel {
             panelIndex: panel.index, horizontal: pointing.direction, roll: pointing.roll,
             orientation: plan.orientation, isAboveHorizon: pointing.isAboveHorizon,
             lowestAltitude: pointing.lowestAltitude, onTargetThreshold: AimMosaicAim.onTargetThreshold(for: plan)))
+    }
+
+    // MARK: Satellite
+
+    /// Points the guidance at the satellite (or the peak of its pass) at the present moment. A followed satellite moves
+    /// across the sky, so this runs with every sensor tick: one `SatelliteSkyContext` and one look, a few microseconds.
+    /// Real time rather than the clock's second, which would make the target jump.
+    private func refreshSatelliteGuidance() {
+        guard let source = satelliteSource else {
+            if hadSatellite {
+                hadSatellite = false
+                engine.setSatellite(nil, sourceID: nil)
+                wasOnTarget = nil
+            }
+            return
+        }
+        // A new source starts without a remembered on-target state, so reaching it does not buzz for the old one.
+        if !hadSatellite || engine.satelliteSourceID != source.id { wasOnTarget = nil }
+        hadSatellite = true
+        engine.setSatellite(source.fix(at: Date()), sourceID: source.id)
     }
 
     // MARK: Zoom

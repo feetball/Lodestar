@@ -173,9 +173,12 @@ confirmed on hardware. *Settings ▸ About ▸ Sensor Diagnostics* helps with th
 ## Privacy
 
 Lodestar has no accounts, analytics, ads or tracking, and it never collects your data: location, motion
-and camera data are processed on the device. The only network use is Apple's: map tiles in the site
-picker, and Apple's geocoding service, which receives a site's coordinates to look up its time zone while
-you add or edit a site. See `Lodestar/Resources/PrivacyInfo.xcprivacy`.
+and camera data are processed on the device. The network is used by Apple (map tiles in the site picker,
+and the geocoding service, which receives a site's coordinates to look up its time zone while you add or
+edit a site) and by the optional downloads in Settings ▸ Online Data, which are off until switched on:
+CelesTrak, the Minor Planet Center and MET Norway see the IP address, and MET Norway also the location
+rounded to about 10 km. GoTo mount control talks to the mount on the local network only. See
+`docs/privacy.md` and `Lodestar/Resources/PrivacyInfo.xcprivacy`.
 
 ## Data and credits
 

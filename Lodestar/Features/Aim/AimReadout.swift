@@ -12,6 +12,8 @@ struct AimReadout: View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
             if model.mosaicSession.isActive {
                 AimMosaicReadout(model: model, frame: model.engine.frame())
+            } else if let source = model.satelliteSource {
+                SatelliteAimReadout(model: model, source: source)
             } else if let target = model.guidanceTarget {
                 let frame = model.engine.frame()
                 VStack(spacing: 8) {
