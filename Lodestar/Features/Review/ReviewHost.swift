@@ -100,11 +100,50 @@ private struct ReviewDestination: View {
             ReviewObjectDetail(id: "asteroid.4")
         case .starTrails, .timeLapse:
             ToolsStarTrailsView()
+        case .satellitePasses:
+            ReviewSatellitePasses()
+        case .satellitePassDetail:
+            ReviewSatellitePassDetail()
         case .mountConnection, .mountConnected, .mountSkyWatcher, .mountSkyWatcherEquatorial, .mountSkyWatcherConnected,
              .mountSkyWatcherAligned1, .mountSkyWatcherAligned2:
             MountConnectionView()
         default:
             EmptyView()
+        }
+    }
+}
+
+/// The satellite passes list, with a board of its own.
+private struct ReviewSatellitePasses: View {
+    @Environment(AppModel.self) private var app
+    @State private var board = SatellitePassBoard()
+
+    var body: some View {
+        SatellitePassesView(board: board)
+            .task(id: app.online.satellites.generation) {
+                await board.keepCurrent(app: app, observer: app.observerContext?.observer)
+            }
+    }
+}
+
+/// The detail screen of the first pass of the ISS (or of whatever comes first).
+private struct ReviewSatellitePassDetail: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.palette) private var palette
+    @State private var board = SatellitePassBoard()
+
+    var body: some View {
+        Group {
+            if let items = board.items, let item = items.first(where: \.isISS) ?? items.first {
+                SatellitePassDetailView(item: item)
+            } else {
+                ProgressView()
+                    .tint(palette.accent)
+                    .screenBackground(palette)
+            }
+        }
+        .task(id: app.online.satellites.generation) {
+            await board.keepCurrent(app: app, observer: app.observerContext?.observer)
         }
     }
 }

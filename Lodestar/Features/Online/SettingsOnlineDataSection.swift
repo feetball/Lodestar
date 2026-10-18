@@ -4,7 +4,12 @@ import SwiftUI
 /// updated, an "Update now" button and the last error. The first switch asks for confirmation once.
 struct SettingsOnlineDataSection: View {
     @Environment(AppModel.self) private var app
+    #if DEBUG
+    // The visual review opens the first-time explanation (`screen=online-first-time`).
+    @State private var pending: OnlineFeed? = ScreenshotMode.current?.screen == .onlineFirstTime ? .satellites : nil
+    #else
     @State private var pending: OnlineFeed?
+    #endif
 
     var body: some View {
         SettingsSection(title: OnlineText.sectionTitle, footer: OnlineText.footer) {

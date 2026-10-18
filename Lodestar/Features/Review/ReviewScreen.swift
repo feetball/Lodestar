@@ -41,6 +41,13 @@ enum ReviewScreen: Hashable {
     case mountSkyWatcherSheet
     case mountSkyWatcherSheetAligned
     case mountSkyWatcherSync
+    // Online data (with fixtures instead of downloads): the satellite passes list and one pass, Aim following a satellite
+    // or waiting for its peak, and the explanation that comes before the first feed is switched on.
+    case satellitePasses
+    case satellitePassDetail
+    case aimSatellite
+    case aimSatellitePeak
+    case onlineFirstTime
     // The widgets drawn at their sizes (the widget views are in the app only in the review build), by variant.
     case widgets
     case widgetsStates
@@ -60,6 +67,8 @@ enum ReviewScreen: Hashable {
         "mount-sw-connected": .mountSkyWatcherConnected, "mount-sw-aligned-1": .mountSkyWatcherAligned1,
         "mount-sw-aligned-2": .mountSkyWatcherAligned2, "mount-sw-sheet": .mountSkyWatcherSheet,
         "mount-sw-sheet-aligned": .mountSkyWatcherSheetAligned, "mount-sw-sync": .mountSkyWatcherSync,
+        "satellite-passes": .satellitePasses, "satellite-pass-detail": .satellitePassDetail,
+        "aim-satellite": .aimSatellite, "aim-satellite-peak": .aimSatellitePeak, "online-first-time": .onlineFirstTime,
         "widgets": .widgets, "widgets-states": .widgetsStates, "widgets-large-type": .widgetsLargeType,
         "widgets-red": .widgetsRed,
     ]
@@ -80,16 +89,25 @@ enum ReviewScreen: Hashable {
     var tab: AppTab {
         switch self {
         case .mosaic, .mountSheet, .mountSheetSlewing, .aimMount, .aimMountSlewing, .mountSkyWatcherSheet,
-             .mountSkyWatcherSheetAligned, .mountSkyWatcherSync:
+             .mountSkyWatcherSheetAligned, .mountSkyWatcherSync, .aimSatellite, .aimSatellitePeak:
             return .aim
-        case .eventsCalendar, .event, .cometsList, .asteroidsList, .widgets, .widgetsStates, .widgetsLargeType,
+        case .eventsCalendar, .event, .cometsList, .asteroidsList, .satellitePasses, .satellitePassDetail, .widgets, .widgetsStates, .widgetsLargeType,
              .widgetsRed:
             return .tonight
         case .cometDetail, .asteroidDetail:
             return .objects
         case .starTrails, .timeLapse, .mountConnection, .mountConnected, .skyline, .siteEditor, .mountSkyWatcher,
-             .mountSkyWatcherEquatorial, .mountSkyWatcherConnected, .mountSkyWatcherAligned1, .mountSkyWatcherAligned2:
+             .mountSkyWatcherEquatorial, .mountSkyWatcherConnected, .mountSkyWatcherAligned1, .mountSkyWatcherAligned2,
+             .onlineFirstTime:
             return .settings
+        }
+    }
+
+    /// Whether the screen needs the satellites and the forecast (instead of the downloads).
+    var needsOnlineData: Bool {
+        switch self {
+        case .satellitePasses, .satellitePassDetail, .aimSatellite, .aimSatellitePeak: return true
+        default: return false
         }
     }
 
@@ -112,12 +130,12 @@ enum ReviewScreen: Hashable {
     }
 
     /// Whether `ReviewHost` builds the screen (the others are the real tab, with a sheet for the Aim tab).
-    var usesHost: Bool { tab != .aim || isWidgets }
+    var usesHost: Bool { (tab != .aim && self != .onlineFirstTime) || isWidgets }
 
     /// Whether the screen is pushed on the host's navigation stack.
     var isPushed: Bool {
         switch self {
-        case .skyline, .siteEditor: return false
+        case .skyline, .siteEditor, .onlineFirstTime: return false
         default: return usesHost
         }
     }

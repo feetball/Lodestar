@@ -9,7 +9,7 @@ import LodestarKit
 ///         site=Grand_Canyon tz=America/Phoenix target=special.galacticCenter pointing=171,17 night=0
 ///
 /// The visual review adds `screen=<name>` (a sub-screen or sheet, see `ReviewScreen`), `comets=0|1` (add the comets of
-/// `ReviewFixtures`; on by default with `screen=`) and `review=1` (run the review driver, which pages the screen and
+/// `ReviewFixtures`; on by default with `screen=`), `online=1` (satellites and a cloud forecast in place of the downloads) and `review=1` (run the review driver, which pages the screen and
 /// reports its state, without a `screen=`). Unknown keys are ignored and an unknown screen name is no screen.
 struct ScreenshotMode {
     var tab: AppTab
@@ -27,6 +27,8 @@ struct ScreenshotMode {
     var screenName: String?
     /// Whether the comets of `ReviewFixtures` are added to the catalog.
     var addsFixtureComets: Bool
+    /// Whether the satellites and the cloud forecast of `ReviewFixtures` take the place of the online downloads.
+    var addsOnlineData: Bool
     /// Whether the review driver runs (it pages the screen and reports its state for the capture script).
     var runsReviewDriver: Bool
 
@@ -55,6 +57,7 @@ struct ScreenshotMode {
         screenName = values["screen"]
         screen = values["screen"].flatMap(ReviewScreen.init(name:))
         addsFixtureComets = values["comets"] == "1" || (values["screen"] != nil && values["comets"] != "0")
+        addsOnlineData = values["online"] == "1" || (screen?.needsOnlineData ?? false)
         runsReviewDriver = values["review"] == "1" || values["screen"] != nil
     }
 }

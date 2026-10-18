@@ -57,6 +57,14 @@ jobs:
           SWIFT
           grep -n "reviewWidgetFamily" WidgetShared/*.swift LodestarWidgets/*.swift
 
+      # Real element sets of 2026-10-18 for the satellite screens (the app has no network in the review).
+      - name: Add the satellite fixtures to the app (review build only)
+        run: |
+          mkdir -p Lodestar/ReviewFixtures
+          cp LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_stations.json \
+             LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_omm_sample.json \
+             LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_starlink_sample.json Lodestar/ReviewFixtures/
+
       - name: Add the widget views to the app (review build only)
         run: |
           mkdir -p Lodestar/ReviewWidgetSources

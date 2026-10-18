@@ -28,4 +28,68 @@ enum ReviewFixtures {
         cometLines.compactMap { try? CometElementsParser.parseLine($0) }
     }
 }
+
+extension ReviewFixtures {
+    /// The satellites of the LodestarKit tests (real element sets of 2026-10-18), read by the app's own parser. The
+    /// review workflow copies the three files next to the app's resources; without them there are no satellites.
+    static func satelliteGroups(now: Date) -> [SatelliteGroup] {
+        let files: [(OnlineResource, String)] = [
+            (.stations, "satellite_stations"), (.visual, "satellite_omm_sample"), (.starlink, "satellite_starlink_sample"),
+        ]
+        var groups: [SatelliteGroup] = []
+        for (resource, name) in files {
+            guard let group = resource.group,
+                  let url = Bundle.main.url(forResource: name, withExtension: "json")
+                    ?? Bundle.main.url(forResource: name, withExtension: "json", subdirectory: "ReviewFixtures"),
+                  let data = try? Data(contentsOf: url),
+                  let parsed = try? SatelliteGroup.parse(group: group, data: data, now: now) else { continue }
+            groups.append(parsed.value)
+        }
+        return groups
+    }
+
+    /// A cloud forecast in the shape of MET Norway's answer, read by the app's own parser: hourly values from half a day
+    /// before `reference` to two and a half days after it, cloudy in the evening, clear in the middle of the night, high
+    /// cloud before dawn, a cloudy day after. Local solar time is taken from the longitude.
+    static func forecast(around reference: Date, latitude: Double, longitude: Double) -> CloudForecast? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let first = (reference.timeIntervalSince1970 / 3_600).rounded(.down) * 3_600 - 12 * 3_600
+        var series: [[String: Any]] = []
+        for hour in 0..<72 {
+            let time = Date(timeIntervalSince1970: first + Double(hour) * 3_600)
+            let solarHour = (time.timeIntervalSince1970 / 3_600 + longitude / 15).truncatingRemainder(dividingBy: 24)
+            let local = solarHour < 0 ? solarHour + 24 : solarHour
+            let low: Double
+            let medium: Double
+            let high: Double
+            switch local {
+            case 17..<21: (low, medium, high) = (60, 40, 30)
+            case 21..<23: (low, medium, high) = (20, 10, 10)
+            case 23..<24, 0..<3: (low, medium, high) = (0, 0, 5)
+            case 3..<5.5: (low, medium, high) = (0, 5, 60)
+            case 5.5..<8: (low, medium, high) = (10, 30, 80)
+            default: (low, medium, high) = (70, 60, 40)
+            }
+            let total = min(100, max(low, medium, high) + (low + medium + high) / 12)
+            series.append([
+                "time": formatter.string(from: time),
+                "data": ["instant": ["details": [
+                    "cloud_area_fraction": total, "cloud_area_fraction_low": low,
+                    "cloud_area_fraction_medium": medium, "cloud_area_fraction_high": high,
+                ]]],
+            ])
+        }
+        let object: [String: Any] = [
+            "type": "Feature",
+            "geometry": ["type": "Point", "coordinates": [longitude, latitude, 2_130]],
+            "properties": [
+                "meta": ["updated_at": formatter.string(from: reference.addingTimeInterval(-3_600))],
+                "timeseries": series,
+            ],
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else { return nil }
+        return try? ForecastParser.parseForecast(data)
+    }
+}
 #endif

@@ -36,8 +36,18 @@ final class ReviewDriver {
     private func run(app: AppModel, mode: ScreenshotMode) async {
         write(state: "")
         await app.catalog.load()
+        if mode.addsOnlineData {
+            let place = app.observerContext?.location
+            app.online.installReviewData(
+                satellites: ReviewFixtures.satelliteGroups(now: Date()),
+                forecast: place.flatMap {
+                    ReviewFixtures.forecast(around: app.clock.now, latitude: $0.latitude, longitude: $0.longitude)
+                },
+                now: Date())
+        }
         if let screen = mode.screen {
             await prepareMount(app: app, screen: screen)
+            await prepareSatellite(app: app, screen: screen)
         }
         // Let the screen finish its first layout and its own background work before the script looks.
         try? await Task.sleep(for: .seconds(2))
@@ -91,6 +101,22 @@ final class ReviewDriver {
                 used.append(star.j2000)
             }
         }
+    }
+
+    // MARK: Satellite
+
+    /// Leads Aim to the first pass of the ISS (or of whatever satellite comes first): the satellite itself or the point where
+    /// the pass peaks.
+    private func prepareSatellite(app: AppModel, screen: ReviewScreen) async {
+        guard screen == .aimSatellite || screen == .aimSatellitePeak,
+              let observer = app.observerContext?.observer else { return }
+        let library = app.online.satellites
+        let start = app.clock.now
+        let items = await Task.detached(priority: .userInitiated) {
+            SatellitePasses.compute(library: library, observer: observer, start: start)
+        }.value
+        guard let item = items.first(where: \.isISS) ?? items.first else { return }
+        app.satelliteAim.start(screen == .aimSatellite ? .follow(item, observer: observer) : .peak(item, observer: observer))
     }
 
     private func waitForConnection(_ service: MountService) async {

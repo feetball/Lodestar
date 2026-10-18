@@ -45,6 +45,10 @@ final class OnlineDataService {
     @ObservationIgnored private let expiresJitter = TimeInterval.random(in: 0..<OnlineDataService.maximumJitter)
     @ObservationIgnored private var loaded = Set<OnlineFeed>()
     @ObservationIgnored private var workTail: Task<Void, Never>?
+    #if DEBUG
+    /// Set by `installReviewData`: nothing is loaded or requested any more, so that the fixtures stay.
+    @ObservationIgnored private var isOfflineForReview = false
+    #endif
 
     init(catalog: CatalogService, store: OnlineStore = OnlineStore(), refresher: OnlineRefresher = OnlineRefresher()) {
         self.catalog = catalog
@@ -137,6 +141,9 @@ final class OnlineDataService {
     // MARK: Loading
 
     private func loadSaved(_ feed: OnlineFeed) async {
+        #if DEBUG
+        if isOfflineForReview { return }
+        #endif
         guard loaded.insert(feed).inserted else { return }
         for resource in feed.resources {
             if let (data, _) = await refresher.loadCached(resource), isEnabled(feed) { publish(data) }
@@ -147,6 +154,9 @@ final class OnlineDataService {
     // MARK: Refreshing
 
     private func refresh(_ feed: OnlineFeed, manual: Bool) async {
+        #if DEBUG
+        if isOfflineForReview { return }
+        #endif
         for resource in feed.resources {
             guard isEnabled(feed) else { return }
             await refreshResource(feed, resource: resource, manual: manual)
@@ -236,3 +246,20 @@ final class OnlineDataService {
         }
     }
 }
+
+#if DEBUG
+extension OnlineDataService {
+    /// Puts data in place of the downloads for the visual review in the Simulator (`online=1` in screenshot mode, see
+    /// `ReviewDriver`): every feed shows as switched on and updated a few hours ago, the screens get the satellites and
+    /// the forecast given, and no request is made from then on. Nothing is saved.
+    func installReviewData(satellites groups: [SatelliteGroup], forecast value: CloudForecast?, now: Date) {
+        isOfflineForReview = true
+        for group in groups { publish(.satellites(group)) }
+        if let value { publish(.forecast(value)) }
+        for feed in OnlineFeed.allCases {
+            statuses[feed] = OnlineFeedStatus(isEnabled: true, lastUpdate: now.addingTimeInterval(-3 * 3600))
+        }
+        hasExplained = true
+    }
+}
+#endif

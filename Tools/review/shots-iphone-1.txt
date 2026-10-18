@@ -1,8 +1,8 @@
 # name | modes (d day, n night) | launch arguments | options (pages=<n>, fixed=<seconds>)
 # Tabs that gained cards or sections: Upcoming events and Bright Comets, the comet and asteroid sections, GoTo Mount and Tools.
-tonight|dn|tab=tonight comets=1|pages=6
+tonight|dn|tab=tonight comets=1 online=1|pages=8
 objects|dn|tab=objects comets=1|pages=4
-settings|dn|tab=settings|pages=6
+settings|dn|tab=settings online=1|pages=8
 aim-comet|dn|tab=aim target=comet.161P comets=1|
 # Events
 events-calendar|dn|screen=events-calendar|pages=4
@@ -26,3 +26,10 @@ mosaic|dn|screen=mosaic target=dso.M31|pages=4
 # Skyline recording
 skyline|dn|screen=skyline|
 site-editor|dn|screen=site-editor|pages=3
+# Online data, with fixtures in place of the downloads
+online-first-time|dn|screen=online-first-time|
+satellite-passes|dn|screen=satellite-passes|pages=3
+satellite-pass-detail|dn|screen=satellite-pass-detail|pages=4
+aim-satellite|dn|screen=aim-satellite|
+aim-satellite-peak|n|screen=aim-satellite-peak|
+aim-streak|dn|tab=aim online=1 target=special.ncp|
