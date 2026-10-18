@@ -78,6 +78,7 @@ jobs:
       - name: Generate the project from project.yml
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/spec"
           xcodegen generate --spec project.yml --project "$RUNNER_TEMP/spec"
           xcodebuild -list -project "$RUNNER_TEMP/spec/Lodestar.xcodeproj"
           for phase in "Embed Watch Content" "Embed Foundation Extensions"; do
