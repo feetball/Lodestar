@@ -313,3 +313,11 @@ Android engine) with subcommands `sgp4`, `snapshot`, `passes` and `streaks`. Pin
 
 The comet generators (`gen_comet*.py` and companions copied from the comets work) rebuild the Kepler and Horizons
 test tables in `CometsKeplerData`/`CometsHorizonsData` from JPL Horizons queries and an independent mpmath solver.
+
+## Bright asteroids — `build_bright_asteroids.py`
+
+Builds `asteroids.txt` (bundled in both engines): the 216 asteroids that can reach magnitude 11
+(H ≤ 10.5 and a best-case opposition magnitude ≤ 11.0) from the MPC orbit file, pinned in `asteroids.lock.json`
+(the MPC rewrites the file daily and keeps no archive, so the lock pins one snapshot; `--refresh-lock` re-pins it, then
+update the count, epoch and reference data in the tests). `--check` verifies the shipped files offline.
+`make_asteroid_reference.py` writes the JPL Horizons test data.

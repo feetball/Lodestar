@@ -3,6 +3,7 @@ import Foundation
 /// Everything a `Catalog` holds, as produced by `CatalogAssembler`.
 struct CatalogContents {
     let objects: [CelestialObject]
+    let listed: [CelestialObject]
     let constellations: ConstellationDirectory
     let milkyWay: MilkyWayOutline
     let renderStars: [RenderStar]
@@ -17,7 +18,8 @@ struct CatalogContents {
 
 /// Reads the data files, validates their records and builds the catalog's objects and search index.
 enum CatalogAssembler {
-    private struct ObjectTable {
+    /// The objects of a catalog or part of one, with the search index that grows with them.
+    struct ObjectTable {
         var objects: [CelestialObject] = []
         var search = SearchIndexBuilder()
 
@@ -101,7 +103,7 @@ enum CatalogAssembler {
         }
 
         return CatalogContents(
-            objects: table.objects, constellations: constellations, milkyWay: milkyWay, renderStars: renderStars,
+            objects: table.objects, listed: table.objects.filter(\.isListed), constellations: constellations, milkyWay: milkyWay, renderStars: renderStars,
             report: report, searchIndex: table.search.finish(objectsByRank: objectsByRank),
             indexByID: indexByID, listedByGroup: listedByGroup, deepSky: deepSkyObjects,
             deepSkyUpTo: deepSkyUpTo(deepSkyObjects), byCatalogue: byCatalogue(deepSkyObjects))

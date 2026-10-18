@@ -4,8 +4,9 @@ import Foundation
 ///
 /// The value is part of the catalog data: for deep-sky objects it follows the rules in `Tools/README.md`
 /// (catalogue membership, name, brightness and size; dark nebulae have no magnitude and are rated by name
-/// and size), for stars it follows the magnitude, and the Sun, the Moon, the planets, the Milky Way core,
-/// the celestial poles and custom targets are always showpieces. A smaller value is more conspicuous, so
+/// and size), for stars it follows the magnitude, for comets and asteroids it follows the peak magnitude
+/// estimate (`init(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets, the Milky Way core, the
+/// celestial poles and custom targets are always showpieces. A smaller value is more conspicuous, so
 /// the natural order is the order of importance: `showpiece < prominent < notable < obscure`.
 ///
 /// Use it to keep a crowded sky readable: draw (or label) only the objects up to a limit that grows as the
@@ -29,6 +30,14 @@ public enum Prominence: Int, Comparable, CaseIterable, Hashable, Sendable {
     public static let prominentStarMagnitude = 3.5
     /// Stars brighter than this (inclusive) are notable; fainter ones are obscure.
     public static let notableStarMagnitude = 5.0
+    /// Comets and asteroids with a peak magnitude estimate up to this value (inclusive) are showpieces: naked-eye class.
+    public static let showpieceSmallBodyMagnitude = 6.0
+    /// Comets and asteroids with a peak magnitude estimate up to this value (inclusive) are prominent: binocular class.
+    public static let prominentSmallBodyMagnitude = 8.0
+    /// Comets and asteroids with a peak magnitude estimate up to this value (inclusive) are notable: within reach of a
+    /// camera on a tripod, the default limit of `SmallBodySelection`. Fainter ones, and bodies without magnitude
+    /// parameters, are obscure.
+    public static let notableSmallBodyMagnitude = 10.0
 
     /// The English name shown to people, for example "Showpiece".
     public var displayName: String {
@@ -48,6 +57,25 @@ public enum Prominence: Int, Comparable, CaseIterable, Hashable, Sendable {
         } else if starMagnitude <= Self.prominentStarMagnitude {
             self = .prominent
         } else if starMagnitude <= Self.notableStarMagnitude {
+            self = .notable
+        } else {
+            self = .obscure
+        }
+    }
+
+    /// The prominence of a comet or an asteroid from its peak magnitude estimate
+    /// (`SmallBodyBrightness.peakMagnitudeEstimate(of:)`): 1 up to magnitude 6, 2 up to 8, 3 up to 10, else 4; a body
+    /// without an estimate is 4.
+    public init(smallBodyPeakMagnitude: Double?) {
+        guard let magnitude = smallBodyPeakMagnitude else {
+            self = .obscure
+            return
+        }
+        if magnitude <= Self.showpieceSmallBodyMagnitude {
+            self = .showpiece
+        } else if magnitude <= Self.prominentSmallBodyMagnitude {
+            self = .prominent
+        } else if magnitude <= Self.notableSmallBodyMagnitude {
             self = .notable
         } else {
             self = .obscure

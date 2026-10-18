@@ -180,7 +180,7 @@ final class CatalogLoadingTests: XCTestCase {
                 if let motion {
                     XCTAssertTrue(motion.raMilliarcsecondsPerYear.isFinite && motion.decMilliarcsecondsPerYear.isFinite, object.id)
                 }
-            case .solarSystem, .celestialPole:
+            case .solarSystem, .celestialPole, .smallBody:
                 XCTAssertNil(object.j2000)
             }
             if let magnitude = object.magnitude { XCTAssertTrue(magnitude.isFinite, object.id) }

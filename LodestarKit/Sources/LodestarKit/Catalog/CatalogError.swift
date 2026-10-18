@@ -38,6 +38,10 @@ public enum CatalogError: Error, Hashable, Sendable {
     /// A data file that must contain objects yielded none, because it was empty or because every
     /// record was rejected.
     case noValidRecords(CatalogFile, rejected: Int)
+    /// The bundled list of bright asteroids (`BundledAsteroids`) is missing, unreadable, larger than
+    /// `BundledAsteroids.maximumFileBytes` or has no valid line. It is not one of the catalog's four data files, so it
+    /// has no `CatalogFile`.
+    case brightAsteroidsUnavailable(reason: String)
 }
 
 extension CatalogError: LocalizedError, CustomStringConvertible {
@@ -54,6 +58,8 @@ extension CatalogError: LocalizedError, CustomStringConvertible {
             "The catalog data file \(file.fileName) has an unsupported schema version (\(version.map(String.init) ?? "none"))."
         case .noValidRecords(let file, let rejected):
             "The catalog data file \(file.fileName) has no valid records (\(rejected) rejected)."
+        case .brightAsteroidsUnavailable(let reason):
+            "The bundled bright-asteroid list is unavailable: \(reason)"
         }
     }
 

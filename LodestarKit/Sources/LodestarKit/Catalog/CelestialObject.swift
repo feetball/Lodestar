@@ -8,6 +8,9 @@ public enum ObjectPosition: Hashable, Sendable {
     case solarSystem(SolarSystemBody)
     /// The north or south celestial pole of date.
     case celestialPole(north: Bool)
+    /// A comet or an asteroid; its position comes from its orbital elements (`SmallBodyEphemeris`, with the same
+    /// pipeline as a planet).
+    case smallBody(SmallBody)
 }
 
 /// A star, deep-sky object, solar-system body, special direction or user-made target.
@@ -22,30 +25,34 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
 
     /// A stable identifier: `"sun"`, `"moon"`, `"planet.mars"`, `"star.hip32349"` (or `"star.hr<n>"`,
     /// `"star.hyg<n>"` for stars without a Hipparcos number), `"dso.M31"`, `"dso.NGC7000"`,
-    /// `"special.galacticCenter"`, `"special.ncp"`, `"special.scp"` or `"custom.<uuid>"`.
+    /// `"special.galacticCenter"`, `"special.ncp"`, `"special.scp"`, `"comet.C/2023 A3"`, `"comet.12P"`, `"asteroid.4"`,
+    /// `"asteroid.2024 YR4"` (the identifiers of `SmallBody`, which survive element updates) or `"custom.<uuid>"`.
     public let id: String
     /// The name shown in lists.
     ///
     /// Stars use their proper name, else the Bayer designation with the constellation ("γ Cas"),
     /// else the Flamsteed number ("48 Cas"), else a catalog number ("HR 123"). Deep-sky objects use
-    /// their first common name, else "M 31", "NGC 7000" or "IC 434".
+    /// their first common name, else "M 31", "NGC 7000" or "IC 434". Comets and asteroids use their title:
+    /// "C/2023 A3 (Tsuchinshan-ATLAS)", "12P/Pons-Brooks", "(4) Vesta", "2024 YR4".
     public let name: String
     /// Catalog designations, in display order: for example "M 31", "NGC 224" or "α CMa",
-    /// "Alpha Canis Majoris", "9 CMa", "HR 2491", "HD 48915", "HIP 32349". May contain `name`.
+    /// "Alpha Canis Majoris", "9 CMa", "HR 2491", "HD 48915", "HIP 32349". May contain `name`. A comet or an
+    /// asteroid has its designation: "C/2023 A3", "12P", "2024 YR4", and "(4)" for a numbered asteroid.
     public let designations: [String]
-    /// Common names other than `name`.
+    /// Common names other than `name`. The name of a comet or an asteroid: "Tsuchinshan-ATLAS", "Vesta".
     public let alternateNames: [String]
     /// The kind of object.
     public let category: ObjectCategory
-    /// The IAU abbreviation of the constellation the object lies in ("CMa"), if known.
+    /// The IAU abbreviation of the constellation the object lies in ("CMa"), if known. `nil` for the objects that
+    /// move through the sky (the Sun, the Moon, the planets, comets, asteroids).
     public let constellation: String?
     /// The full name of the constellation ("Canis Major"), if known.
     public let constellationName: String?
     /// The visual magnitude, if known.
     ///
     /// For the few deep-sky objects that only have a blue magnitude in the source data, that value.
-    /// `nil` for the Sun, the Moon and the planets, whose brightness changes; use
-    /// `SkyFrame.currentMagnitude(of:)` for those.
+    /// `nil` for the Sun, the Moon, the planets, comets and asteroids, whose brightness changes; use
+    /// `SkyFrame.currentMagnitude(of:)` for those, or `estimatedPeakMagnitude` for a date-free rating.
     public let magnitude: Double?
     /// The size of an extended object, if known.
     public let angularSize: AngularSize?
@@ -61,17 +68,18 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
     ///
     /// All solar-system and special objects are listed, and so are the deep-sky objects whose
     /// `prominence` is `.notable` or better, stars with a proper name and other stars of magnitude 3.5
-    /// or brighter. The remaining objects (the obscure deep-sky objects and the faint stars) are only
-    /// found by search, by catalogue (`Catalog.objects(in:)` with a `DeepSkyCatalogue`) and drawn on
-    /// the sky.
+    /// or brighter, and the comets and asteroids of `.notable` or better. The remaining objects (the obscure
+    /// deep-sky objects, the faint stars, the faint comets and asteroids) are only found by search, by
+    /// catalogue (`Catalog.objects(in:)` with a `DeepSkyCatalogue`) and drawn on the sky.
     public let isListed: Bool
     /// A short note for the detail view, if there is something worth saying.
     public let notes: String?
     /// How conspicuous the object is, see `Prominence`.
     ///
     /// Deep-sky objects have the value of the data file (a record without one counts as `.notable`),
-    /// stars follow their magnitude (`Prominence(starMagnitude:)`), and the Sun, the Moon, the planets,
-    /// the special directions and custom targets are showpieces.
+    /// stars follow their magnitude (`Prominence(starMagnitude:)`), comets and asteroids follow their
+    /// `estimatedPeakMagnitude` (`Prominence(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets, the
+    /// special directions and custom targets are showpieces.
     public let prominence: Prominence
     /// The object's numbers in the catalogues of `DeepSkyCatalogue`, in the order of `designations`
     /// (Messier, NGC, IC, then the others).
@@ -133,10 +141,25 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
         return nil
     }
 
-    /// `true` for the Sun, the Moon and the planets.
+    /// `true` for the Sun, the Moon, the planets, comets and asteroids: the objects whose place and brightness change.
     public var isSolarSystem: Bool {
-        if case .solarSystem = position { return true }
-        return false
+        switch position {
+        case .solarSystem, .smallBody: true
+        case .fixed, .celestialPole: false
+        }
+    }
+
+    /// The comet or asteroid behind the object; `nil` for every other object.
+    public var smallBody: SmallBody? {
+        if case .smallBody(let body) = position { return body }
+        return nil
+    }
+
+    /// The date-free peak magnitude estimate of a comet or an asteroid
+    /// (`SmallBodyBrightness.peakMagnitudeEstimate(of:)`), the number behind its `prominence` and its place in a
+    /// brightness order; `nil` for other objects and for bodies without magnitude parameters.
+    public var estimatedPeakMagnitude: Double? {
+        smallBody.flatMap { SmallBodyBrightness.peakMagnitudeEstimate(of: $0) }
     }
 
     /// One line describing the object, such as "Galaxy · Andromeda · mag 3.4".
@@ -148,11 +171,15 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
     }
 
     /// The magnitude used to order objects by brightness: the catalog magnitude, or for
-    /// solar-system bodies a typical peak magnitude, or +∞ when nothing is known.
+    /// solar-system bodies a typical peak magnitude, for comets and asteroids `estimatedPeakMagnitude`, or +∞ when
+    /// nothing is known.
     var rankingMagnitude: Double {
         if let magnitude { return magnitude }
-        if case .solarSystem(let body) = position { return Self.typicalPeakMagnitude(of: body) }
-        return .infinity
+        switch position {
+        case .solarSystem(let body): return Self.typicalPeakMagnitude(of: body)
+        case .smallBody(let body): return SmallBodyBrightness.peakMagnitudeEstimate(of: body) ?? .infinity
+        case .fixed, .celestialPole: return .infinity
+        }
     }
 
     private static func typicalPeakMagnitude(of body: SolarSystemBody) -> Double {
@@ -167,6 +194,20 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
         case .uranus: 5.7
         case .neptune: 7.8
         }
+    }
+
+    // MARK: Comets and asteroids
+
+    /// Creates the catalog object of a comet or an asteroid.
+    ///
+    /// The identifier is the body's own (`SmallBody.id`), the name its `SmallBody.title`; the designation (and for a
+    /// numbered asteroid the number in parentheses, "(4)") is the one designation, the common name the one alternate
+    /// name. There is no constellation and no fixed magnitude: the position and the magnitude come from
+    /// `SkyFrame.horizontal(of:)` and `SkyFrame.currentMagnitude(of:)`. `prominence` and `isListed` follow the
+    /// `estimatedPeakMagnitude`. A `Catalog` builds these objects itself (`Catalog.withSmallBodies(_:)`); use this for
+    /// a single body that is not in a catalog, for example one fetched for a target.
+    public init(smallBody body: SmallBody) {
+        self = CatalogFactory.smallBody(body).object
     }
 
     // MARK: Custom targets

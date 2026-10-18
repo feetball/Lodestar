@@ -93,6 +93,41 @@ final class CatalogPerformanceTests: XCTestCase {
         XCTAssertLessThan(groupTime, sortBudget)
     }
 
+    func testAddingSmallBodiesIsFastAndSearchStaysFast() throws {
+        let base = try CatalogFixture.catalog()
+        let bundledAsteroids = try BundledAsteroids.load().bodies
+        let comets = SyntheticOrbits(seed: 1).bodies(1_000)
+        let nearEarthObjects = SyntheticOrbits(seed: 2).bodies(43_000)
+        _ = base.withSmallBodies(bundledAsteroids)
+        func best(_ count: Int, _ body: () -> Void) -> Double {
+            var best = Double.infinity
+            for _ in 0..<count { best = min(best, milliseconds(body)) }
+            return best
+        }
+        let loadTime = best(5) { _ = try? BundledAsteroids.load() }
+        let asteroidTime = best(5) { _ = base.withSmallBodies(bundledAsteroids) }
+        let cometTime = best(5) { _ = base.withSmallBodies(comets) }
+        let nearEarthTime = best(3) { _ = base.withSmallBodies(nearEarthObjects) }
+        let withBodies = base.withSmallBodies(bundledAsteroids + comets)
+        for _ in 0..<20 { _ = withBodies.search("a", limit: 50) }
+        let searchTime = best(10) { _ = withBodies.search("vesta", limit: 50) }
+        let broadSearchTime = best(10) { _ = withBodies.search("a", limit: 50) }
+        let groupTime = best(5) { _ = withBodies.objects(in: .solarSystem) }
+        print("CATALOG PERF BundledAsteroids.load \(String(format: "%.2f", loadTime)) ms; withSmallBodies: \(bundledAsteroids.count) asteroids \(String(format: "%.2f", asteroidTime)) ms, "
+            + "\(comets.count) comets \(String(format: "%.2f", cometTime)) ms, "
+            + "\(nearEarthObjects.count) bodies \(String(format: "%.1f", nearEarthTime)) ms; "
+            + "search \"vesta\" \(String(format: "%.3f", searchTime)) ms, \"a\" \(String(format: "%.3f", broadSearchTime)) ms, "
+            + "optimized: \(Self.optimized)")
+        let scale = Self.optimized ? 1.0 : 10.0
+        XCTAssertLessThan(loadTime, 100 * scale, "loading the bundled asteroids")
+        XCTAssertLessThan(asteroidTime, 100 * scale, "adding the bundled asteroids")
+        XCTAssertLessThan(cometTime, 150 * scale, "adding 1 000 comets")
+        XCTAssertLessThan(nearEarthTime, 3_000 * scale, "adding 43 000 bodies")
+        XCTAssertLessThan(searchTime, searchBudget)
+        XCTAssertLessThan(broadSearchTime, searchBudget)
+        XCTAssertLessThan(groupTime, 1 * scale)
+    }
+
     func testIdentifierLookupDoesNotScan() throws {
         let catalog = try CatalogFixture.catalog()
         let identifiers = catalog.objects.map(\.id)

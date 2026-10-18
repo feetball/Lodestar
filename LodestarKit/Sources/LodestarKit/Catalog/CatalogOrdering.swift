@@ -34,6 +34,11 @@ enum CatalogOrdering {
         }
     }
 
+    /// The values of one object that is not part of a table (its `index` is 0).
+    static func item(for object: CelestialObject) -> Item {
+        items(for: [object])[0]
+    }
+
     static func sorted(_ objects: [CelestialObject], by order: CatalogSortOrder) -> [CelestialObject] {
         let items = items(for: objects)
         let ordered: [Item]

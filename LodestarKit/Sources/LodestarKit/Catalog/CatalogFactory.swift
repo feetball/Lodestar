@@ -396,6 +396,21 @@ enum CatalogFactory {
         return numbers
     }
 
+    /// The object of a comet or an asteroid, with the texts it can be found by: the title (entry 0), the designation
+    /// ("C/2023 A3", "12P", "2024 YR4", "(4)" for a numbered asteroid, entry 1) and the common name (entry 2).
+    static func smallBody(_ body: SmallBody) -> ObjectDraft {
+        let estimate = SmallBodyBrightness.peakMagnitudeEstimate(of: body)
+        let prominence = Prominence(smallBodyPeakMagnitude: estimate)
+        let isAsteroid = body.kind == .asteroid
+        let designation = isAsteroid && body.number != nil ? "(\(body.designation))" : body.designation
+        let object = CelestialObject(
+            id: body.id, name: body.title, designations: [designation],
+            alternateNames: body.name.isEmpty ? [] : [body.name],
+            category: isAsteroid ? .asteroid : .comet, position: .smallBody(body),
+            isListed: prominence <= Prominence.lastListed, prominence: prominence)
+        return ObjectDraft(plain: object)
+    }
+
     /// The identifier under which a deep-sky object with an acronym for a name ("LMC") also answers.
     static func acronymAlias(for alternateName: String) -> String? {
         guard (2...5).contains(alternateName.count),
