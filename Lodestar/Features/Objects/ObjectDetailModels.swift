@@ -42,6 +42,11 @@ struct ObjectDetailCurrent: Sendable {
     let moonPhase: MoonPhaseInfo?
     /// `true` when the object is above the horizon but hidden behind the site's recorded skyline.
     let isBehindSkyline: Bool
+    /// `true` for a comet or an asteroid, whose distances and warnings are in `smallBody`.
+    var isSmallBody = false
+    /// A comet's or asteroid's distances, elongation, phase, magnitude estimate, warnings and tail; `nil` when its
+    /// orbit cannot be evaluated.
+    var smallBody: SmallBodyDetail?
 }
 
 /// One point of the altitude curve.

@@ -162,12 +162,13 @@ struct SkyChartLabel: Sendable, Identifiable {
 /// Something a tap can select.
 struct SkyChartPickable: Sendable {
     enum Kind: Sendable {
-        case target, body, deepSky, star
+        case target, body, smallBody, deepSky, star
 
         /// Scales the distance to a tap: objects that are rarer or more important win ties.
         var distanceBias: CGFloat {
             switch self {
             case .target, .body: return 0.5
+            case .smallBody: return 0.6
             case .deepSky: return 0.8
             case .star: return 1
             }
@@ -201,6 +202,8 @@ struct SkyChartScene: Sendable {
     /// Highest priority first.
     let labels: [SkyChartLabel]
     let pickables: [SkyChartPickable]
+    /// The comets and asteroids above the horizon: the target and the bright ones.
+    let smallBodies: [SkyChartSmallBodyMarker]
 }
 
 extension SkyChartScene {
@@ -247,6 +250,8 @@ enum SkyChartSceneBuilder {
         labels += starLabels(snapshot.stars)
         labels += deepSkyLabels(snapshot.deepSky)
         labels += bodies.filter(\.isAboveHorizon).map(bodyLabel)
+        let smallBodies = SmallBodyChartMarkers.build(snapshot.smallBodies, targetID: snapshot.target?.object.id)
+        labels += SmallBodyChartMarkers.labels(smallBodies)
         if let target, target.isAboveHorizon {
             labels.append(SkyChartLabel(id: "target.\(target.object.id)", text: target.object.name, style: .target,
                                         point: PlanisphereProjection.chartPoint(target.direction),
@@ -263,7 +268,8 @@ enum SkyChartSceneBuilder {
             skyline: horizon.map(SkyChartSkyline.init(profile:)),
             mosaic: mosaicPanels(snapshot.mosaic),
             labels: labels,
-            pickables: pickables(snapshot, bodies: bodies, target: target))
+            pickables: pickables(snapshot, bodies: bodies, target: target) + SmallBodyChartMarkers.pickables(smallBodies),
+            smallBodies: smallBodies)
     }
 
     // MARK: Stars

@@ -45,8 +45,14 @@ enum ObjectsFormat {
     /// Type, constellation and magnitude on one line, such as "Galaxy · Andromeda · mag 3.4".
     ///
     /// `magnitude` overrides the catalog magnitude for objects whose brightness changes. With `spoken` the parts are
-    /// separated by commas and "magnitude" is written out.
-    static func subtitle(of object: CelestialObject, magnitude: Double?, spoken: Bool = false) -> String {
+    /// separated by commas and "magnitude" is written out. A comet or an asteroid gets its kind, magnitude estimate,
+    /// elongation and warnings from `position` instead.
+    static func subtitle(of object: CelestialObject, magnitude: Double?, spoken: Bool = false,
+                         position: ObjectSkyPosition? = nil) -> String {
+        if object.smallBody != nil {
+            return SmallBodyText.subtitle(of: object, info: position?.smallBody, isComputed: position != nil,
+                                          spoken: spoken)
+        }
         var parts = [object.category.displayName]
         if let constellation = object.constellationName {
             parts.append(constellation)
@@ -106,11 +112,11 @@ enum ObjectsFormat {
     /// Everything a row shows, as one VoiceOver label.
     static func spokenSummary(of object: CelestialObject, position: ObjectSkyPosition?, isFavorite: Bool,
                               in timeZone: TimeZone, showsProminence: Bool = false) -> String {
-        var parts = [object.name]
+        var parts = [SmallBodyText.displayName(object)]
         if let designation = extraDesignation(of: object) {
             parts.append(designation)
         }
-        parts.append(subtitle(of: object, magnitude: position?.magnitude, spoken: true))
+        parts.append(subtitle(of: object, magnitude: position?.magnitude, spoken: true, position: position))
         if let line = catalogueLine(of: object, showsProminence: showsProminence) {
             parts.append(line.replacingOccurrences(of: " \u{00B7} ", with: ", "))
         }

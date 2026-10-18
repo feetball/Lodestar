@@ -105,6 +105,8 @@ enum AimMosaicPlanner {
     static func message(for error: MosaicError, object: CelestialObject? = nil) -> String {
         switch error {
         case .objectNotFixed:
+            // A comet or an asteroid drifts against the stars: the words say so.
+            if let object, object.smallBody != nil { return SmallBodyText.mosaicRefusal(for: object) }
             return "The Sun, the Moon and the planets move across the sky, so a mosaic cannot be planned for them."
         case .objectHasNoSize:
             return "\(object?.name ?? "This object") has no known angular size. Choose a nebula, galaxy or large cluster, or use a custom size."

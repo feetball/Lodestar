@@ -36,6 +36,9 @@ struct TonightTargetsCard: View {
             }
             TonightNote(text: "Ranked by height in the dark, brightness and size. Only objects that climb above "
                         + "\(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} are listed.", style: .footnote)
+            if targets.contains(where: { $0.note != nil }) {
+                TonightNote(text: SmallBodyText.targetsNote, style: .footnote)
+            }
             if appliesSkyline {
                 TonightSkylineNote(detail: "targets hidden behind the skyline are left out.")
             }
@@ -81,7 +84,7 @@ private struct TonightTargetRow: View {
                     Text(title)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(palette.primaryText)
-                    Text(TonightFormat.description(of: object))
+                    Text(target.note ?? TonightFormat.description(of: object))
                         .font(.footnote)
                         .foregroundStyle(palette.secondaryText)
                     Text(timing)
@@ -117,7 +120,8 @@ private struct TonightTargetRow: View {
 
     /// The name, with the first catalog designation when it differs: "Andromeda Galaxy · M 31".
     private var title: String {
-        TonightFormat.designation(of: object).map { "\(object.name) \u{00B7} \($0)" } ?? object.name
+        let name = SmallBodyText.displayName(object)
+        return TonightFormat.designation(of: object).map { "\(name) \u{00B7} \($0)" } ?? name
     }
 
     /// "Best 23:40 facing SE · 7h 12m above 20°".
@@ -129,7 +133,7 @@ private struct TonightTargetRow: View {
     }
 
     private var spokenSummary: String {
-        var parts = [object.name, object.category.displayName]
+        var parts = [SmallBodyText.displayName(object), object.category.displayName]
         if let constellation = object.constellationName {
             parts.append(constellation)
         }

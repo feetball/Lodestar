@@ -14,7 +14,8 @@ struct ObjectSkyPosition: Sendable, Equatable {
     let nextRise: Date?
     /// `true` when the object stays below the horizon (or behind the skyline) throughout the search window.
     let neverRises: Bool
-    /// The current magnitude of the Sun, the Moon and the planets, whose brightness changes; `nil` for other objects.
+    /// The current magnitude of the Sun, the Moon, the planets, comets and asteroids, whose brightness changes; `nil`
+    /// for other objects.
     let magnitude: Double?
     /// The instant the position was computed for.
     let computedAt: Date
@@ -24,6 +25,9 @@ struct ObjectSkyPosition: Sendable, Equatable {
     let isBehindSkyline: Bool
     /// Whether a recorded skyline decided the answers.
     let usesSkyline: Bool
+    /// For a comet or an asteroid: distances, elongation and warnings now; `nil` for other objects and when its orbit
+    /// cannot be evaluated.
+    var smallBody: SmallBodyInfo?
 }
 
 /// Computes sky positions for lists of objects. Pure, so it can run on any thread.
@@ -61,7 +65,8 @@ enum ObjectsPositionCalculator {
                 computedAt: date,
                 isAboveHorizon: isAbove,
                 isBehindSkyline: visibility != nil && horizontal.altitude > 0 && !isAbove,
-                usesSkyline: visibility != nil)
+                usesSkyline: visibility != nil,
+                smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) })
         }
         return result
     }

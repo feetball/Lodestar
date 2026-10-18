@@ -39,7 +39,7 @@ struct ObjectRow: View {
     private var names: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(object.name)
+                Text(SmallBodyText.displayName(object))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(palette.primaryText)
                     .lineLimit(2)
@@ -55,10 +55,11 @@ struct ObjectRow: View {
                         .foregroundStyle(palette.accent)
                 }
             }
-            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude))
+            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude, position: position))
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-                .lineLimit(1)
+                // The kind, magnitude, elongation and warnings of a comet or an asteroid take two lines.
+                .lineLimit(object.smallBody == nil ? 1 : 2)
             if let line = ObjectsFormat.catalogueLine(of: object, showsProminence: showsProminence) {
                 Text(line)
                     .font(.caption)

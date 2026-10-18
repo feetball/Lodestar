@@ -43,6 +43,7 @@ private struct ObjectDetailContent: View {
                         .frame(minHeight: 300)
                         .card(palette)
                 }
+                SmallBodyTailCard(detail: snapshot?.current.smallBody)
                 ObjectDetailPhotographyCard(object: object, snapshot: snapshot, lens: app.lensSetup,
                                             timeZone: context?.timeZone ?? .autoupdatingCurrent)
                 if ObjectDetailAboutCard.hasContent(for: object) {
@@ -53,7 +54,7 @@ private struct ObjectDetailContent: View {
             .padding(.vertical, 12)
         }
         .screenBackground(palette)
-        .navigationTitle(object.name)
+        .navigationTitle(SmallBodyText.displayName(object))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: context) {
             await keepSnapshotFresh(for: context)
@@ -147,7 +148,7 @@ struct ObjectDetailHeader: View {
         Button {
             app.aim(at: object)
         } label: {
-            Label("Aim at \(object.name)", systemImage: "scope")
+            Label("Aim at \(SmallBodyText.displayName(object))", systemImage: "scope")
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)

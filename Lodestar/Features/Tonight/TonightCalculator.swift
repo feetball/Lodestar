@@ -26,11 +26,16 @@ enum TonightCalculator {
         let tonightStart = localNoon(of: tonight, calendar: calendar)
         let nights = calendar.dateComponents([.day], from: calendar.startOfDay(for: tonightStart),
                                              to: calendar.startOfDay(for: summary.night.start)).day ?? 0
+        // Comets and asteroids are not deep-sky objects: they get their own card, and the clearly good ones join the
+        // targets.
+        let smallBodies = input.catalog.map { SmallBodyTonightPlanner.plan(catalog: $0, summary: summary, skyline: skyline) }
         return TonightReport(
             summary: summary, timeZone: context.timeZone,
             timeline: TonightTimelineModel(summary: summary, timeZone: context.timeZone),
-            targets: targets(for: summary, catalog: input.catalog, skyline: skyline),
-            tonightStart: tonightStart, nightsFromTonight: nights, appliesSkyline: skyline != nil)
+            targets: targets(for: summary, catalog: input.catalog, skyline: skyline,
+                             movingTargets: smallBodies?.targets ?? []),
+            tonightStart: tonightStart, nightsFromTonight: nights, appliesSkyline: skyline != nil,
+            smallBodies: smallBodies?.bright)
     }
 
     /// An instant on the date of the night that is under way at `now`, or of the coming night once the Sun
@@ -54,11 +59,11 @@ enum TonightCalculator {
 
     // MARK: Best targets
 
-    private static func targets(for summary: NightSummary, catalog: Catalog?,
-                                skyline: HorizonProfile?) -> TonightTargetsOutcome {
+    private static func targets(for summary: NightSummary, catalog: Catalog?, skyline: HorizonProfile?,
+                                movingTargets: [TonightTarget]) -> TonightTargetsOutcome {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
-        return .ranked(rankedTargets(in: catalog, summary: summary, skyline: skyline))
+        return .ranked(movingTargets + rankedTargets(in: catalog, summary: summary, skyline: skyline))
     }
 
     /// The listed deep-sky objects that climb to at least `minimumTargetAltitude` in the dark, best first, at

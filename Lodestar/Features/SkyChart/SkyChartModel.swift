@@ -23,6 +23,8 @@ struct SkyChartSelection: Equatable {
     var horizontal: HorizontalCoordinate
     /// The current magnitude, when known (the Sun, Moon and planets change theirs).
     var magnitude: Double?
+    /// Distance, elongation and warnings of a selected comet or asteroid; `nil` for any other object.
+    var smallBody: SmallBodyInfo?
 }
 
 /// Builds the sky chart's scene off the main actor and holds what the chart shows: the scene,
@@ -128,7 +130,8 @@ final class SkyChartModel {
     private static func selection(for object: CelestialObject, in scene: SkyChartScene) -> SkyChartSelection {
         let frame = SkyFrame(date: scene.date, observer: scene.observer)
         return SkyChartSelection(object: object, horizontal: frame.horizontal(of: object, refraction: true),
-                                 magnitude: frame.currentMagnitude(of: object))
+                                 magnitude: frame.currentMagnitude(of: object),
+                                 smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) })
     }
 
     // MARK: Zoom and pan

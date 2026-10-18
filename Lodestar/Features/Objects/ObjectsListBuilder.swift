@@ -30,6 +30,8 @@ struct ObjectsListSection: Identifiable, Sendable {
         case favorites
         case recent
         case group(ObjectGroup)
+        /// The comets or the asteroids, which the Solar System group holds besides the Sun, the Moon and the planets.
+        case smallBodies(ObjectCategory)
         case prominence(Prominence)
         case all
         case results
@@ -37,6 +39,8 @@ struct ObjectsListSection: Identifiable, Sendable {
 
     let kind: Kind
     let objects: [CelestialObject]
+    /// Favorite comets and asteroids that have no current orbit: listed after `objects` with "no current orbit".
+    var unavailable: [String] = []
 
     var id: Kind { kind }
 
@@ -45,6 +49,7 @@ struct ObjectsListSection: Identifiable, Sendable {
         case .favorites: return "Favorites"
         case .recent: return "Recent"
         case .group(let group): return group.displayName
+        case .smallBodies(let category): return "\(category.displayName)s"
         case .prominence(let prominence): return Self.title(of: prominence)
         case .all: return "All Objects"
         case .results: return "Results"
@@ -56,6 +61,7 @@ struct ObjectsListSection: Identifiable, Sendable {
         case .favorites: return "star.fill"
         case .recent: return "clock"
         case .group(let group): return group.systemImageName
+        case .smallBodies(let category): return category.systemImageName
         case .prominence(let prominence): return Self.systemImage(of: prominence)
         case .all: return "list.bullet"
         case .results: return "magnifyingglass"
@@ -107,8 +113,11 @@ enum ObjectsListBuilder {
         var sections: [ObjectsListSection] = []
         let favorites = ordered(resolved(favoriteIDs), by: effective.sortOrder, index: index, positions: positions,
                                 catalogue: effective.catalogue)
-        if !favorites.isEmpty {
-            sections.append(ObjectsListSection(kind: .favorites, objects: favorites))
+        // A favorite comet that dropped out of the orbit data stays, as "no current orbit", unless a filter is on.
+        let lostFavorites = effective.showsOnlyAboveHorizon || effective.showsOnlyPopular || effective.catalogue != .all
+            ? [] : SmallBodyFavorites.withoutOrbit(favoriteIDs: favoriteIDs, catalog: catalog)
+        if !favorites.isEmpty || !lostFavorites.isEmpty {
+            sections.append(ObjectsListSection(kind: .favorites, objects: favorites, unavailable: lostFavorites))
         }
         // Recents keep their most-recent-first order whatever the sort order is.
         let recents = resolved(recentIDs)
@@ -135,7 +144,19 @@ enum ObjectsListBuilder {
             let byGroup = Dictionary(grouping: visible, by: \.group)
             for group in ObjectGroup.allCases {
                 guard let members = byGroup[group] else { continue }
-                sections.append(ObjectsListSection(kind: .group(group), objects: sorted(members)))
+                guard group == .solarSystem else {
+                    sections.append(ObjectsListSection(kind: .group(group), objects: sorted(members)))
+                    continue
+                }
+                // The Solar System group holds the comets and asteroids too: they get a section each.
+                let parts: [(ObjectsListSection.Kind, [CelestialObject])] = [
+                    (.group(group), members.filter { $0.smallBody == nil }),
+                    (.smallBodies(.comet), members.filter { $0.category == .comet }),
+                    (.smallBodies(.asteroid), members.filter { $0.category == .asteroid }),
+                ]
+                for (kind, part) in parts where !part.isEmpty {
+                    sections.append(ObjectsListSection(kind: kind, objects: sorted(part)))
+                }
             }
         case .prominence:
             let byProminence = Dictionary(grouping: visible, by: \.prominence)
@@ -154,8 +175,9 @@ enum ObjectsListBuilder {
         if options.showsOnlyAboveHorizon, positions[object.id]?.isAboveHorizon != true {
             return false
         }
-        if options.hidesFaintObjects, let magnitude = object.magnitude,
-           magnitude > ObjectsListOptions.faintMagnitudeLimit {
+        // A comet or an asteroid has no catalog magnitude: its current one decides.
+        let magnitude = object.magnitude ?? (object.smallBody == nil ? nil : positions[object.id]?.magnitude)
+        if options.hidesFaintObjects, let magnitude, magnitude > ObjectsListOptions.faintMagnitudeLimit {
             return false
         }
         if options.showsOnlyPopular, object.prominence > ObjectsListOptions.popularProminence {

@@ -179,6 +179,9 @@ struct SkyChartSurface: View {
             parts.append("The Sun, Moon and planets are all below the horizon.")
         }
         parts += visibleBodies.map(description(of:))
+        if let smallBodies = SmallBodyChartMarkers.spokenSummary(content.scene.smallBodies) {
+            parts.append(smallBodies)
+        }
         let deepSkyCount = content.scene.deepSky.count
         if layers.deepSkyObjects, deepSkyCount > 0 {
             parts.append("\(deepSkyCount) deep-sky \(deepSkyCount == 1 ? "object" : "objects") above the horizon are drawn.")
@@ -213,6 +216,13 @@ struct SkyChartSurface: View {
                     .accessibilityHint("Shows the object's card")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { model.select(body.object) }
+            }
+            ForEach(content.scene.smallBodies) { marker in
+                Color.clear
+                    .accessibilityLabel(SmallBodyChartMarkers.description(marker))
+                    .accessibilityHint("Shows the object's card")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { model.select(marker.object) }
             }
         }
     }

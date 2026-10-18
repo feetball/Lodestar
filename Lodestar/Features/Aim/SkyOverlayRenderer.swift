@@ -2,7 +2,7 @@ import SwiftUI
 import LodestarKit
 
 /// Paints one frame of the sky overlay: Milky Way, grid, constellations, horizon, deep-sky objects, stars, planets,
-/// the ground below the recorded skyline, the panels of a mosaic, the DSLR frame, the target (or the panel being
+/// comets and asteroids, the ground below the recorded skyline, the panels of a mosaic, the DSLR frame, the target (or the panel being
 /// aimed at) and the reticle, followed by their labels.
 ///
 /// Everything is projected with the phone's own back camera, the heading offset applied and the DSLR's device
@@ -97,6 +97,7 @@ struct SkyOverlayRenderer {
         drawDeepSky(in: context)
         drawStars(in: context)
         drawBodies(in: context)
+        drawSmallBodies(in: context)
         drawSkyline(in: context)
         drawMosaic(in: context)
         drawDSLRFrame(in: context)
