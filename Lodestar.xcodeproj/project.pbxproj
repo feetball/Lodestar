@@ -440,7 +440,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lodestar shows the live camera view behind its sky overlay so you can line up your tripod. Video is processed on your iPhone only and is never recorded, stored, or shared.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never collected or tracked.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never tracked, and it leaves your iPhone only for the optional cloud forecast, rounded to about 10 km.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "magnetometer gyroscope accelerometer";
@@ -482,7 +482,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lodestar shows the live camera view behind its sky overlay so you can line up your tripod. Video is processed on your iPhone only and is never recorded, stored, or shared.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never collected or tracked.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never tracked, and it leaves your iPhone only for the optional cloud forecast, rounded to about 10 km.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "magnetometer gyroscope accelerometer";

@@ -137,7 +137,8 @@ struct OnboardingPermissionsPage: View {
             systemImage: "location",
             title: "Where are you?",
             introduction: "Lodestar needs your position to work out where things are in your sky. It asks only while "
-                + "the app is open, an approximate position is enough, and it is never collected or tracked.") {
+                + "the app is open, an approximate position is enough, and it is never tracked. It stays on "
+                + "your iPhone; only the optional cloud forecast sends it, rounded to about 10 km.") {
             HStack {
                 status
                 Spacer(minLength: 0)
