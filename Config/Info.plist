@@ -15,6 +15,17 @@
 	     datagrams to every address of the subnet instead. -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lodestar connects to your telescope mount over your local network. Nothing is sent to the internet.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>net.kuecker.Lodestar</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lodestar</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
