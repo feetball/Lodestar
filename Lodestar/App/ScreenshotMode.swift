@@ -7,6 +7,10 @@ import LodestarKit
 ///
 ///     -LodestarScreenshot tab=aim date=2026-07-17T05:30:00Z lat=36.0544 lon=-112.1401 elevation=2130
 ///         site=Grand_Canyon tz=America/Phoenix target=special.galacticCenter pointing=171,17 night=0
+///
+/// The visual review adds `screen=<name>` (a sub-screen or sheet, see `ReviewScreen`), `comets=0|1` (add the comets of
+/// `ReviewFixtures`; on by default with `screen=`) and `review=1` (run the review driver, which pages the screen and
+/// reports its state, without a `screen=`). Unknown keys are ignored and an unknown screen name is no screen.
 struct ScreenshotMode {
     var tab: AppTab
     var date: Date
@@ -17,6 +21,14 @@ struct ScreenshotMode {
     /// Where the phone's back camera points (portrait, level).
     var pointing: HorizontalCoordinate?
     var nightMode: Bool
+    /// The sub-screen or sheet to open after launch (`screen=`), or `nil`.
+    var screen: ReviewScreen?
+    /// The name given with `screen=`, whether or not it is a known one.
+    var screenName: String?
+    /// Whether the comets of `ReviewFixtures` are added to the catalog.
+    var addsFixtureComets: Bool
+    /// Whether the review driver runs (it pages the screen and reports its state for the capture script).
+    var runsReviewDriver: Bool
 
     static let current: ScreenshotMode? = ScreenshotMode(arguments: ProcessInfo.processInfo.arguments)
 
@@ -40,6 +52,10 @@ struct ScreenshotMode {
             return numbers.count == 2 ? HorizontalCoordinate(azimuth: numbers[0], altitude: numbers[1]) : nil
         }
         nightMode = values["night"] == "1"
+        screenName = values["screen"]
+        screen = values["screen"].flatMap(ReviewScreen.init(name:))
+        addsFixtureComets = values["comets"] == "1" || (values["screen"] != nil && values["comets"] != "0")
+        runsReviewDriver = values["review"] == "1" || values["screen"] != nil
     }
 }
 #endif

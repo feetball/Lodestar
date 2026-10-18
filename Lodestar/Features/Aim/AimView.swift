@@ -23,6 +23,10 @@ private struct AimScreen: View {
 
     init(app: AppModel) {
         _model = State(initialValue: AimViewModel(app: app))
+        #if DEBUG
+        // The visual review opens the sheet it asks for (`screen=mosaic`, `screen=mount-sheet`).
+        _sheet = State(initialValue: ScreenshotMode.current?.screen?.aimSheet)
+        #endif
     }
 
     /// The sensors, the timelines and the audio run only while this tab is showing and the app is in front.

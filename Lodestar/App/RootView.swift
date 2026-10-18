@@ -11,7 +11,9 @@ struct RootView: View {
         let palette = app.palette
 
         Group {
-            if app.settings.hasCompletedOnboarding {
+            if let host = reviewHost {
+                host
+            } else if app.settings.hasCompletedOnboarding {
                 TabView(selection: $app.selectedTab) {
                     AimView()
                         .tabItem { Label(AppTab.aim.title, systemImage: AppTab.aim.systemImage) }

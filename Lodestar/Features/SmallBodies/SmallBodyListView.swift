@@ -89,7 +89,12 @@ struct SmallBodyListView: View {
 
     @State private var period = SmallBodyListPeriod.now
     @State private var limit = SmallBodyMagnitudeLimit.default
+    #if DEBUG
+    // The visual review opens the list of asteroids (`screen=asteroids-list`).
+    @State private var kind = ScreenshotMode.current?.screen?.listKind ?? SmallBodyListKind.comets
+    #else
     @State private var kind = SmallBodyListKind.comets
+    #endif
     /// The rows; `nil` while they are being worked out.
     @State private var entries: [SmallBodyListEntry]?
 

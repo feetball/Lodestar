@@ -110,7 +110,8 @@ final class AppModel {
             settings.locationSource = .site(site.id)
         }
         settingsStore.settings = settings
-        selectedTab = demo.tab
+        selectedTab = demo.screen?.tab ?? demo.tab
+        if demo.addsFixtureComets { catalog.setDownloadedSmallBodies(ReviewFixtures.comets) }
         clock.freeze(at: demo.date)
         if let pointing = demo.pointing { motion.useScreenshotPointing(pointing) }
     }
@@ -183,6 +184,9 @@ final class AppModel {
         }
         #endif
         evaluateSun(force: true)
+        #if DEBUG
+        ReviewDriver.shared.start(app: self)
+        #endif
     }
 
     func handleScenePhase(_ phase: ScenePhase) {

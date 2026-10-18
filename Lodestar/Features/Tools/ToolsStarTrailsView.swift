@@ -45,6 +45,10 @@ private struct ToolsStarTrailsForm: View {
     init(myCamera: LensSetup) {
         self.myCamera = myCamera
         _trail = State(initialValue: ToolsTrailInputs(camera: myCamera))
+        #if DEBUG
+        // The visual review opens the time-lapse plan (`screen=time-lapse`).
+        if ScreenshotMode.current?.screen == .timeLapse { _mode = State(initialValue: .timeLapse) }
+        #endif
     }
 
     /// What the sky information depends on.
