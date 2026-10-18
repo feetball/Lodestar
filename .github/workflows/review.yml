@@ -45,7 +45,7 @@ jobs:
           import WidgetKit
 
           private struct ReviewWidgetFamilyKey: EnvironmentKey {
-              static let defaultValue = WidgetFamily.systemSmall
+              static let defaultValue = WidgetFamily.accessoryRectangular
           }
 
           extension EnvironmentValues {
