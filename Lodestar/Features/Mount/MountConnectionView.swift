@@ -385,7 +385,7 @@ private struct MountConnectSection: View {
         let address = MountAddress(text: form.host, defaultPort: form.port)
         let canConnect = !address.host.isEmpty && (1...65_535).contains(address.port)
         let isLost: Bool = {
-            if case .lost = service.connection { return true }
+            if case .lost = service.connection { return !service.isDemo }
             return false
         }()
         SettingsSection(title: "Connect",

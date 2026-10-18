@@ -68,7 +68,7 @@ struct MountAimStrip: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button {
-                    service.connect(observer: app.observerContext?.observer)
+                    service.reconnect(observer: app.observerContext?.observer)
                 } label: {
                     Label("Reconnect", systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)

@@ -299,9 +299,7 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
         case .dns(let code):
             // kDNSServiceErr_PolicyDenied: the person said no to the local network question.
             return code == -65_570 ? "Local Network access is off for Lodestar" : "the address was not found"
-        case .tls:
-            return "a secure connection failed"
-        @unknown default:
+        default:
             return "a network error"
         }
     }

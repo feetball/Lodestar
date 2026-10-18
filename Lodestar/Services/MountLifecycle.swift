@@ -7,7 +7,7 @@ final class MountLifecycle {
     private var backgroundTask = UIBackgroundTaskIdentifier.invalid
 
     /// - Parameter onBackground: Called on the main actor when the app has moved to the background.
-    init(onBackground: @escaping @MainActor () -> Void) {
+    init(onBackground: @escaping @MainActor @Sendable () -> Void) {
         NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil,
                                                queue: .main) { _ in
             MainActor.assumeIsolated { onBackground() }

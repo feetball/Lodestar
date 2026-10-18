@@ -214,6 +214,16 @@ final class MountService {
         startConnection(option: option, form: form, observer: observer, isDemo: false)
     }
 
+    /// Connects again after the connection was lost: to the simulated mount if that was the one, else to the mount chosen
+    /// on the connection screen.
+    func reconnect(observer: Observer?) {
+        if isDemo {
+            connectDemo(observer: observer)
+        } else {
+            connect(observer: observer)
+        }
+    }
+
     /// Connects to the simulated mount.
     func connectDemo(observer: Observer?) {
         startConnection(option: .demo, form: MountConnectionForm(option: .demo), observer: observer, isDemo: true)

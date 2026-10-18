@@ -13,8 +13,10 @@ extension AimViewModel {
     /// The marker for the mount's reported position, or `nil` without a connected mount or a location. Cheap enough to ask
     /// for every frame: the direction is worked out at most once a second.
     func mountMarker() -> AimMountMarker? {
-        guard let observer = app.observerContext?.observer,
-              let found = MountService.shared.overlayDirection(observer: observer, at: Date()) else { return nil }
+        // Most people have no mount: answer that before doing any work.
+        let service = MountService.shared
+        guard service.isConnected, let observer = app.observerContext?.observer,
+              let found = service.overlayDirection(observer: observer, at: Date()) else { return nil }
         return AimMountMarker(direction: found.direction, isMoving: found.isMoving)
     }
 }
