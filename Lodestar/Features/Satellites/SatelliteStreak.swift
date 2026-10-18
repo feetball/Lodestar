@@ -34,9 +34,9 @@ final class SatelliteStreakMonitor {
     var isSheetPresented = false
 
     /// The shortest exposure considered, in seconds.
-    static let minimumExposure = 1
+    nonisolated static let minimumExposure = 1
     /// The longest, in seconds: long exposures are the tracker's business, not the plain tripod's.
-    static let maximumExposure = 120
+    nonisolated static let maximumExposure = 120
 
     private static let interval: TimeInterval = 1
     private static let reuseAge: TimeInterval = 3
@@ -89,8 +89,9 @@ final class SatelliteStreakMonitor {
            lens == lastLens, target?.id == lastTargetID {
             return
         }
-        guard let cameraFrame = CameraFrame(solution: frame.pointing, widthDegrees: configuration.lensFrame.horizontal,
-                                            heightDegrees: configuration.lensFrame.vertical) else {
+        // The engine's frame (not the app's own `CameraFrame`, the camera picture).
+        guard let cameraFrame = LodestarKit.CameraFrame(solution: frame.pointing, widthDegrees: configuration.lensFrame.horizontal,
+                                                        heightDegrees: configuration.lensFrame.vertical) else {
             clear()
             return
         }
