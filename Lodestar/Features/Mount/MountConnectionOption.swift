@@ -141,8 +141,7 @@ enum MountDiscoveryKind: Sendable {
             }
             return """
                 No Sky-Watcher mount answered. Check that the mount is switched on and the phone is on its Wi-Fi \
-                network, or type its address. If iOS asked whether Lodestar may use the local network, it must be \
-                allowed: a refusal looks like a mount that does not answer.
+                network, or type its address.
                 """
         }
     }
