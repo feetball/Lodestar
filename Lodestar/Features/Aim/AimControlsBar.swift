@@ -72,23 +72,22 @@ struct AimControlsBar: View {
     }
 }
 
-/// Shows the field of view along the screen's long side and steps the zoom of the virtual sky through its presets.
-/// With the camera picture the field of view is the camera's and cannot be changed.
+/// Steps the zoom through its presets: the camera picture's zoom (shown as "2×") while it is behind the sky, else
+/// the virtual sky's field of view along the screen's long side (shown in degrees).
 private struct AimFieldOfViewButton: View {
     let model: AimViewModel
     let minHeight: CGFloat
 
     var body: some View {
         let usesCamera = model.cameraGeometry != nil
-        let fieldOfView = model.fieldOfView
-        let next = model.nextFieldOfViewPreset
         Button {
-            model.stepFieldOfView()
+            model.stepZoom()
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: next < model.virtualFieldOfView ? "plus.magnifyingglass" : "minus.magnifyingglass")
+                Image(systemName: model.nextZoomStepZoomsIn ? "plus.magnifyingglass" : "minus.magnifyingglass")
                     .font(.system(size: 20, weight: .medium))
-                Text(AngleFormatter.formatDegrees(fieldOfView, decimals: 0))
+                Text(usesCamera ? Self.zoomText(model.cameraZoom)
+                     : AngleFormatter.formatDegrees(model.fieldOfView, decimals: 0))
                     .font(.caption2.weight(.semibold).monospacedDigit())
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -96,9 +95,19 @@ private struct AimFieldOfViewButton: View {
             .padding(.horizontal, 2)
         }
         .buttonStyle(AimControlButtonStyle(minHeight: minHeight))
-        .disabled(usesCamera)
         .accessibilityLabel("Zoom")
-        .accessibilityValue("\(usesCamera ? "Camera field of view" : "Field of view") \(AimFormat.spoken(fieldOfView))")
-        .accessibilityHint(usesCamera ? "" : "Changes the field of view to \(AimFormat.spoken(next)).")
+        .accessibilityValue(usesCamera
+                            ? "Camera zoom \(Self.zoomText(model.cameraZoom)), field of view \(AimFormat.spoken(model.fieldOfView))"
+                            : "Field of view \(AimFormat.spoken(model.fieldOfView))")
+        .accessibilityHint(usesCamera
+                           ? "Changes the camera zoom to \(Self.zoomText(model.nextCameraZoomPreset))."
+                           : "Changes the field of view to \(AimFormat.spoken(model.nextFieldOfViewPreset)).")
+    }
+
+    /// "2×", or "2.5×" between whole zooms.
+    private static func zoomText(_ factor: Double) -> String {
+        let rounded = (factor * 10).rounded() / 10
+        let digits = rounded == rounded.rounded() ? 0 : 1
+        return rounded.formatted(.number.precision(.fractionLength(digits))) + "\u{00D7}"
     }
 }

@@ -111,6 +111,12 @@ final class CameraService {
         }
     }
 
+    /// Zooms the picture by `factor` (1 = the camera's full field of view, at most `CameraEngine.maximumZoom`). It
+    /// is kept while the camera is stopped and applied when it starts; `geometry` follows with the frames.
+    func setZoom(_ factor: Double) {
+        engine.setZoom(factor)
+    }
+
     /// Stops the camera and clears the picture. Idempotent.
     func stop() {
         wantsRunning = false

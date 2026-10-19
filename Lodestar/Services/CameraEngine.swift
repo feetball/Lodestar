@@ -5,6 +5,7 @@ import CoreImage.CIFilterBuiltins
 import CoreMedia
 import Foundation
 import ImageIO
+import LodestarKit
 import os
 
 /// One processed camera frame, upright in portrait. `CGImage` is immutable; the wrapper keeps the hand-off
@@ -50,13 +51,15 @@ enum CameraEngineEvent: Sendable, Equatable {
 ///   `startRunning()` blocks, so session work never runs on the main thread.
 /// - `frameQueue` (serial, as AVFoundation requires): `redFilter`, `appliedIntensity`, `lastFrameTime`,
 ///   `publishedSize`. `CMSampleBuffer`, `CVPixelBuffer` and `CIFilter` never leave it.
-/// - locks: `nightIntensity`, `frameSink`, `longSideFieldOfView`.
+/// - locks: `nightIntensity`, `frameSink`, `longSideFieldOfView`, `requestedZoom`.
 final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutputSampleBufferDelegate {
     /// Frames are skipped when closer together than this, a little under 1/30 s so a 30 fps camera passes every
     /// frame while a faster one is thinned to about 30 fps.
     private static let minimumFrameInterval = 0.030
     /// Longest auto-exposure time allowed for the night preview (bounded by what the format supports).
     private static let nightExposureCeiling = CMTime(value: 1, timescale: 4)
+    /// The most the picture is zoomed (digitally, on the wide camera), whatever the format would allow.
+    static let maximumZoom = 8.0
 
     /// Session events in order; never finishes.
     let events: AsyncStream<CameraEngineEvent>
@@ -73,6 +76,7 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
     private let nightIntensity = OSAllocatedUnfairLock<Double?>(initialState: nil)
     private let frameSink = OSAllocatedUnfairLock<AsyncStream<CameraFrame>.Continuation?>(initialState: nil)
     private let longSideFieldOfView = OSAllocatedUnfairLock<Double?>(initialState: nil)
+    private let requestedZoom = OSAllocatedUnfairLock<Double>(initialState: 1)
 
     // sessionQueue only
     private var camera: AVCaptureDevice?
@@ -147,6 +151,20 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         }
     }
 
+    /// Zooms the picture by `factor` (1 = the full field of view), limited to what the format allows and to
+    /// `maximumZoom`. The geometry of the following frames reports the narrower field of view.
+    func setZoom(_ factor: Double) {
+        guard factor.isFinite else { return }
+        let changed = requestedZoom.withLock { current -> Bool in
+            defer { current = factor }
+            return current != factor
+        }
+        guard changed else { return }
+        sessionQueue.async { [self] in
+            if isConfigured, let camera { applyZoom(to: camera) }
+        }
+    }
+
     // MARK: Session (sessionQueue)
 
     private func configuredCamera() throws -> AVCaptureDevice {
@@ -191,31 +209,42 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         connection.preferredVideoStabilizationMode = .off // stabilization crops the field of view and adds latency
     }
 
-    /// Fixes the optics (zoom 1×) and records the field of view that geometry is derived from.
+    /// Fixes the optics (the requested zoom) and records the field of view that geometry is derived from.
     private func prepare(_ device: AVCaptureDevice) {
-        _ = recordFieldOfView(of: device)
-        if (try? device.lockForConfiguration()) != nil {
-            device.videoZoomFactor = 1
-            device.unlockForConfiguration()
-        }
+        applyZoom(to: device)
         applyExposureCeiling(to: device, force: true)
     }
 
     /// Runs once the session is running: a format change made by the session invalidates the exposure ceiling
-    /// and may change the field of view, in which case the next frame publishes its geometry again.
+    /// and the zoom and may change the field of view, in which case the next frame publishes its geometry again.
     private func settleOptics(of device: AVCaptureDevice) {
-        if recordFieldOfView(of: device) { resetFrameState(keepFrameTimes: true) }
+        applyZoom(to: device)
         applyExposureCeiling(to: device, force: true)
     }
 
-    /// Stores the field of view across the long side of the active format; `true` if it changed.
+    /// Sets the requested zoom, within the format's limits, and records the resulting field of view; the next frame
+    /// publishes its geometry again if that changed.
+    private func applyZoom(to device: AVCaptureDevice) {
+        let maximum = min(Double(device.activeFormat.videoMaxZoomFactor), Self.maximumZoom)
+        let factor = AstroMath.clamp(requestedZoom.withLock { $0 }, 1, max(maximum, 1))
+        if (try? device.lockForConfiguration()) != nil {
+            device.videoZoomFactor = CGFloat(factor)
+            device.unlockForConfiguration()
+        }
+        if recordFieldOfView(of: device) { resetFrameState(keepFrameTimes: true) }
+    }
+
+    /// Stores the field of view across the long side of the active format at the current zoom; `true` if it changed.
     private func recordFieldOfView(of device: AVCaptureDevice) -> Bool {
         let format = device.activeFormat
         // With geometric distortion correction on (the default where supported) the corrected field of view applies.
         let fieldOfView = device.isGeometricDistortionCorrectionEnabled
             ? format.geometricDistortionCorrectedVideoFieldOfView
             : format.videoFieldOfView
-        let value = fieldOfView > 0 ? Double(fieldOfView) : nil // 0 means unknown
+        // Zooming crops the centre of the picture: the tangent of the half-angle shrinks by the zoom factor.
+        let zoom = max(Double(device.videoZoomFactor), 1)
+        let zoomed = AstroMath.degrees(2 * atan(tan(AstroMath.radians(Double(fieldOfView)) / 2) / zoom))
+        let value = fieldOfView > 0 ? zoomed : nil // 0 means unknown
         return longSideFieldOfView.withLock { current in
             defer { current = value }
             return current != value
