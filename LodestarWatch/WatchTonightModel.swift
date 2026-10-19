@@ -34,24 +34,37 @@ final class WatchTonightModel {
         locator.requestAuthorization()
     }
 
-    /// Works out the entries again for the current place and asks the complications to do the same.
+    /// Works out the entries again for the current place and asks the complications to do the same. A place the iPhone
+    /// sends meanwhile makes it start over, so that it never shows what was worked out for the place before.
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        let (place, now) = await placeAndDate()
-        guard let place else {
+        var phone: TonightPlace?
+        var computed: [TonightEntry]?
+        repeat {
+            phone = phonePlace
+            computed = await entriesForCurrentPlace()
+        } while phonePlace != phone
+        guard let computed else {
             entries = []
             needsLocation = true
             isLoading = false
             return
         }
-        entries = await Task.detached(priority: .userInitiated) {
-            TonightBuilder.entries(for: place, from: now)
-        }.value
+        entries = computed
         needsLocation = false
         isLoading = false
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// The entries for the current place, or `nil` without a place.
+    private func entriesForCurrentPlace() async -> [TonightEntry]? {
+        let (place, now) = await placeAndDate()
+        guard let place else { return nil }
+        return await Task.detached(priority: .userInitiated) {
+            TonightBuilder.entries(for: place, from: now)
+        }.value
     }
 
     /// The place to work for and the moment to start from. (The visual review of the Simulator fixes both.)
@@ -67,6 +80,7 @@ final class WatchTonightModel {
         guard place != phonePlace else { return }
         phonePlace = place
         TonightPlaceStore.save(place, as: .phone)
+        // A refresh already under way sees the new place and starts over.
         await refresh()
     }
 }

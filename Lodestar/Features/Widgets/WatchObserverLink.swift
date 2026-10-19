@@ -24,6 +24,8 @@ final class WatchObserverLink {
 
     private var delegate: SessionDelegate?
     private var payload: Payload?
+    /// What the active watch was last sent, so that an unchanged observer is not sent again; forgotten when the
+    /// session or the watch changes.
     private var lastSent: Payload?
 
     private init() {}
@@ -49,12 +51,20 @@ final class WatchObserverLink {
     private func activateIfNeeded() {
         guard delegate == nil else { return }
         let delegate = SessionDelegate { [weak self] in
-            Task { @MainActor [weak self] in self?.flush() }
+            Task { @MainActor [weak self] in self?.sessionChanged() }
         }
         self.delegate = delegate
         let session = WCSession.default
         session.delegate = delegate
         session.activate()
+    }
+
+    /// The session has been activated (again) or the watch's state has changed: another paired watch may be the
+    /// active one now, or the watch app may have been installed again, so the observer is sent even if it is the one
+    /// sent before.
+    private func sessionChanged() {
+        lastSent = nil
+        flush()
     }
 
     private func flush() {
