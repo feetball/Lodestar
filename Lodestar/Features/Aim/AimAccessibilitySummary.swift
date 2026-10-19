@@ -18,7 +18,12 @@ struct AimAccessibilitySummary: View {
 
     private func summary() -> String {
         guard let frame = model.engine.frame() else { return "Waiting for the motion sensors." }
-        guard let target = model.guidanceTarget else { return "No target. Use the Target button to choose one." }
+        guard let target = model.guidanceTarget else {
+            if let nearby = model.nearbyObject(in: frame) {
+                return "No target. Near \(nearby.name), \(AimFormat.spoken(nearby.separation)) from center."
+            }
+            return "No target. Use the Target button to choose one."
+        }
         guard let guidance = frame.guidance else { return "Locating \(target.name)." }
         let summary = AimGuidanceSummary(guidance)
         let note = summary.isBelowHorizon ? " Below the horizon." : ""

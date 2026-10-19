@@ -62,8 +62,15 @@ struct TonightTimelineModel: Sendable {
     let coreVisible: [DateInterval]
     /// The part of `coreVisible` in which the Moon is down too.
     let coreMoonFree: [DateInterval]
-    /// Whole hours for the time axis labels, spaced to fit.
-    let hourTicks: [Date]
+    /// A whole hour on the time axis.
+    struct HourTick: Sendable {
+        let date: Date
+        /// The hour of the day, 0–23, in the night's time zone.
+        let hour: Int
+    }
+
+    /// Every whole hour inside `range`; the drawing labels as many as fit.
+    let hourTicks: [HourTick]
 
     init(summary: NightSummary, timeZone: TimeZone) {
         let twilight = summary.twilight
@@ -111,22 +118,23 @@ struct TonightTimelineModel: Sendable {
         intervals.compactMap { $0.intersection(with: range) }.filter { $0.duration > 0 }
     }
 
-    /// The whole hours inside `range` that get a label: every hour, or every second, third, fourth or sixth
-    /// hour when the night is long.
-    private static func hourTicks(in range: DateInterval, calendar: Calendar) -> [Date] {
-        let hours = range.duration / 3600
-        let spacing = [1, 2, 3, 4].first { hours / Double($0) <= 7.5 } ?? 6
-        var ticks: [Date] = []
+    /// The whole hours inside `range`.
+    private static func hourTicks(in range: DateInterval, calendar: Calendar) -> [HourTick] {
+        var ticks: [HourTick] = []
         var cursor = range.start
         for _ in 0..<48 {
             guard let next = calendar.nextDate(after: cursor, matching: DateComponents(minute: 0, second: 0),
                                                matchingPolicy: .nextTime),
                   next < range.end else { break }
-            if calendar.component(.hour, from: next) % spacing == 0 {
-                ticks.append(next)
-            }
+            ticks.append(HourTick(date: next, hour: calendar.component(.hour, from: next)))
             cursor = next
         }
         return ticks
+    }
+
+    /// Hours between labels so that labels `labelWidth` points wide keep a `gap` between them on an axis that
+    /// gives each hour `pointsPerHour`: every hour, or every second, third, fourth, sixth or twelfth hour.
+    static func labelSpacing(pointsPerHour: CGFloat, labelWidth: CGFloat, gap: CGFloat) -> Int {
+        [1, 2, 3, 4, 6].first { pointsPerHour * CGFloat($0) >= labelWidth + gap } ?? 12
     }
 }
