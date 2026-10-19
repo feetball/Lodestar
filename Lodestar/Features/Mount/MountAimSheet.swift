@@ -18,11 +18,7 @@ struct MountAimSheet: View {
                     MountConnectionView()
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            .sheetToolbar(confirm: "Done", onConfirm: { dismiss() })
         }
         .background(palette.background)
         .foregroundStyle(palette.primaryText)
@@ -76,6 +72,7 @@ private struct MountControlPanel: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $confirmation) { confirmation in
             MountConfirmationSheet(confirmation: confirmation)
+                .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }

@@ -1,0 +1,222 @@
+# Night chrome experiment: which way of turning the system chrome of iOS 26 red at night works best?
+#
+# Night mode must be pure red on black (green and blue at zero). With the iOS 26 SDK the system chrome ignores the palette:
+# the glass tab bar, the back button, the Done capsule, switches, segmented pickers, the Objects search field, the large
+# titles, slider ticks and chevrons come out white or grey. This workflow builds the app once (Debug, Simulator) and
+# photographs the same eight night screens (Tools/review/shots-chrome.txt) once per variant on an iPhone 17 Pro Simulator.
+# A variant is chosen with the launch argument nightchrome=<tokens joined by +> (Lodestar/Theme/NightChrome.swift):
+#
+#   base        today's behaviour; the control run and the layout reference
+#   ovl         the SwiftUI Color.red multiply overlay forced on at night (ovl-g: with a compositing group under it), and
+#               themedRoot on the three nested mount sheets
+#   win         a red multiply UIView over every app window (Lodestar/Theme/NightWindowFilter.swift)
+#   win-t       win plus transparent navigation and tab bar appearances, for the missing large title
+#   t           only the transparent bar appearances
+#   compat      UIDesignRequiresCompatibility=YES added to the Info.plist of the built app before the first install
+#   compat-win  compat plus win, to see what is left over for the window filter
+#   ctl         palette-drawn replacements: tab bar, back button, Done/Cancel/Save, switch, segmented picker, search
+#               field, slider, inline titles, placeholders (Lodestar/Theme/NightControls.swift, NightBars.swift)
+#
+# How to read it. Each variant uploads an artifact chrome-<variant> with the pictures (<shot>-n-1.png), one
+# <shot>-n.chrome-log.txt per shot (what the app says it did: no "win:", "ovl:" or "t:" line means the variant was not
+# active and the picture is base; the "hit" lines show which view a touch at three places would reach, it must never be
+# NightFilterView) and leaks.txt, the output of
+#
+#     python3 Tools/review/night_leaks.py <pictures> --ignore-top 150
+#
+# which counts, per picture, the pixels whose green or blue channel is above 24 below the status bar (the status bar is
+# white in the Simulator and hidden at night in real use). The job summary of each variant shows the same lines. Compare
+# the counts with base: zero is the goal, equal to base means the variant did nothing. Two things the count cannot see:
+#   - a SOLID RED picture (win when the blend filter is ignored) also has zero leaks, so look at the pictures: the content
+#     must still be there (cards, text, the selected tab) and most of the screen black;
+#   - the large title in Objects and Settings (y 150-450) and the thumb of an on-switch must be visible, and selected and
+#     unselected tab items or segments must still be told apart. Cut those regions out with pngtool crop --scale 2.
+# Decision order: win (win-t if the title band is empty), ovl if it works (it is preferred over win), compat as a stop-gap,
+# ctl for what the others cannot fix. See the plan in the review results for the full success criteria.
+name: Review Chrome
+
+on:
+  push:
+    branches: [ios-night-chrome-exp]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: review-chrome-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      # Real element sets of 2026-10-18 for the satellite screens (the app has no network in the review).
+      - name: Add the satellite fixtures to the app (review build only)
+        run: |
+          mkdir -p Lodestar/ReviewFixtures
+          cp LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_stations.json \
+             LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_omm_sample.json \
+             LodestarKit/Tests/LodestarKitTests/Fixtures/satellite_starlink_sample.json Lodestar/ReviewFixtures/
+
+      - name: Build the app for the Simulator (Debug)
+        run: |
+          set +e
+          xcodebuild build \
+            -project Lodestar.xcodeproj \
+            -scheme Lodestar \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+            SWIFT_OPTIMIZATION_LEVEL=-O \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet 2>&1 | tee "$RUNNER_TEMP/build.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "---- errors"
+          grep -E "error:" "$RUNNER_TEMP/build.log" | sort -u | head -60 || true
+          echo "---- warnings in the night chrome files"
+          grep -E "warning:" "$RUNNER_TEMP/build.log" | grep -E "Theme/Night|NightChrome|NightBars|NightControls" | sort -u | head -30 || true
+          exit "$status"
+
+      - name: Check the products
+        run: |
+          APP="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/Lodestar.app"
+          ls "$APP" "$APP/PlugIns"
+          lipo -archs "$APP/Lodestar" || true
+          du -sh "$APP"
+
+      - name: Pack the app
+        run: |
+          tar -C "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator" -cf "$RUNNER_TEMP/Lodestar.app.tar" Lodestar.app
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lodestar-chrome-app
+          path: ${{ runner.temp }}/Lodestar.app.tar
+          retention-days: 3
+          compression-level: 0
+
+  # One Simulator per variant, each with the same list of shots.
+  capture:
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: base
+            args: nightchrome=base
+            plist: "false"
+          - name: ovl
+            args: nightchrome=ovl
+            plist: "false"
+          - name: ovl-g
+            args: nightchrome=ovl+g
+            plist: "false"
+          - name: win
+            args: nightchrome=win
+            plist: "false"
+          - name: win-t
+            args: nightchrome=win+t
+            plist: "false"
+          - name: t
+            args: nightchrome=t
+            plist: "false"
+          - name: compat
+            args: nightchrome=compat
+            plist: "true"
+          - name: compat-win
+            args: nightchrome=compat+win
+            plist: "true"
+          - name: ctl
+            args: nightchrome=ctl
+            plist: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lodestar-chrome-app
+          path: ${{ runner.temp }}/app
+
+      - name: Boot a Simulator and install the app
+        env:
+          VARIANT: ${{ matrix.name }}
+          PATCH_PLIST: ${{ matrix.plist }}
+        run: |
+          tar -C "$RUNNER_TEMP/app" -xf "$RUNNER_TEMP/app/Lodestar.app.tar"
+          APP="$(find "$RUNNER_TEMP/app" -maxdepth 3 -name Lodestar.app -type d | head -n 1)"
+          echo "app $APP"
+          # The compatibility variants add the Info.plist key to the built app before it is installed, so that no
+          # install of the unpatched app exists to be cached.
+          if [ "$PATCH_PLIST" = true ]; then
+            /usr/libexec/PlistBuddy -c "Add :UIDesignRequiresCompatibility bool true" "$APP/Info.plist" \
+              || /usr/libexec/PlistBuddy -c "Set :UIDesignRequiresCompatibility true" "$APP/Info.plist"
+            /usr/libexec/PlistBuddy -c "Print :UIDesignRequiresCompatibility" "$APP/Info.plist"
+          fi
+          RUNTIME="$(xcrun simctl list runtimes | grep -E '^iOS ' | tail -n 1 | sed -E 's/.* - //')"
+          echo "runtime $RUNTIME"
+          UDID="$(xcrun simctl create review-chrome-$VARIANT com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro "$RUNTIME")"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b > /dev/null
+          xcrun simctl ui "$UDID" appearance dark
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 \
+            --cellularMode active --cellularBars 4 --wifiBars 3
+          xcrun simctl install "$UDID" "$APP"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/shots"
+          {
+            echo "variant=$VARIANT"
+            echo "plist_patched=$PATCH_PLIST"
+            echo "runtime=$RUNTIME"
+          } > "$RUNNER_TEMP/shots/variant.txt"
+
+      - name: Capture
+        env:
+          EXTRA_ARGS: ${{ matrix.args }}
+        run: bash Tools/review/capture.sh "$UDID" "$RUNNER_TEMP/shots" Tools/review/shots-chrome.txt n
+
+      # Informational: counts the pixels that are not red (needs numpy and Pillow, installed into a virtual environment).
+      - name: Count the pixels that are not red
+        if: always()
+        continue-on-error: true
+        env:
+          VARIANT: ${{ matrix.name }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet numpy pillow
+          "$RUNNER_TEMP/venv/bin/python" Tools/review/night_leaks.py "$RUNNER_TEMP/shots" --ignore-top 150 | tee "$RUNNER_TEMP/shots/leaks.txt"
+          {
+            echo "### $VARIANT"
+            echo '```'
+            cat "$RUNNER_TEMP/shots/leaks.txt"
+            echo '```'
+            echo '```'
+            cat "$RUNNER_TEMP"/shots/variant.txt "$RUNNER_TEMP"/shots/*.chrome-log.txt 2>/dev/null | sort | uniq -c | sort -rn | head -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: chrome-${{ matrix.name }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 7

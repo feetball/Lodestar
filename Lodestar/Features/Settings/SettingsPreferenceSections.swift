@@ -49,12 +49,8 @@ struct SettingsSkyDisplaySection: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Coordinates")
                     .accessibilityHidden(true)
-                Picker("Coordinates", selection: $store.settings.coordinateStyle) {
-                    ForEach(CoordinateStyle.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ThemedSegmentedPicker("Coordinates", selection: $store.settings.coordinateStyle,
+                                      options: CoordinateStyle.allCases, label: \.title)
             }
         }
     }

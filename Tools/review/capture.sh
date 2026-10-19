@@ -11,6 +11,9 @@
 #              moving: wait this long instead of waiting for it to settle
 # The fourth argument limits the run to one mode. A shot is written as <name>-<d|n>-<page>.png, the page counted from 1.
 # The review driver in the app (ReviewDriver) scrolls long screens one page at a time when told to.
+# The environment variable EXTRA_ARGS (optional) adds launch arguments to every shot, such as nightchrome=win for the night
+# chrome experiment (.github/workflows/review-chrome.yml). When the app wrote a chrome-log.txt (a Debug build does), it is
+# copied next to the picture as <name>-<d|n>.chrome-log.txt and printed.
 set -u
 
 UDID="$1"
@@ -19,6 +22,7 @@ SHOTS="$3"
 ONLY="${4:-dn}"
 BUNDLE=net.kuecker.Lodestar
 COMMON="date=2026-10-19T05:00:00Z lat=36.0544 lon=-112.1401 elevation=2130 site=Grand_Canyon tz=America/Phoenix pointing=350,38 review=1"
+COMMON="$COMMON ${EXTRA_ARGS:-}"
 
 mkdir -p "$OUT"
 FAILED=0
@@ -27,6 +31,14 @@ FAILED=0
 state_value() {
   [ -f "$DATA/Documents/review-state.txt" ] || return 0
   sed -n "s/^$1=//p" "$DATA/Documents/review-state.txt" | head -n 1
+}
+
+# copy_chrome_log <label>: the night chrome log of the app (chrome-log.txt in its Documents), if there is one, kept next to the
+# pictures and printed, so that a run can show which variant was really active.
+copy_chrome_log() {
+  [ -f "$DATA/Documents/chrome-log.txt" ] || return 0
+  cp "$DATA/Documents/chrome-log.txt" "$OUT/$1.chrome-log.txt"
+  sed "s/^/  chrome-log: /" "$DATA/Documents/chrome-log.txt"
 }
 
 # shoot <file>: one screenshot.
@@ -87,6 +99,8 @@ capture() {
     settle "$file"
   fi
   local total
+  copy_chrome_log "$name-$suffix"
+
   total="$(state_value pages)"
   [ -n "$total" ] || total=1
   [ "$total" -le "$pages" ] || total="$pages"

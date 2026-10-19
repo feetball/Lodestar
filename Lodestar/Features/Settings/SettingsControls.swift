@@ -78,9 +78,7 @@ struct SettingsSliderRow: View {
                     .foregroundStyle(palette.secondaryText)
             }
             .accessibilityHidden(true)
-            Slider(value: $value, in: range, step: step) {
-                Text(title)
-            }
+            ThemedSlider(title: title, value: $value, range: range, step: step)
             .accessibilityValue(valueText)
         }
     }
@@ -189,7 +187,7 @@ struct SettingsNumberField: View {
                     Text(prefix)
                         .foregroundStyle(palette.secondaryText)
                 }
-                TextField(title, text: $text, prompt: Text(placeholder))
+                TextField(title, text: $text, prompt: Text(placeholder).placeholder(palette))
                     .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
                     .submitLabel(.done)
                     .multilineTextAlignment(.trailing)

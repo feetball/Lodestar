@@ -1,0 +1,19 @@
+# name | modes (d day, n night) | launch arguments | options (pages=<n>, fixed=<seconds>)
+# The night chrome experiment (.github/workflows/review-chrome.yml): the eight screens that show the system chrome of iOS 26 in
+# night mode, page 1 only. The same list is run once per variant; the variant comes in through EXTRA_ARGS (nightchrome=<tokens>).
+#   tonight          the glass tab bar on a content-rich tab
+#   objects          large title, search field and filter capsule, tab bar
+#   settings         large title, switches, segmented pickers, sliders, disclosure chevrons, tab bar
+#   events-calendar  back button of a pushed screen, a switch, filter chips
+#   star-trails      back button, a segmented picker, slider rows
+#   mount-sheet      the Done capsule of a sheet (and a nested sheet)
+#   site-editor      Cancel and Save, text fields with placeholders, a segmented picker
+#   mosaic           Done, sliders with tick dots, a segmented picker, over the Aim tab (camera preview)
+tonight|n|tab=tonight comets=1 online=1|pages=1
+objects|n|tab=objects comets=1|pages=1
+settings|n|tab=settings online=1|pages=1
+events-calendar|n|screen=events-calendar|pages=1
+star-trails|n|screen=star-trails|pages=1
+mount-sheet|n|screen=mount-sheet target=special.ncp|pages=1
+site-editor|n|screen=site-editor|pages=1
+mosaic|n|screen=mosaic target=dso.M31|pages=1

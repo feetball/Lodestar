@@ -80,20 +80,8 @@ struct SiteEditor: View {
             .disabled(isSaving)
             .navigationTitle(existingSite == nil ? "New Site" : "Edit Site")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if isSaving {
-                        ProgressView()
-                            .tint(palette.accent)
-                    } else {
-                        Button("Save") { save() }
-                            .disabled(draft.location == nil)
-                    }
-                }
-            }
+            .sheetToolbar(cancel: "Cancel", confirm: "Save", isBusy: isSaving, canConfirm: draft.location != nil,
+                          onCancel: { dismiss() }, onConfirm: { save() })
             .task(id: lookupKey) {
                 await lookUpTimeZone()
             }
@@ -320,7 +308,7 @@ private struct SiteCoordinateField: View {
             Text(title)
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-            TextField(title, text: $text, prompt: Text(prompt))
+            TextField(title, text: $text, prompt: Text(prompt).placeholder(palette))
                 .keyboardType(.numbersAndPunctuation)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)

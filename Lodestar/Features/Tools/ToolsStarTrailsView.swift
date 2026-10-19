@@ -61,12 +61,7 @@ private struct ToolsStarTrailsForm: View {
     var body: some View {
         Form {
             SettingsSection(title: "Plan") {
-                Picker("Plan", selection: $mode) {
-                    ForEach(ToolsPlannerMode.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ThemedSegmentedPicker("Plan", selection: $mode, options: ToolsPlannerMode.allCases, label: \.title)
             }
             switch mode {
             case .starTrails:
@@ -79,6 +74,7 @@ private struct ToolsStarTrailsForm: View {
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("Star Trails & Time-Lapse")
         .navigationBarTitleDisplayMode(.inline)
+        .nightBackButton()
         .task(id: SkyKey(observer: app.observerContext?.observer, targetID: app.target?.id,
                          frame: trail.setup.fieldOfView)) {
             while !Task.isCancelled {

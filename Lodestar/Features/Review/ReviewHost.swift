@@ -37,10 +37,12 @@ struct ReviewHost: View {
         TabView(selection: $app.selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 tabContent(tab)
+                    .nightHidesTabBar()
                     .tabItem { Label(tab.title, systemImage: tab.systemImage) }
                     .tag(tab)
             }
         }
+        .nightTabBar(selection: $app.selectedTab)
     }
 
     @ViewBuilder

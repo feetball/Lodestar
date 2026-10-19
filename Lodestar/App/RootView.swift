@@ -16,25 +16,31 @@ struct RootView: View {
             } else if app.settings.hasCompletedOnboarding {
                 TabView(selection: $app.selectedTab) {
                     AimView()
+                        .nightHidesTabBar()
                         .tabItem { Label(AppTab.aim.title, systemImage: AppTab.aim.systemImage) }
                         .tag(AppTab.aim)
                     ObjectsView()
+                        .nightHidesTabBar()
                         .statusBarHidden(app.isNightModeActive)
                         .tabItem { Label(AppTab.objects.title, systemImage: AppTab.objects.systemImage) }
                         .tag(AppTab.objects)
                     SkyChartView()
+                        .nightHidesTabBar()
                         .statusBarHidden(app.isNightModeActive)
                         .tabItem { Label(AppTab.sky.title, systemImage: AppTab.sky.systemImage) }
                         .tag(AppTab.sky)
                     TonightView()
+                        .nightHidesTabBar()
                         .statusBarHidden(app.isNightModeActive)
                         .tabItem { Label(AppTab.tonight.title, systemImage: AppTab.tonight.systemImage) }
                         .tag(AppTab.tonight)
                     SettingsView()
+                        .nightHidesTabBar()
                         .statusBarHidden(app.isNightModeActive)
                         .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.systemImage) }
                         .tag(AppTab.settings)
                 }
+                .nightTabBar(selection: $app.selectedTab)
             } else {
                 OnboardingView()
             }
@@ -42,6 +48,7 @@ struct RootView: View {
         .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
         .onChange(of: palette, initial: true) { _, newPalette in
             BarAppearance.apply(newPalette)
+            NightWindowFilter.setActive(NightChrome.isActive("win", night: newPalette.isNight))
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             app.handleScenePhase(phase)

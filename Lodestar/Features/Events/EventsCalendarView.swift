@@ -33,6 +33,7 @@ struct EventsCalendarView: View {
         .screenBackground(palette)
         .navigationTitle("Events")
         .navigationBarTitleDisplayMode(.inline)
+        .nightBackButton()
     }
 
     // MARK: Content

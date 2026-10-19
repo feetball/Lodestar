@@ -24,6 +24,7 @@ final class ReviewDriver {
     /// Starts the driver when the launch arguments ask for it. Call once, after launch.
     func start(app: AppModel) {
         guard task == nil, let mode = ScreenshotMode.current, mode.runsReviewDriver else { return }
+        NightChrome.logLaunch()
         task = Task { [weak self] in
             await self?.run(app: app, mode: mode)
         }
@@ -52,6 +53,7 @@ final class ReviewDriver {
         // Let the screen finish its first layout and its own background work before the script looks.
         try? await Task.sleep(for: .seconds(2))
         isReady = true
+        NightChrome.logHitTests()
         while !Task.isCancelled {
             if let command = readCommand(), command != page {
                 page = command

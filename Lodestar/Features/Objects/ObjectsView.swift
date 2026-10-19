@@ -58,11 +58,13 @@ struct ObjectsView: View {
                 .navigationDestination(for: CelestialObject.self) { object in
                     ObjectDetailView(object: object)
                 }
-                .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
-                            prompt: "Name, M31, NGC 7000")
+                .nightSearchable(text: $query, prompt: "Name, M31, NGC 7000") { nightSearchRow }
+                .nightInlineTitle()
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .toolbar { toolbarContent }
+                .toolbar {
+                    if !usesNightControls { toolbarContent }
+                }
         }
         .sheet(isPresented: $isShowingCustomTarget) {
             CustomTargetSheet()
@@ -235,6 +237,32 @@ struct ObjectsView: View {
                 .buttonStyle(.lodestarSecondary)
             }
         }
+    }
+
+    /// Whether the night controls take the place of the system search field and toolbar buttons (iOS 26, night, `ctl`).
+    private var usesNightControls: Bool { NightChrome.isActive("ctl", night: palette.isNight) }
+
+    /// The night search row: the search field with the buttons of the toolbar beside it, drawn in the palette.
+    private var nightSearchRow: some View {
+        HStack(spacing: 8) {
+            NightSearchField(text: $query, prompt: "Name, M31, NGC 7000")
+            Button {
+                isShowingCustomTarget = true
+            } label: {
+                Image(systemName: "plus")
+                    .foregroundStyle(palette.accent)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Custom Target")
+            ObjectsOptionsMenu(grouping: $grouping, sortOrder: $sortOrder,
+                               showsOnlyAboveHorizon: $showsOnlyAboveHorizon, hidesFaintObjects: $hidesFaintObjects,
+                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized,
+                               hasLocation: app.observerContext != nil)
+                .disabled(isSearching)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(palette.background)
     }
 
     @ToolbarContentBuilder

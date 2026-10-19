@@ -33,13 +33,22 @@ private struct ThemedRootModifier: ViewModifier {
     let palette: Palette
     let redFilter: Bool
 
+    /// Whether the multiply overlay is drawn: the user's red filter setting, or on iOS 26 the night chrome experiment
+    /// `ovl`, which tries the same overlay to turn the system chrome of iOS 26 red (it ignores the palette there).
+    private var showsOverlay: Bool {
+        guard palette.isNight else { return false }
+        return redFilter || NightChrome.isActive("ovl", night: true)
+    }
+
     func body(content: Content) -> some View {
         content
             .environment(\.palette, palette)
             .tint(palette.accent)
             .preferredColorScheme(.dark)
+            .modifier(OverlayGroup(isOn: NightChrome.isActive("ovl", night: palette.isNight) && NightChrome.has("g")))
+            .modifier(NightControlsModifier(isOn: NightChrome.isActive("ctl", night: palette.isNight)))
             .overlay {
-                if palette.isNight && redFilter {
+                if showsOverlay {
                     // Multiply by pure red: white → red, blue/green → black. Hit testing is off so
                     // the overlay never intercepts touches.
                     Color(red: 1, green: 0, blue: 0)
@@ -47,8 +56,26 @@ private struct ThemedRootModifier: ViewModifier {
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
+                        .onAppear {
+                            if !redFilter { NightChrome.log("ovl: overlay shown in a themed root") }
+                        }
                 }
             }
+    }
+}
+
+/// Flattens the content into one layer before the overlay is drawn over it (`ovl+g`), to see whether that makes the
+/// overlay blend with the UIKit-drawn parts of the content. Does nothing when off.
+private struct OverlayGroup: ViewModifier {
+    let isOn: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isOn {
+            content.compositingGroup()
+        } else {
+            content
+        }
     }
 }
 
@@ -58,8 +85,12 @@ private struct ThemedRootModifier: ViewModifier {
 @MainActor
 enum BarAppearance {
     static func apply(_ palette: Palette) {
-        let tab = tabBarAppearance(palette)
-        let navigation = navigationBarAppearance(palette)
+        // Night chrome experiment `t`: iOS 26 bars are transparent glass; an opaque appearance background there hides the
+        // large title behind the bar background (an empty band at the top of Objects and Settings).
+        let transparent = NightChrome.isActive("t", night: palette.isNight)
+        if transparent { NightChrome.log("t: transparent bar appearances") }
+        let tab = tabBarAppearance(palette, transparent: transparent)
+        let navigation = navigationBarAppearance(palette, transparent: transparent)
         let accent = UIColor(palette.accent)
 
         UITabBar.appearance().standardAppearance = tab
@@ -90,13 +121,17 @@ enum BarAppearance {
         }
     }
 
-    private static func tabBarAppearance(_ palette: Palette) -> UITabBarAppearance {
+    private static func tabBarAppearance(_ palette: Palette, transparent: Bool) -> UITabBarAppearance {
         let selected = UIColor(palette.accent)
         let normal = UIColor(palette.tertiaryText)
         let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = UIColor(palette.surface)
-        tab.shadowColor = UIColor(palette.stroke)
+        if transparent {
+            tab.configureWithTransparentBackground()
+        } else {
+            tab.configureWithOpaqueBackground()
+            tab.backgroundColor = UIColor(palette.surface)
+            tab.shadowColor = UIColor(palette.stroke)
+        }
         for itemAppearance in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
             itemAppearance.normal.iconColor = normal
             itemAppearance.normal.titleTextAttributes = [.foregroundColor: normal]
@@ -106,12 +141,16 @@ enum BarAppearance {
         return tab
     }
 
-    private static func navigationBarAppearance(_ palette: Palette) -> UINavigationBarAppearance {
+    private static func navigationBarAppearance(_ palette: Palette, transparent: Bool) -> UINavigationBarAppearance {
         let title = UIColor(palette.primaryText)
         let navigation = UINavigationBarAppearance()
-        navigation.configureWithOpaqueBackground()
-        navigation.backgroundColor = UIColor(palette.background)
-        navigation.shadowColor = .clear
+        if transparent {
+            navigation.configureWithTransparentBackground()
+        } else {
+            navigation.configureWithOpaqueBackground()
+            navigation.backgroundColor = UIColor(palette.background)
+            navigation.shadowColor = .clear
+        }
         navigation.titleTextAttributes = [.foregroundColor: title]
         navigation.largeTitleTextAttributes = [.foregroundColor: title]
         return navigation

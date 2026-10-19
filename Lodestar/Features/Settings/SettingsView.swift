@@ -23,6 +23,7 @@ struct SettingsView: View {
             .themedList(palette)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
+            .nightInlineTitle()
         }
     }
 }
