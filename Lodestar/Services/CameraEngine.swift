@@ -8,10 +8,13 @@ import ImageIO
 import LodestarKit
 import os
 
-/// One processed camera frame, upright in portrait. `CGImage` is immutable; the wrapper keeps the hand-off
+/// One processed camera frame, upright in portrait, with the optics it was captured with, so the overlay never
+/// draws one zoom over a picture taken at another. `CGImage` is immutable; the wrapper keeps the hand-off
 /// independent of whether the SDK already declares it `Sendable`.
 struct CameraFrame: @unchecked Sendable {
     let image: CGImage
+    /// `nil` while the format's field of view is unknown.
+    let geometry: CameraGeometry?
 }
 
 /// Why the capture pipeline could not start.
@@ -37,8 +40,8 @@ enum CameraInterruption: Sendable, Equatable {
 enum CameraEngineEvent: Sendable, Equatable {
     case started
     case failed(CameraEngineFailure)
-    /// The optics of the frames now arriving (sent when the frame size changes and after each start).
-    case geometry(CameraGeometry)
+    /// The strongest zoom the active format supports, at most `CameraEngine.maximumZoom` (sent after each start).
+    case zoomLimit(Double)
     case interrupted(CameraInterruption)
     case interruptionEnded
     case runtimeError(isRecoverable: Bool)
@@ -50,8 +53,8 @@ enum CameraEngineEvent: Sendable, Equatable {
 /// - `sessionQueue`: `session`, `output` wiring, `camera`, `isConfigured`, `isExposureCeilingRaised`.
 ///   `startRunning()` blocks, so session work never runs on the main thread.
 /// - `frameQueue` (serial, as AVFoundation requires): `redFilter`, `appliedIntensity`, `lastFrameTime`,
-///   `publishedSize`. `CMSampleBuffer`, `CVPixelBuffer` and `CIFilter` never leave it.
-/// - locks: `nightIntensity`, `frameSink`, `longSideFieldOfView`, `requestedZoom`.
+///   `lastGeometry`. `CMSampleBuffer`, `CVPixelBuffer` and `CIFilter` never leave it.
+/// - locks: `nightIntensity`, `frameSink`, `fieldOfViewHistory`, `requestedZoom`.
 final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutputSampleBufferDelegate {
     /// Frames are skipped when closer together than this, a little under 1/30 s so a 30 fps camera passes every
     /// frame while a faster one is thinned to about 30 fps.
@@ -60,6 +63,18 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
     private static let nightExposureCeiling = CMTime(value: 1, timescale: 4)
     /// The most the picture is zoomed (digitally, on the wide camera), whatever the format would allow.
     static let maximumZoom = 8.0
+    /// Seconds between setting a zoom and the first frame captured with it. Frames already in the pipeline when the
+    /// zoom changes keep the field of view they were captured with.
+    private static let zoomLatency = 0.1
+    /// Field-of-view changes remembered for frames still in flight.
+    private static let fieldOfViewHistoryLength = 8
+
+    /// A field of view along the long side of the format, valid for frames presented from `validFrom` (seconds on
+    /// the session's clock) on.
+    private struct FieldOfViewChange {
+        let validFrom: Double
+        let degrees: Double
+    }
 
     /// Session events in order; never finishes.
     let events: AsyncStream<CameraEngineEvent>
@@ -75,17 +90,19 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
 
     private let nightIntensity = OSAllocatedUnfairLock<Double?>(initialState: nil)
     private let frameSink = OSAllocatedUnfairLock<AsyncStream<CameraFrame>.Continuation?>(initialState: nil)
-    private let longSideFieldOfView = OSAllocatedUnfairLock<Double?>(initialState: nil)
+    /// Oldest first; empty while the field of view is unknown.
+    private let fieldOfViewHistory = OSAllocatedUnfairLock<[FieldOfViewChange]>(initialState: [])
     private let requestedZoom = OSAllocatedUnfairLock<Double>(initialState: 1)
 
     // sessionQueue only
     private var camera: AVCaptureDevice?
     private var isConfigured = false
     private var isExposureCeilingRaised = false
+    private var reportedZoomLimit: Double?
     // frameQueue only
     private var appliedIntensity: Double?
     private var lastFrameTime = -Double.infinity
-    private var publishedSize: CGSize?
+    private var lastGeometry: CameraGeometry?
 
     override init() {
         (events, eventSink) = AsyncStream.makeStream(of: CameraEngineEvent.self, bufferingPolicy: .unbounded)
@@ -211,51 +228,76 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
 
     /// Fixes the optics (the requested zoom) and records the field of view that geometry is derived from.
     private func prepare(_ device: AVCaptureDevice) {
-        applyZoom(to: device)
+        applyZoom(to: device, isRunning: false)
         applyExposureCeiling(to: device, force: true)
     }
 
     /// Runs once the session is running: a format change made by the session invalidates the exposure ceiling
-    /// and the zoom and may change the field of view, in which case the next frame publishes its geometry again.
+    /// and the zoom and may change the field of view.
     private func settleOptics(of device: AVCaptureDevice) {
-        applyZoom(to: device)
+        applyZoom(to: device, isRunning: false)
         applyExposureCeiling(to: device, force: true)
     }
 
-    /// Sets the requested zoom, within the format's limits, and records the resulting field of view; the next frame
-    /// publishes its geometry again if that changed.
-    private func applyZoom(to device: AVCaptureDevice) {
-        let maximum = min(Double(device.activeFormat.videoMaxZoomFactor), Self.maximumZoom)
-        let factor = AstroMath.clamp(requestedZoom.withLock { $0 }, 1, max(maximum, 1))
+    /// Sets the requested zoom, within the format's limits, and records the resulting field of view. While frames
+    /// are flowing (`isRunning`), the new field of view applies only to frames captured after the change; otherwise
+    /// it replaces what was known, as the format itself may have changed.
+    private func applyZoom(to device: AVCaptureDevice, isRunning: Bool = true) {
+        let limit = max(min(Double(device.activeFormat.videoMaxZoomFactor), Self.maximumZoom), 1)
+        if limit != reportedZoomLimit {
+            reportedZoomLimit = limit
+            eventSink.yield(.zoomLimit(limit))
+        }
+        let factor = AstroMath.clamp(requestedZoom.withLock { $0 }, 1, limit)
         if (try? device.lockForConfiguration()) != nil {
             device.videoZoomFactor = CGFloat(factor)
             device.unlockForConfiguration()
         }
-        if recordFieldOfView(of: device) { resetFrameState(keepFrameTimes: true) }
+        recordFieldOfView(of: device, isRunning: isRunning)
     }
 
-    /// Stores the field of view across the long side of the active format at the current zoom; `true` if it changed.
-    private func recordFieldOfView(of device: AVCaptureDevice) -> Bool {
+    /// Records the field of view across the long side of the active format at the current zoom.
+    private func recordFieldOfView(of device: AVCaptureDevice, isRunning: Bool) {
         let format = device.activeFormat
         // With geometric distortion correction on (the default where supported) the corrected field of view applies.
         let fieldOfView = device.isGeometricDistortionCorrectionEnabled
             ? format.geometricDistortionCorrectedVideoFieldOfView
             : format.videoFieldOfView
+        guard fieldOfView > 0 else { // 0 means unknown
+            fieldOfViewHistory.withLock { $0 = [] }
+            return
+        }
         // Zooming crops the centre of the picture: the tangent of the half-angle shrinks by the zoom factor.
         let zoom = max(Double(device.videoZoomFactor), 1)
-        let zoomed = AstroMath.degrees(2 * atan(tan(AstroMath.radians(Double(fieldOfView)) / 2) / zoom))
-        let value = fieldOfView > 0 ? zoomed : nil // 0 means unknown
-        return longSideFieldOfView.withLock { current in
-            defer { current = value }
-            return current != value
+        let degrees = AstroMath.degrees(2 * atan(tan(AstroMath.radians(Double(fieldOfView)) / 2) / zoom))
+        let validFrom = isRunning
+            ? CMClockGetTime(session.synchronizationClock ?? CMClockGetHostTimeClock()).seconds + Self.zoomLatency
+            : -Double.infinity
+        let change = FieldOfViewChange(validFrom: validFrom, degrees: degrees)
+        fieldOfViewHistory.withLock { history in
+            guard isRunning else {
+                history = [change]
+                return
+            }
+            guard history.last?.degrees != degrees else { return }
+            history.append(change)
+            if history.count > Self.fieldOfViewHistoryLength { history.removeFirst() }
         }
     }
 
-    /// Makes the next frame publish its geometry (and, unless kept, restarts the frame-rate limiter).
-    private func resetFrameState(keepFrameTimes: Bool = false) {
+    /// The field of view a frame presented at `time` (seconds on the session's clock) was captured with: the
+    /// newest change valid by then, or the oldest one known.
+    private func fieldOfView(at time: Double?) -> Double? {
+        fieldOfViewHistory.withLock { history in
+            guard let time else { return history.last?.degrees }
+            return (history.last { $0.validFrom <= time } ?? history.first)?.degrees
+        }
+    }
+
+    /// Restarts the frame-rate limiter.
+    private func resetFrameState() {
         frameQueue.async { [self] in
-            publishedSize = nil
-            if !keepFrameTimes { lastFrameTime = -Double.infinity }
+            lastFrameTime = -Double.infinity
         }
     }
 
@@ -302,9 +344,10 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         if let intensity = nightIntensity.withLock({ $0 }) {
             image = redMonochrome(image, intensity: intensity)
         }
-        publishGeometry(forFrameSize: image.extent.size)
+        let frameGeometry = geometry(forFrameSize: image.extent.size,
+                                     fieldOfView: fieldOfView(at: presentationTime.isNumeric ? presentationTime.seconds : nil))
         guard let frame = context.createCGImage(image, from: image.extent) else { return }
-        sink.yield(CameraFrame(image: frame))
+        sink.yield(CameraFrame(image: frame, geometry: frameGeometry))
     }
 
     private func redMonochrome(_ image: CIImage, intensity: Double) -> CIImage {
@@ -317,13 +360,16 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         return redFilter.outputImage ?? image
     }
 
-    private func publishGeometry(forFrameSize size: CGSize) {
-        guard size != publishedSize else { return }
-        publishedSize = size
-        guard let fieldOfView = longSideFieldOfView.withLock({ $0 }),
-              let geometry = CameraGeometry.portrait(longSideFieldOfView: fieldOfView,
-                                                     width: Int(size.width), height: Int(size.height)) else { return }
-        eventSink.yield(.geometry(geometry))
+    /// The geometry of a frame, reusing the previous frame's when nothing changed.
+    private func geometry(forFrameSize size: CGSize, fieldOfView: Double?) -> CameraGeometry? {
+        guard let fieldOfView else { return nil }
+        let width = Int(size.width), height = Int(size.height)
+        if let lastGeometry, lastGeometry.imageWidth == width, lastGeometry.imageHeight == height,
+           max(lastGeometry.portraitHorizontalFOV, lastGeometry.portraitVerticalFOV) == fieldOfView {
+            return lastGeometry
+        }
+        lastGeometry = CameraGeometry.portrait(longSideFieldOfView: fieldOfView, width: width, height: height)
+        return lastGeometry
     }
 
     // MARK: Notifications
