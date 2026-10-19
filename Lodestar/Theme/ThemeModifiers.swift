@@ -62,12 +62,18 @@ enum BarAppearance {
         let navigation = navigationBarAppearance(palette)
         let accent = UIColor(palette.accent)
 
+        let unselected = UIColor(palette.tertiaryText)
         UITabBar.appearance().standardAppearance = tab
         UITabBar.appearance().scrollEdgeAppearance = tab
+        // The floating glass tab bar of iOS 26 ignores the item colours of the appearance and draws unselected
+        // items in the label colour (white), but follows the bar's tint colours.
+        UITabBar.appearance().tintColor = accent
+        UITabBar.appearance().unselectedItemTintColor = unselected
         UINavigationBar.appearance().standardAppearance = navigation
         UINavigationBar.appearance().scrollEdgeAppearance = navigation
         UINavigationBar.appearance().compactAppearance = navigation
         UINavigationBar.appearance().tintColor = accent
+        UIBarButtonItem.appearance().tintColor = accent
 
         // System switches and sliders draw white thumbs; at night every pixel must be red.
         let nightAccent: UIColor? = palette.isNight ? accent : nil
@@ -78,14 +84,18 @@ enum BarAppearance {
         UISlider.appearance().maximumTrackTintColor = palette.isNight ? UIColor(palette.stroke) : nil
         UITextField.appearance(whenContainedInInstancesOf: [UISearchBar.self]).textColor = UIColor(palette.primaryText)
 
+        // The track of iOS 26 is a light glass on which dim red text disappears: give it the surface colour, and at
+        // night the unselected titles full text strength.
+        UISegmentedControl.appearance().backgroundColor = UIColor(palette.surface)
         UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(palette.surfaceRaised)
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(palette.primaryText)], for: .selected)
-        UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(palette.secondaryText)], for: .normal)
+        let unselectedSegment = palette.isNight ? palette.primaryText.opacity(0.8) : palette.secondaryText
+        UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(unselectedSegment)], for: .normal)
 
         // Restyle the bars that already exist; the proxies above only affect views created later.
         for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
             for window in scene.windows {
-                restyle(window, tab: tab, navigation: navigation, accent: accent)
+                restyle(window, tab: tab, navigation: navigation, accent: accent, unselected: unselected)
             }
         }
     }
@@ -114,14 +124,24 @@ enum BarAppearance {
         navigation.shadowColor = .clear
         navigation.titleTextAttributes = [.foregroundColor: title]
         navigation.largeTitleTextAttributes = [.foregroundColor: title]
+        // The glass back button of iOS 26 draws its chevron in the label colour (white) whatever the tint; an
+        // image in the palette's own colour is drawn as it is.
+        let accent = UIColor(palette.accent)
+        if let chevron = UIImage(systemName: "chevron.backward",
+                                 withConfiguration: UIImage.SymbolConfiguration(weight: .semibold))?
+            .withTintColor(accent, renderingMode: .alwaysOriginal) {
+            navigation.setBackIndicatorImage(chevron, transitionMaskImage: chevron)
+        }
         return navigation
     }
 
     private static func restyle(_ view: UIView, tab: UITabBarAppearance, navigation: UINavigationBarAppearance,
-                                accent: UIColor) {
+                                accent: UIColor, unselected: UIColor) {
         if let bar = view as? UITabBar {
             bar.standardAppearance = tab
             bar.scrollEdgeAppearance = tab
+            bar.tintColor = accent
+            bar.unselectedItemTintColor = unselected
         } else if let bar = view as? UINavigationBar {
             bar.standardAppearance = navigation
             bar.scrollEdgeAppearance = navigation
@@ -129,7 +149,7 @@ enum BarAppearance {
             bar.tintColor = accent
         }
         for subview in view.subviews {
-            restyle(subview, tab: tab, navigation: navigation, accent: accent)
+            restyle(subview, tab: tab, navigation: navigation, accent: accent, unselected: unselected)
         }
     }
 }

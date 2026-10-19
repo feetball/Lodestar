@@ -91,12 +91,22 @@ extension SkyOverlayRenderer {
     private static let edgeTopInset: CGFloat = 96
     private static let edgeBottomInset: CGFloat = 240
 
+    /// Draws the ring on what the guidance leads to: the panel of a mosaic being shot, else the satellite, else the target.
     mutating func drawTarget(in context: GraphicsContext) {
-        guard let target = frame.target else { return }
+        let aim: (direction: Vector3, name: String)
+        if let panel = frame.mosaic, let mosaic {
+            aim = (panel.aim.horizontal.unitVector, "Panel \(min(mosaic.step + 1, mosaic.count))")
+        } else if let satellite = frame.satellite {
+            aim = (satellite.direction, satellite.label)
+        } else if let target = frame.target {
+            aim = (target.direction, SmallBodyText.displayName(target.object))
+        } else {
+            return
+        }
         let isOnTarget = frame.guidance?.state == .onTarget
         let color = isOnTarget ? palette.positive : palette.guidance
-        guard let point = projector.point(target.direction), isVisible(point, margin: 0) else {
-            drawEdgeIndicator(toward: target, color: color, in: context)
+        guard let point = projector.point(aim.direction), isVisible(point, margin: 0) else {
+            drawEdgeIndicator(toward: aim.direction, color: color, in: context)
             return
         }
         // A pulsing ring marks the target; once the camera is on it the ring stops and thickens.
@@ -104,13 +114,13 @@ extension SkyOverlayRenderer {
         let radius = CGFloat(21 + pulse)
         context.stroke(ellipse(at: point, radius: radius), with: .color(color), lineWidth: isOnTarget ? 3.5 : 2)
         context.fill(ellipse(at: point, radius: 2.5), with: .color(color))
-        addLabel(target.object.name, near: point, offset: CGSize(width: 0, height: -(radius + 15)),
+        addLabel(aim.name, near: point, offset: CGSize(width: 0, height: -(radius + 15)),
                  style: AimLabelStyle(size: 14, weight: .bold, color: color), priority: 0)
     }
 
     /// An arrow at the screen edge in the direction of a target that is not in view, with its distance.
-    private mutating func drawEdgeIndicator(toward target: SkySnapshot.Target, color: Color, in context: GraphicsContext) {
-        let device = worldToDevice * target.direction
+    mutating func drawEdgeIndicator(toward direction: Vector3, color: Color, in context: GraphicsContext) {
+        let device = worldToDevice * direction
         var heading = CGVector(dx: device.x, dy: -device.y)
         let length = hypot(heading.dx, heading.dy)
         heading = length > 1e-6 ? CGVector(dx: heading.dx / length, dy: heading.dy / length) : CGVector(dx: 0, dy: -1)
@@ -146,7 +156,7 @@ extension SkyOverlayRenderer {
         layer.fill(arrow, with: .color(color))
         layer.stroke(arrow, with: .color(.black.opacity(0.5)), lineWidth: 1)
 
-        let separation = AimFormat.angle(boresight.angle(to: target.direction))
+        let separation = AimFormat.angle(boresight.angle(to: direction))
         labels.add(separation, at: CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38),
                    style: AimLabelStyle(size: 14, weight: .bold, color: color), priority: 3)
     }

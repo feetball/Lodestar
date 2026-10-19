@@ -3,12 +3,17 @@ import Foundation
 /// The kind of a sky object, as shown in lists and used to pick an icon.
 ///
 /// The cases follow the OpenNGC type codes for deep-sky objects, plus the kinds that the catalog
-/// adds itself: the solar-system bodies, the Milky Way core, the celestial poles and
+/// adds itself: the solar-system bodies (the Sun, the Moon, the planets and, once small bodies are added with
+/// `Catalog.withSmallBodies(_:)`, comets and asteroids), the Milky Way core, the celestial poles and
 /// user-created targets.
 public enum ObjectCategory: String, Codable, CaseIterable, Sendable {
     case sun
     case moon
     case planet
+    /// A comet; added to a catalog with `Catalog.withSmallBodies(_:)`.
+    case comet
+    /// An asteroid (minor planet); the bright ones are bundled, see `BundledAsteroids`.
+    case asteroid
     case star
     case doubleStar
     case galaxy
@@ -35,6 +40,8 @@ public enum ObjectCategory: String, Codable, CaseIterable, Sendable {
         case .sun: "Sun"
         case .moon: "Moon"
         case .planet: "Planet"
+        case .comet: "Comet"
+        case .asteroid: "Asteroid"
         case .star: "Star"
         case .doubleStar: "Double Star"
         case .galaxy: "Galaxy"
@@ -63,6 +70,8 @@ public enum ObjectCategory: String, Codable, CaseIterable, Sendable {
         case .sun: "sun.max"
         case .moon: "moon"
         case .planet: "circle.circle"
+        case .comet: "sparkle"
+        case .asteroid: "circle.fill"
         case .star: "star"
         case .doubleStar: "star.leadinghalf.filled"
         case .galaxy: "hurricane"
@@ -88,7 +97,7 @@ public enum ObjectCategory: String, Codable, CaseIterable, Sendable {
     /// The browse group the category is listed under.
     public var group: ObjectGroup {
         switch self {
-        case .sun, .moon, .planet:
+        case .sun, .moon, .planet, .comet, .asteroid:
             .solarSystem
         case .star, .doubleStar, .asterism:
             .stars

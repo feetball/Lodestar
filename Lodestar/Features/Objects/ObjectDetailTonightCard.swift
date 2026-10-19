@@ -36,6 +36,17 @@ struct ObjectDetailTonightCard: View {
             .foregroundStyle(palette.tertiaryText)
         eventRows(for: night)
         darknessRows(for: night)
+        if night.appliesSkyline {
+            Label {
+                Text("Skyline applied: the object rises when it clears your skyline and sets when it sinks behind it.")
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "mountain.2")
+            }
+            .font(.footnote)
+            .foregroundStyle(palette.tertiaryText)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     /// The observer's time zone as people write it, such as "MDT".
@@ -47,9 +58,11 @@ struct ObjectDetailTonightCard: View {
     private func eventRows(for night: ObjectDetailNight) -> some View {
         switch night.events.circumstance {
         case .alwaysDown:
-            InfoRow(label: "Visibility", value: "Stays below the horizon")
+            InfoRow(label: "Visibility",
+                    value: night.appliesSkyline ? "Stays behind the skyline" : "Stays below the horizon")
         case .alwaysUp:
-            InfoRow(label: "Visibility", value: "Always above the horizon")
+            InfoRow(label: "Visibility",
+                    value: night.appliesSkyline ? "Always above the skyline" : "Always above the horizon")
             timelineRows(for: night)
         case .normal:
             timelineRows(for: night)
@@ -58,15 +71,15 @@ struct ObjectDetailTonightCard: View {
 
     private func timelineRows(for night: ObjectDetailNight) -> some View {
         ForEach(night.timeline) { event in
-            InfoRow(label: title(of: event.kind), value: value(of: event, in: night))
+            InfoRow(label: title(of: event.kind, in: night), value: value(of: event, in: night))
         }
     }
 
-    private func title(of kind: ObjectDetailEvent.Kind) -> String {
+    private func title(of kind: ObjectDetailEvent.Kind, in night: ObjectDetailNight) -> String {
         switch kind {
-        case .rise: return "Rises"
+        case .rise: return night.appliesSkyline ? "Clears the skyline" : "Rises"
         case .transit: return "Highest point"
-        case .set: return "Sets"
+        case .set: return night.appliesSkyline ? "Sinks behind the skyline" : "Sets"
         }
     }
 
@@ -85,6 +98,8 @@ struct ObjectDetailTonightCard: View {
             InfoRow(label: "Dark sky", value: "\(start) \u{2013} \(end)")
             if object.category != .sun, let best = night.bestInDarkness {
                 InfoRow(label: "Highest in the dark", value: highestText(best))
+            } else if object.category != .sun, night.appliesSkyline {
+                InfoRow(label: "Highest in the dark", value: "Behind the skyline")
             }
         } else {
             InfoRow(label: "Dark sky", value: "No astronomical darkness tonight")

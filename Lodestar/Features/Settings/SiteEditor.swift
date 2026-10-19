@@ -23,6 +23,8 @@ enum SiteEditorTarget: Identifiable {
 struct SiteEditor: View {
     /// Wait after the last change to the position before the time zone is looked up (typing, map picks).
     private static let lookupDelay: Duration = .milliseconds(600)
+    /// A site counts as moved, for its skyline, when its position changed by more than this many degrees (about 100 m).
+    private static let movedPositionDegrees = 0.001
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
@@ -36,6 +38,7 @@ struct SiteEditor: View {
     @State private var isSaving = false
     @State private var isConfirmingDelete = false
     @State private var failureMessage: String?
+    @State private var horizonFlow = HorizonFlowState()
 
     /// - Parameters:
     ///   - target: The new site's starting point, or the site to edit.
@@ -66,10 +69,12 @@ struct SiteEditor: View {
                 nameSection
                 positionSection
                 timeZoneSection
+                HorizonSiteSection(siteID: existingSite?.id, movedAway: hasMovedAway, flow: $horizonFlow)
                 if existingSite != nil {
                     deleteSection
                 }
             }
+            .horizonFlow($horizonFlow)
             .themedList(palette)
             .scrollDismissesKeyboard(.interactively)
             .disabled(isSaving)
@@ -183,6 +188,14 @@ struct SiteEditor: View {
         }
     }
 
+    /// Whether the position being edited is more than about 100 m from where the saved site was: its skyline then
+    /// belongs to another spot.
+    private var hasMovedAway: Bool {
+        guard let existingSite, let location = draft.location else { return false }
+        return abs(existingSite.latitude - location.latitude) > Self.movedPositionDegrees
+            || abs(existingSite.longitude - location.longitude) > Self.movedPositionDegrees
+    }
+
     // MARK: Time zone
 
     /// Restarts the time zone lookup when the position (not the name or elevation) or the attempt changes.
@@ -260,9 +273,13 @@ struct SiteEditor: View {
         isSaving = false
         guard let location = draft.location else { return }
         let zone = timeZoneStatus.timeZone ?? TimeZoneResolver.nominalTimeZone(longitude: location.longitude)
+        // The skyline is recorded and saved on its own while the editor is open, so the stored one is the current one.
+        let horizon = existingSite.flatMap { existing in
+            app.settings.savedSites.first { $0.id == existing.id }?.horizon
+        }
         guard let site = SavedSite(id: existingSite?.id ?? UUID(), name: draft.name, latitude: location.latitude,
                                    longitude: location.longitude, elevation: location.elevation,
-                                   timeZoneIdentifier: zone.identifier) else {
+                                   timeZoneIdentifier: zone.identifier, horizon: horizon) else {
             failureMessage = "This position cannot be saved. Check the latitude, longitude and elevation."
             return
         }
@@ -280,6 +297,7 @@ struct SiteEditor: View {
     private func deleteSite() {
         guard let existingSite else { return }
         app.settingsStore.removeSites(withIDs: [existingSite.id])
+        HorizonCoverageMemory.store(siteID: existingSite.id, horizon: nil, coverage: 0)
         dismiss()
     }
 }

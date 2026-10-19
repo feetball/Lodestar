@@ -12,7 +12,11 @@ struct AimReadout: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
             let frame = model.engine.frame()
-            if let target = model.guidanceTarget {
+            if model.mosaicSession.isActive {
+                AimMosaicReadout(model: model, frame: frame)
+            } else if let source = model.satelliteSource {
+                SatelliteAimReadout(model: model, source: source)
+            } else if let target = model.guidanceTarget {
                 VStack(spacing: 8) {
                     AimTargetCard(object: target, horizontal: frame?.target?.horizontal,
                                   belowHorizonNote: belowHorizonNote(for: target, frame: frame),
@@ -27,9 +31,14 @@ struct AimReadout: View {
         }
     }
 
-    /// "Below the horizon · rises 23:41 (in 5h 12m)", or `nil` while the target is up.
+    /// "Below the horizon · rises 23:41 (in 5h 12m)", "Behind your skyline", or `nil` while the target is in the clear.
     private func belowHorizonNote(for target: CelestialObject, frame: AimFrame?) -> String? {
-        guard let altitude = frame?.target?.horizontal.altitude, altitude < 0 else { return nil }
+        guard let altitude = frame?.target?.horizontal.altitude else { return nil }
+        if altitude >= 0, let horizontal = frame?.target?.horizontal,
+           model.skyContent?.skyline?.mask.isBelow(azimuth: horizontal.azimuth, altitude: altitude) == true {
+            return "Behind your skyline"
+        }
+        guard altitude < 0 else { return nil }
         guard let info = model.riseInfo, info.targetID == target.id,
               let timeZone = model.app.observerContext?.timeZone else { return "Below the horizon" }
         if let rise = info.nextRise {
@@ -46,19 +55,22 @@ private struct AimTargetCard: View {
     let belowHorizonNote: String?
     /// Drops the target, to look around freely; `nil` hides the button.
     let onClear: (() -> Void)?
+    @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    /// A comet's or asteroid's magnitude estimate and elongation, kept current; unused for other objects.
+    @State private var smallBody = SmallBodyLive.pending
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 ObjectIcon(category: object.category, size: 16)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(object.name)
+                    Text(SmallBodyText.displayName(object))
                         .font(.headline)
                         .foregroundStyle(palette.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                    Text(subtitle)
+                    Text(object.smallBody == nil ? subtitle : smallBody.subtitle(of: object))
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
                         .lineLimit(1)
@@ -92,6 +104,7 @@ private struct AimTargetCard: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.warning)
             }
+            SmallBodyAimNotes(live: smallBody)
             if object.category == .sun {
                 Label("Never point at the Sun without a certified solar filter", systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.semibold))
@@ -105,6 +118,9 @@ private struct AimTargetCard: View {
                 Button("Clear target", action: onClear)
             }
         }
+        .task(id: object.id) {
+            await SmallBodyLive.keepCurrent(of: object, clock: app.clock) { smallBody = $0 }
+        }
     }
 
     private var subtitle: String {
@@ -113,7 +129,7 @@ private struct AimTargetCard: View {
 }
 
 /// The pan and tilt the head has to make, or the state that replaces them.
-private struct AimMoveRow: View {
+struct AimMoveRow: View {
     let summary: AimGuidanceSummary
     @Environment(\.palette) private var palette
 
@@ -144,7 +160,7 @@ private struct AimMoveRow: View {
     }
 }
 
-private struct AimMovePill: View {
+struct AimMovePill: View {
     let move: AimGuidanceSummary.Move
     @Environment(\.palette) private var palette
 

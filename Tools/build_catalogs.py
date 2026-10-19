@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Builds the sky catalogs that ship inside Lodestar.
 
-The script downloads a handful of open astronomical data files from GitHub, each pinned to an
-immutable commit and verified against the sha256 digest recorded in ``sources.lock.json``, and
-converts them into the compact JSON resources bundled by ``LodestarKit``:
+The script downloads open astronomical data files, each pinned (GitHub files to an immutable
+commit, CDS/VizieR files to the URL) and verified against the sha256 digest recorded in
+``sources.lock.json``, and converts them into the compact JSON resources bundled by ``LodestarKit``:
 
     stars.json           stars brighter than magnitude 6.5 plus every named star (HYG Database)
-    dsos.json            Messier, named and bright NGC/IC objects (OpenNGC)
+    dsos.json            the deep-sky catalog: Messier, Caldwell, bright and named NGC/IC objects
+                         (OpenNGC), Sharpless 2 HII regions, Barnard and Lynds dark nebulae and
+                         large Collinder/Melotte/Trumpler/Stock clusters (CDS/VizieR)
     constellations.json  the 88 IAU constellations: names, label positions, stick figures
     milkyway.json        five nested Milky Way brightness outlines (d3-celestial)
 
@@ -24,6 +26,7 @@ Lock maintenance::
 
     --refresh-lock             re-resolve each source's ref to a commit, re-download, re-hash
     --refresh-lock --ref KEY=REF   additionally move one source to another branch or tag
+    --refresh-lock --only KEY      refresh just the named sources and keep the rest of the lock
     --check                    build in memory and compare with ``--out`` instead of writing
 
 Only the Python standard library is used. See ``Tools/README.md`` for the full documentation.
@@ -35,6 +38,7 @@ import argparse
 import bisect
 import csv
 import datetime as dt
+import gzip
 import hashlib
 import http.client
 import json
@@ -65,6 +69,7 @@ T = TypeVar("T")
 USER_AGENT = "lodestar-build-catalogs/1"
 GITHUB_API = "https://api.github.com"
 RAW_CONTENT = "https://raw.githubusercontent.com"
+CDS_FTP = "https://cdsarc.cds.unistra.fr/ftp/"
 DOWNLOAD_TIMEOUT_SECONDS = 60
 MAX_DOWNLOAD_BYTES = 128 * 1024 * 1024
 
@@ -74,7 +79,10 @@ SUN_HYG_ID = 0
 HIPPARCOS_EPOCH = 1991.25
 J2000_EPOCH = 2000.0
 
-# Deep-sky objects: catalogue objects pass with V <= 10.0 (or B <= 10.5 when V is unknown).
+# Deep-sky objects, first selection ("legacy"): every Messier object, every named object, every
+# other object with V <= 10.0 (or B <= 10.5 when V is unknown) and every large nebula without a
+# magnitude. Everything this rule selects keeps prominence 3 or better, so no object of the first
+# release can drop out of the browse lists (see ``dso_prominence``).
 DSO_VISUAL_MAGNITUDE_LIMIT = 10.0
 DSO_BLUE_MAGNITUDE_LIMIT = 10.5
 # Large nebulae usually have no magnitude at all but are prime wide-field targets.
@@ -88,6 +96,56 @@ DSO_TYPES = frozenset(
      "GPair", "GTrpl", "GGroup", "**", "*", "Other"}
 )
 MESSIER_COUNT = 110
+CALDWELL_COUNT = 109
+
+# Deep-sky objects, extended selection: what a photographer can reach with a camera lens or a
+# small telescope. In addition to the first selection, every OpenNGC object that
+#   - has V <= 11.5 (or B <= 12.0 when V is unknown), or
+#   - is a nebula of any kind (NEBULA_TYPES) at least 3' across, or
+#   - is an open cluster, cluster with nebulosity or association at least 30' across, or
+#   - is a Caldwell object.
+# Plain stars (`*`, `**`) only enter when they are Messier, Caldwell or named.
+EXT_VISUAL_MAGNITUDE_LIMIT = 11.5
+EXT_BLUE_MAGNITUDE_LIMIT = 12.0
+EXT_NEBULA_MIN_SIZE_ARCMIN = 3.0
+EXT_CLUSTER_MIN_SIZE_ARCMIN = 30.0
+CLUSTER_TYPES = frozenset({"OCl", "Cl+N", "*Ass"})
+
+# Lynds' dark nebulae (VizieR VII/7A): 1,791 clouds, far too many to draw. The cut keeps the
+# darkest clouds (opacity class 6 of 1-6) and the large ones (at least a square degree), plus the
+# few that have a popular name. An LDN cloud is drawn as a circle of the same area.
+LYNDS_DARKEST_OPACITY = 6
+LYNDS_MIN_AREA_SQUARE_DEGREES = 1.0
+
+# Collinder, Melotte, Trumpler and Stock clusters from Dias et al. (VizieR B/ocl): only the
+# large ones, which fill a camera-lens field and are easy to miss in a list of small clusters.
+OPEN_CLUSTER_MIN_SIZE_ARCMIN = 60.0
+# Beyond 10 degrees a "cluster" is a moving group (Collinder 285 is the Ursa Major group, 23
+# degrees across), not something that is framed or found in the sky.
+OPEN_CLUSTER_MAX_SIZE_ARCMIN = 600.0
+OPEN_CLUSTER_CATALOGUES = {"Collinder": "Cl", "Melotte": "Mel", "Trumpler": "Tr", "Stock": "St"}
+
+# Prominence: how conspicuous an object is among deep-sky objects, from 1 (showpiece) to 4
+# (obscure). The rules are in ``dso_prominence``; the thresholds are here.
+PROMINENCE_SHOWPIECE_MAGNITUDE = 4.0
+PROMINENCE_BRIGHT_MAGNITUDE = 8.0
+PROMINENCE_NOTABLE_MAGNITUDE = 10.0
+PROMINENCE_LARGE_NEBULA_ARCMIN = 60.0
+PROMINENCE_NOTABLE_NEBULA_ARCMIN = 10.0
+PROMINENCE_NOTABLE_CLUSTER_ARCMIN = 30.0
+PROMINENCE_LARGE_DARK_ARCMIN = 180.0
+PROMINENCE_NOTABLE_DARK_ARCMIN = 60.0
+LYNDS_NOTABLE_OPAQUE_ARCMIN = 20.0
+SHARPLESS_NOTABLE_ARCMIN = 30.0
+SHARPLESS_BRIGHT_NOTABLE_ARCMIN = 10.0
+PROMINENCE_RANGE = (1, 4)
+
+# Reference epochs for precession (Julian dates): B1875.0 is the equinox of the IAU constellation
+# boundaries, B1900.0 and B1950.0 are the equinoxes of the Sharpless and Lynds positions.
+JD_J2000 = 2451545.0
+JD_B1875 = 2405889.25855
+JD_B1900 = 2415020.31352
+JD_B1950 = 2433282.4235
 
 # Hipparcos positions at epoch J2000.0 (ESA 1997, propagated with its proper motions; VizieR
 # I/239), as (right ascension, declination) in degrees. They pin the epoch handling of HYG.
@@ -385,7 +443,13 @@ class SourceFile:
 
 @dataclass(frozen=True)
 class Source:
-    """An upstream GitHub repository the catalogs are derived from."""
+    """An upstream data source: a GitHub repository (``kind`` "github", pinned to a commit) or a
+    CDS/VizieR catalogue directory (``kind`` "cds", pinned to the sha256 of each file).
+
+    For a GitHub source ``repo`` and ``default_ref`` say where the files come from; for a CDS source
+    ``base_url`` is the directory under :data:`CDS_FTP` and ``license_id`` a short description of
+    the terms, since CDS catalogues carry no SPDX license.
+    """
 
     key: str
     title: str
@@ -393,7 +457,14 @@ class Source:
     default_ref: str
     license_id: str
     files: tuple[SourceFile, ...]
+    kind: str = "github"
+    base_url: str = ""
 
+
+# The terms CDS publishes for catalogues without a license of their own (see the licence page of
+# VizieR): free of usage in a scientific context, original authors and publication cited, a
+# VizieR acknowledgement appreciated; commercial use depends on the origin of the catalogue.
+CDS_TERMS = "CDS-VizieR-terms"
 
 SOURCES: tuple[Source, ...] = (
     Source(
@@ -436,6 +507,71 @@ SOURCES: tuple[Source, ...] = (
             SourceFile("readme.md", "legal"),
         ),
     ),
+    Source(
+        key="sharpless",
+        title="Catalogue of HII Regions (Sharpless 1959), CDS VII/20",
+        repo="",
+        default_ref="",
+        license_id=CDS_TERMS,
+        files=(
+            SourceFile("catalog.dat.gz", "data"),
+            SourceFile("ReadMe", "legal"),
+        ),
+        kind="cds",
+        base_url=CDS_FTP + "VII/20",
+    ),
+    Source(
+        key="barnard",
+        title="Barnard's Catalogue of 349 Dark Objects in the Sky (Barnard 1927), CDS VII/220A",
+        repo="",
+        default_ref="",
+        license_id=CDS_TERMS,
+        files=(
+            SourceFile("barnard.dat", "data"),
+            SourceFile("ReadMe", "legal"),
+        ),
+        kind="cds",
+        base_url=CDS_FTP + "VII/220A",
+    ),
+    Source(
+        key="lynds",
+        title="Lynds' Catalogue of Dark Nebulae (Lynds 1962), CDS VII/7A",
+        repo="",
+        default_ref="",
+        license_id=CDS_TERMS,
+        files=(
+            SourceFile("ldn", "data"),
+            SourceFile("ReadMe", "legal"),
+        ),
+        kind="cds",
+        base_url=CDS_FTP + "VII/7A",
+    ),
+    Source(
+        key="dias",
+        title="Optically visible open clusters and candidates, v3.5 (Dias et al. 2002), CDS B/ocl",
+        repo="",
+        default_ref="",
+        license_id=CDS_TERMS,
+        files=(
+            SourceFile("clusters.dat", "data"),
+            SourceFile("ReadMe", "legal"),
+        ),
+        kind="cds",
+        base_url=CDS_FTP + "B/ocl",
+    ),
+    Source(
+        key="roman",
+        title="Identification of a constellation from a position (Roman 1987), CDS VI/42",
+        repo="",
+        default_ref="",
+        license_id=CDS_TERMS,
+        files=(
+            SourceFile("data.dat", "data"),
+            SourceFile("ReadMe", "legal"),
+        ),
+        kind="cds",
+        base_url=CDS_FTP + "VI/42",
+    ),
 )
 SOURCES_BY_KEY = {source.key: source for source in SOURCES}
 
@@ -445,6 +581,11 @@ OPENNGC_ADDENDUM_CSV = ("openngc", "database_files/addendum.csv")
 D3_CONSTELLATIONS = ("d3celestial", "data/constellations.json")
 D3_LINES = ("d3celestial", "data/constellations.lines.json")
 D3_MILKY_WAY = ("d3celestial", "data/mw.json")
+SHARPLESS_DAT = ("sharpless", "catalog.dat.gz")
+BARNARD_DAT = ("barnard", "barnard.dat")
+LYNDS_DAT = ("lynds", "ldn")
+DIAS_DAT = ("dias", "clusters.dat")
+ROMAN_DAT = ("roman", "data.dat")
 
 
 @dataclass(frozen=True)
@@ -458,7 +599,11 @@ class LockedFile:
 
 @dataclass(frozen=True)
 class LockedSource:
-    """A source resolved to an immutable commit."""
+    """A source resolved to an immutable commit (GitHub) or to a directory URL (CDS).
+
+    A CDS source has no ``repo``, ``ref`` or ``commit``; ``url`` is its directory and ``retrieved``
+    the day its files were hashed, since the files cannot be addressed by a commit.
+    """
 
     title: str
     repo: str
@@ -466,6 +611,8 @@ class LockedSource:
     commit: str
     license_id: str
     files: Mapping[str, LockedFile]
+    url: str = ""
+    retrieved: str = ""
 
 
 @dataclass(frozen=True)
@@ -482,6 +629,7 @@ _REPO = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 _REF = re.compile(r"[A-Za-z0-9._-]{1,100}")
 _REPO_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_CDS_DIRECTORY = re.compile(r"[A-Za-z]+(?:/[A-Za-z0-9]+)+")
 
 
 def check_repo_path(path: str) -> None:
@@ -496,23 +644,37 @@ def lock_to_json(lock: Lock) -> str:
     sources: dict[str, object] = {}
     for source in SOURCES:
         entry = lock.sources[source.key]
-        sources[source.key] = {
-            "title": entry.title,
-            "repo": entry.repo,
-            "ref": entry.ref,
-            "commit": entry.commit,
-            "license": entry.license_id,
-            "files": {
-                path: {"role": f.role, "sha256": f.sha256, "bytes": f.size}
-                for path, f in entry.files.items()
-            },
+        files = {
+            path: {"role": f.role, "sha256": f.sha256, "bytes": f.size}
+            for path, f in entry.files.items()
         }
+        if source.kind == "cds":
+            sources[source.key] = {
+                "title": entry.title,
+                "url": entry.url,
+                "license": entry.license_id,
+                "retrieved": entry.retrieved,
+                "files": files,
+            }
+        else:
+            sources[source.key] = {
+                "title": entry.title,
+                "repo": entry.repo,
+                "ref": entry.ref,
+                "commit": entry.commit,
+                "license": entry.license_id,
+                "files": files,
+            }
     document = {"schema": LOCK_SCHEMA_VERSION, "lockedOn": lock.locked_on, "sources": sources}
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
 
 
-def read_lock(path: Path) -> Lock:
-    """Reads and strictly validates the lock file against :data:`SOURCES`."""
+def read_lock(path: Path, *, allow_missing: bool = False) -> Lock:
+    """Reads and strictly validates the lock file against :data:`SOURCES`.
+
+    With ``allow_missing`` sources the file lacks are left out instead of being an error, which
+    lets ``--refresh-lock`` add a new source to an older lock.
+    """
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
@@ -523,20 +685,33 @@ def read_lock(path: Path) -> Lock:
     require(isinstance(locked_on, str) and _DATE.fullmatch(locked_on) is not None,
             f"{path}: lockedOn must be YYYY-MM-DD")
     raw_sources = document.get("sources")
-    require(isinstance(raw_sources, dict) and set(raw_sources) == set(SOURCES_BY_KEY),
+    require(isinstance(raw_sources, dict)
+            and (set(raw_sources) <= set(SOURCES_BY_KEY) if allow_missing
+                 else set(raw_sources) == set(SOURCES_BY_KEY)),
             f"{path}: sources do not match the script; run with --refresh-lock")
     sources: dict[str, LockedSource] = {}
     for source in SOURCES:
+        if allow_missing and source.key not in raw_sources:
+            continue
         raw = raw_sources[source.key]
         require(isinstance(raw, dict), f"{path}: malformed entry for {source.key}")
-        require(raw.get("repo") == source.repo and raw.get("license") == source.license_id
-                and raw.get("title") == source.title,
+        require(raw.get("license") == source.license_id and raw.get("title") == source.title,
                 f"{path}: {source.key} metadata differs from the script; run --refresh-lock")
-        ref, commit = raw.get("ref"), raw.get("commit")
-        require(isinstance(ref, str) and _REF.fullmatch(ref) is not None,
-                f"{path}: {source.key}: bad ref")
-        require(isinstance(commit, str) and _COMMIT.fullmatch(commit) is not None,
-                f"{path}: {source.key}: commit must be a full 40-digit SHA-1")
+        ref, commit, url, retrieved = "", "", "", ""
+        if source.kind == "cds":
+            url, retrieved = raw.get("url"), raw.get("retrieved")
+            require(url == source.base_url,
+                    f"{path}: {source.key} url differs from the script; run --refresh-lock")
+            require(isinstance(retrieved, str) and _DATE.fullmatch(retrieved) is not None,
+                    f"{path}: {source.key}: retrieved must be YYYY-MM-DD")
+        else:
+            require(raw.get("repo") == source.repo,
+                    f"{path}: {source.key} metadata differs from the script; run --refresh-lock")
+            ref, commit = raw.get("ref"), raw.get("commit")
+            require(isinstance(ref, str) and _REF.fullmatch(ref) is not None,
+                    f"{path}: {source.key}: bad ref")
+            require(isinstance(commit, str) and _COMMIT.fullmatch(commit) is not None,
+                    f"{path}: {source.key}: commit must be a full 40-digit SHA-1")
         raw_files = raw.get("files")
         require(isinstance(raw_files, dict)
                 and list(raw_files) == [f.path for f in source.files],
@@ -554,7 +729,7 @@ def read_lock(path: Path) -> Lock:
                     f"{path}: {source.key}/{source_file.path}: bad size")
             files[source_file.path] = LockedFile(source_file.role, digest, size)
         sources[source.key] = LockedSource(source.title, source.repo, ref, commit,
-                                           source.license_id, files)
+                                           source.license_id, files, url, retrieved)
     return Lock(locked_on, sources)
 
 
@@ -601,6 +776,21 @@ def raw_url(repo: str, commit: str, path: str) -> str:
     return f"{RAW_CONTENT}/{repo}/{commit}/{urllib.parse.quote(path)}"
 
 
+def cds_url(base_url: str, path: str) -> str:
+    """The URL of a file in a CDS catalogue directory (HTTPS only, below :data:`CDS_FTP`)."""
+    check_repo_path(path)
+    require(base_url.startswith(CDS_FTP) and _CDS_DIRECTORY.fullmatch(base_url[len(CDS_FTP):])
+            is not None, f"bad CDS directory: {base_url}")
+    return f"{base_url}/{urllib.parse.quote(path)}"
+
+
+def source_url(source: Source, entry: LockedSource, path: str) -> str:
+    """Where a file of a source is downloaded from."""
+    if source.kind == "cds":
+        return cds_url(entry.url, path)
+    return raw_url(entry.repo, entry.commit, path)
+
+
 def download(url: str, destination: Path, max_bytes: int) -> tuple[str, int]:
     """Streams ``url`` into ``destination``; returns the sha256 digest and the byte count."""
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -634,9 +824,18 @@ def sha256_of(path: Path) -> str:
 
 
 def cache_path(cache: Path, key: str, commit: str, path: str) -> Path:
-    """Where a source file is cached: ``<cache>/<source>/<commit>/<repo path>``."""
+    """Where a source file is cached: ``<cache>/<source>/<commit>/<repo path>``.
+
+    CDS sources have no commit; their folder is called ``cds`` and a cached file is trusted only
+    when its sha256 digest matches the lock.
+    """
     check_repo_path(path)
     return cache / key / commit / path
+
+
+def cache_version(entry: LockedSource) -> str:
+    """The cache folder of a source: its commit, or ``cds`` for a CDS directory."""
+    return entry.commit or "cds"
 
 
 def fetch_locked_files(lock: Lock, cache: Path) -> dict[tuple[str, str], Path]:
@@ -644,49 +843,70 @@ def fetch_locked_files(lock: Lock, cache: Path) -> dict[tuple[str, str], Path]:
 
     A cached copy is reused only when its digest matches; anything else is downloaded again.
     A download whose digest differs from the lock is deleted and reported: it means upstream
-    rewrote history, the lock is stale, or the transfer was tampered with.
+    rewrote history or replaced a file, the lock is stale, or the transfer was tampered with.
     """
     paths: dict[tuple[str, str], Path] = {}
     for source in SOURCES:
         entry = lock.sources[source.key]
         for path, locked in entry.files.items():
-            destination = cache_path(cache, source.key, entry.commit, path)
+            destination = cache_path(cache, source.key, cache_version(entry), path)
             if destination.is_file() and sha256_of(destination) == locked.sha256:
                 paths[(source.key, path)] = destination
                 continue
             print(f"downloading {source.key}: {path}", file=sys.stderr)
-            digest, size = download(raw_url(entry.repo, entry.commit, path), destination,
-                                    locked.size + 1)
+            digest, size = download(source_url(source, entry, path), destination, locked.size + 1)
             if digest != locked.sha256 or size != locked.size:
                 destination.unlink(missing_ok=True)
+                where = f"at commit {entry.commit}" if entry.commit else f"from {entry.url}"
                 raise BuildError(
                     f"{source.key}/{path}: sha256 {digest} ({size} bytes) differs from the lock "
-                    f"({locked.sha256}, {locked.size} bytes) at commit {entry.commit}")
+                    f"({locked.sha256}, {locked.size} bytes) {where}")
             paths[(source.key, path)] = destination
     return paths
 
 
-def refresh_lock(previous: Lock | None, overrides: Mapping[str, str], cache: Path) -> Lock:
-    """Re-resolves every source to a commit, downloads its files and records their digests."""
+def refresh_lock(previous: Lock | None, overrides: Mapping[str, str], cache: Path,
+                 only: Sequence[str] = ()) -> Lock:
+    """Re-resolves every source to a commit, downloads its files and records their digests.
+
+    With ``only``, just those sources are refreshed; the others, and the date of the lock, are
+    taken over from ``previous`` unchanged, so output built from them stays byte for byte the
+    same. Sources the previous lock does not know are always refreshed.
+    """
     today = dt.datetime.now(dt.timezone.utc).date().isoformat()
+    refreshed_all = not only
     sources: dict[str, LockedSource] = {}
     for source in SOURCES:
-        old = previous.sources[source.key] if previous else None
-        ref = overrides.get(source.key) or (old.ref if old else source.default_ref)
-        commit = resolve_commit(source.repo, ref)
+        old = previous.sources.get(source.key) if previous else None
+        if only and source.key not in only and old is not None:
+            sources[source.key] = old
+            continue
+        if source.kind == "cds":
+            ref, commit = "", ""
+            version = "cds"
+        else:
+            ref = overrides.get(source.key) or (old.ref if old else source.default_ref)
+            commit = resolve_commit(source.repo, ref)
+            version = commit
         files: dict[str, LockedFile] = {}
         for source_file in source.files:
-            print(f"downloading {source.key}@{commit[:10]}: {source_file.path}", file=sys.stderr)
-            destination = cache_path(cache, source.key, commit, source_file.path)
-            digest, size = download(raw_url(source.repo, commit, source_file.path), destination,
-                                    MAX_DOWNLOAD_BYTES)
+            print(f"downloading {source.key}@{version[:10]}: {source_file.path}", file=sys.stderr)
+            destination = cache_path(cache, source.key, version, source_file.path)
+            if source.kind == "cds":
+                url = cds_url(source.base_url, source_file.path)
+            else:
+                url = raw_url(source.repo, commit, source_file.path)
+            digest, size = download(url, destination, MAX_DOWNLOAD_BYTES)
             require(size > 0, f"{source.key}/{source_file.path}: empty file")
             files[source_file.path] = LockedFile(source_file.role, digest, size)
-        sources[source.key] = LockedSource(source.title, source.repo, ref, commit,
-                                           source.license_id, files)
+        unchanged = old is not None and old.files == files and source.kind == "cds"
+        sources[source.key] = LockedSource(
+            source.title, source.repo, ref, commit, source.license_id, files,
+            source.base_url, old.retrieved if unchanged and old else today)
         if old is not None:
             describe_lock_changes(source.key, old, sources[source.key])
-    return Lock(today, sources)
+    locked_on = today if refreshed_all or previous is None else previous.locked_on
+    return Lock(locked_on, sources)
 
 
 def load_previous_lock(path: Path) -> Lock | None:
@@ -694,7 +914,7 @@ def load_previous_lock(path: Path) -> Lock | None:
     if not path.is_file():
         return None
     try:
-        return read_lock(path)
+        return read_lock(path, allow_missing=True)
     except BuildError as error:
         warn(f"ignoring the existing lock ({error}); using the default refs")
         return None
@@ -703,7 +923,7 @@ def load_previous_lock(path: Path) -> Lock | None:
 def describe_lock_changes(key: str, old: LockedSource, new: LockedSource) -> None:
     """Prints what a refresh changed; legal files get a prominent warning."""
     if old.commit != new.commit:
-        print(f"{key}: commit {old.commit[:10]} -> {new.commit[:10]}", file=sys.stderr)
+        print(f"{key}: commit {old.commit[:10] or '-'} -> {new.commit[:10] or '-'}", file=sys.stderr)
     for path, locked in new.files.items():
         before = old.files.get(path)
         if before is not None and before.sha256 != locked.sha256:
@@ -963,13 +1183,18 @@ def build_stars(path: Path, constellations: ConstellationNames, report: Report) 
 
 
 # ==========================================================================================
-# Deep-sky objects (OpenNGC)
+# Deep-sky objects (OpenNGC, Sharpless, Barnard, Lynds, Dias)
 # ==========================================================================================
 
 NGC_COLUMNS = ("Name", "Type", "RA", "Dec", "Const", "MajAx", "MinAx", "PosAng", "B-Mag",
-               "V-Mag", "SurfBr", "Hubble", "M", "NGC", "IC", "Common names")
+               "V-Mag", "SurfBr", "Hubble", "M", "NGC", "IC", "Identifiers", "Common names")
 _OPENNGC_NAME = re.compile(r"(NGC|IC)(\d{4})")
 _OPENNGC_REFERENCE = re.compile(r"(\d{1,4})([A-Za-z]{1,2}|\s?NED\d{2})?")
+# Cross-identifications that OpenNGC lists in its "Identifiers" column and that the catalog
+# keeps as extra designations: Caldwell ("C 020"), Sharpless 2 ("SH 2-155"), Melotte ("Mel 025")
+# and Collinder ("Cl 050"). The value is the designation prefix of the catalog.
+_IDENTIFIER_PREFIXES = {"C": "C", "SH 2-": "Sh2-", "Mel": "Mel", "Cl": "Cl"}
+_IDENTIFIER = re.compile(r"(C|SH 2-|Mel|Cl)\s?(\d{1,3})")
 
 
 @dataclass(frozen=True)
@@ -990,6 +1215,7 @@ class NgcRow:
     hubble: str
     messier: int | None
     references: tuple[str, ...]  # OpenNGC row names of the same object, e.g. "NGC0651"
+    identifiers: tuple[str, ...]  # other catalogue designations, e.g. "C 020", "LBN 373"
     common_names: tuple[str, ...]
 
 
@@ -1044,6 +1270,9 @@ def read_ngc_rows(path: Path) -> list[NgcRow]:
             messier=messier,
             references=_references(record["NGC"], "NGC", what)
                        + _references(record["IC"], "IC", what),
+            identifiers=tuple(token for token in
+                              (clean_text(part, f"{what} identifiers")
+                               for part in record["Identifiers"].split(",")) if token),
             common_names=_split_common_names(record["Common names"], f"{what} common names"),
         ))
     return rows
@@ -1103,7 +1332,7 @@ def _object_id(row: NgcRow, messier: int | None) -> str:
 
 
 def _qualifies(row: NgcRow, has_names: bool) -> bool:
-    """The magnitude/size part of the deep-sky selection rule."""
+    """The first (legacy) selection rule: magnitude, size and names."""
     if has_names:
         return True
     if row.kind in PLAIN_STAR_TYPES:
@@ -1113,6 +1342,20 @@ def _qualifies(row: NgcRow, has_names: bool) -> bool:
     if row.b_mag is not None:
         return row.b_mag <= DSO_BLUE_MAGNITUDE_LIMIT
     return row.kind in NEBULA_TYPES and (row.major_axis or 0.0) >= NEBULA_MIN_SIZE_ARCMIN
+
+
+def _extended_qualifies(row: NgcRow) -> bool:
+    """The extended selection rule: what a camera lens or a small telescope can reach."""
+    if row.kind in PLAIN_STAR_TYPES:
+        return False
+    size = row.major_axis or 0.0
+    if row.v_mag is not None and row.v_mag <= EXT_VISUAL_MAGNITUDE_LIMIT:
+        return True
+    if row.v_mag is None and row.b_mag is not None and row.b_mag <= EXT_BLUE_MAGNITUDE_LIMIT:
+        return True
+    if row.kind in NEBULA_TYPES and size >= EXT_NEBULA_MIN_SIZE_ARCMIN:
+        return True
+    return row.kind in CLUSTER_TYPES and size >= EXT_CLUSTER_MIN_SIZE_ARCMIN
 
 
 def _ordered_names(row: NgcRow) -> tuple[str, ...]:
@@ -1127,11 +1370,769 @@ def _ordered_names(row: NgcRow) -> tuple[str, ...]:
     return tuple(names)
 
 
-def build_dsos(ngc_path: Path, addendum_path: Path, constellations: ConstellationNames,
-               report: Report) -> list[Item]:
-    """Selects and converts OpenNGC objects (see the module docstring for the rule)."""
+# ------------------------------------------------------------------------------------------
+# Hand-made tables for the catalogues that come from CDS
+# ------------------------------------------------------------------------------------------
+# Every entry names the constellation the object is expected in, which is checked against the
+# computed one, so a mistyped number fails the build instead of attaching a name to the wrong
+# object. The identifications were made by comparing positions and sizes with OpenNGC and
+# reviewed by hand; each must lie within half a diameter of the Sharpless center.
+
+# Sharpless 2 regions that are an object OpenNGC already lists: Sh2 number -> OpenNGC row. The
+# region becomes one more designation of that object instead of a second marker on the sky.
+SHARPLESS_IDENTIFICATIONS: dict[int, str] = {
+    8: "NGC6334", 11: "NGC6357", 25: "NGC6523", 30: "NGC6514", 37: "IC1284", 44: "IC4701",
+    45: "NGC6618", 49: "NGC6611", 86: "NGC6823", 95: "NGC6842", 100: "NGC6857", 103: "NGC6960",
+    105: "NGC6888", 117: "NGC7000", 125: "IC5146", 131: "IC1396", 142: "NGC7380",
+    155: "C009", 156: "IC1470", 158: "NGC7538", 162: "NGC7635", 171: "NGC7822", 184: "NGC0281",
+    185: "IC0063", 190: "IC1805", 199: "IC1848", 206: "NGC1491", 212: "NGC1624",
+    220: "NGC1499", 222: "NGC1579", 229: "IC0405", 234: "IC0417", 236: "IC0410",
+    237: "NGC1931", 238: "NGC1555", 244: "NGC1952", 248: "IC0443", 252: "NGC2174",
+    255: "IC2162", 273: "NGC2264",
+    275: "NGC2238", 277: "NGC2024", 279: "NGC1977", 281: "NGC1976", 296: "IC2177",
+    298: "NGC2359", 311: "NGC2467",
+}
+
+# Popular names of Sharpless regions that OpenNGC does not list: Sh2 number -> (constellation, names).
+SHARPLESS_NAMES: dict[int, tuple[str, tuple[str, ...]]] = {
+    101: ("Cyg", ("Tulip Nebula",)),
+    108: ("Cyg", ("Gamma Cygni Nebula",)),
+    129: ("Cep", ("Flying Bat Nebula",)),
+    132: ("Cep", ("Lion Nebula",)),
+    136: ("Cep", ("Ghost Nebula",)),
+    157: ("Cas", ("Lobster Claw Nebula",)),
+    240: ("Tau", ("Spaghetti Nebula", "Simeis 147")),
+    261: ("Ori", ("Lower's Nebula",)),
+    264: ("Ori", ("Lambda Orionis Ring",)),
+    274: ("Gem", ("Medusa Nebula", "Abell 21")),
+    276: ("Ori", ("Barnard's Loop",)),
+    290: ("Cnc", ("Abell 31",)),
+    308: ("CMa", ("Dolphin Head Nebula",)),
+}
+
+# Sharpless regions that are not HII regions (the catalogue lists every one of them as HII): the
+# well-known planetary nebulae and the supernova remnant Simeis 147. Sh2 number -> OpenNGC type.
+SHARPLESS_TYPES: dict[int, str] = {188: "PN", 216: "PN", 240: "SNR", 274: "PN", 290: "PN"}
+
+# Popular names of Barnard objects (the number may carry a letter) and of Lynds clouds.
+BARNARD_NAMES: dict[str, tuple[str, str]] = {
+    "72": ("Oph", "Snake Nebula"),
+    "78": ("Oph", "Pipe Nebula"),
+    "86": ("Sgr", "Ink Spot Nebula"),
+    "150": ("Cep", "Seahorse Nebula"),
+}
+LYNDS_NAMES: dict[int, tuple[str, str]] = {
+    1235: ("Cep", "Shark Nebula"),
+    1622: ("Ori", "Boogeyman Nebula"),
+}
+
+# Open clusters of the Dias catalogue that are another object in the catalog: designation ->
+# OpenNGC row. Clusters whose designation the catalog carries already (Melotte 22 is the
+# Pleiades, Melotte 25 the Hyades, Melotte 111 is listed) are recognized by themselves.
+OPEN_CLUSTER_IDENTIFICATIONS: dict[str, str] = {"Trumpler 37": "IC1396"}
+
+# Popular names of the Dias clusters.
+OPEN_CLUSTER_NAMES: dict[str, tuple[str, str]] = {
+    "Melotte 20": ("Per", "Alpha Persei Cluster"),
+    "Collinder 69": ("Ori", "Lambda Orionis Cluster"),
+    "Collinder 70": ("Ori", "Orion's Belt Cluster"),
+    "Stock 2": ("Cas", "Muscleman Cluster"),
+}
+
+# Objects the catalog treats as showpieces beyond the Messier and Caldwell objects: widely
+# photographed targets with a popular name. Prominence 1.
+SHOWPIECES: tuple[str, ...] = (
+    "B33", "NGC2024", "IC1805", "IC1848", "NGC281", "NGC1499", "NGC7380", "IC1396", "IC5070",
+    "NGC6334", "NGC6357", "NGC2359", "IC2177", "NGC1977", "IC4592", "NGC1909", "NGC1333",
+    "IC4604", "IC4628", "NGC2174", "NGC7822", "Sh2-129", "Sh2-132", "Sh2-240", "Sh2-276",
+    "LDN1622",
+)
+
+
+# ------------------------------------------------------------------------------------------
+# Positions: precession and constellations
+# ------------------------------------------------------------------------------------------
+
+def precess(ra: float, dec: float, from_jd: float, to_jd: float) -> tuple[float, float]:
+    """Precesses a position (degrees) between two equinoxes (IAU 1976, Meeus ch. 21).
+
+    The Sharpless and Lynds positions are referred to the equinoxes B1900.0 and B1950.0. Their own
+    accuracy is a few arcminutes, so the plain rotation is enough; no proper motion is applied.
+    """
+    t0 = (from_jd - JD_J2000) / 36525.0
+    t = (to_jd - from_jd) / 36525.0
+    base = (2306.2181 + 1.39656 * t0 - 0.000139 * t0 * t0) * t
+    zeta = (base + (0.30188 - 0.000344 * t0) * t * t + 0.017998 * t ** 3) / 3600.0
+    z = (base + (1.09468 + 0.000066 * t0) * t * t + 0.018203 * t ** 3) / 3600.0
+    theta = ((2004.3109 - 0.85330 * t0 - 0.000217 * t0 * t0) * t
+             - (0.42665 + 0.000217 * t0) * t * t - 0.041833 * t ** 3) / 3600.0
+    radians = math.radians
+    a = math.cos(radians(dec)) * math.sin(radians(ra + zeta))
+    b = (math.cos(radians(theta)) * math.cos(radians(dec)) * math.cos(radians(ra + zeta))
+         - math.sin(radians(theta)) * math.sin(radians(dec)))
+    c = (math.sin(radians(theta)) * math.cos(radians(dec)) * math.cos(radians(ra + zeta))
+         + math.cos(radians(theta)) * math.sin(radians(dec)))
+    return (wrap_degrees(math.degrees(math.atan2(a, b)) + z),
+            math.degrees(math.asin(max(-1.0, min(1.0, c)))))
+
+
+def angular_separation(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Angular distance in degrees between two (right ascension, declination) positions."""
+    ra1, de1, ra2, de2 = map(math.radians, (a[0], a[1], b[0], b[1]))
+    sine = math.hypot(math.cos(de2) * math.sin(ra2 - ra1),
+                      math.cos(de1) * math.sin(de2) - math.sin(de1) * math.cos(de2) * math.cos(ra2 - ra1))
+    cosine = math.sin(de1) * math.sin(de2) + math.cos(de1) * math.cos(de2) * math.cos(ra2 - ra1)
+    return math.degrees(math.atan2(sine, cosine))
+
+
+@dataclass(frozen=True)
+class ConstellationBoundaries:
+    """The IAU constellation boundaries of Delporte (1930) as arranged by Roman (1987).
+
+    Each row is the southern edge of a constellation's part: the right ascension range in hours
+    and the lower declination, all at the equinox B1875.0. The first row, in file order, that
+    contains a position is its constellation.
+    """
+
+    rows: tuple[tuple[float, float, float, str], ...]
+
+    @classmethod
+    def read(cls, path: Path, constellations: ConstellationNames) -> ConstellationBoundaries:
+        rows = []
+        try:
+            lines = path.read_text(encoding="ascii").splitlines()
+        except (OSError, UnicodeError) as error:
+            raise BuildError(f"cannot read {path}: {error}") from error
+        for number, line in enumerate(lines, start=1):
+            what = f"{path.name}:{number}"
+            if not line.strip():
+                continue
+            low = present(parse_float(line[1:8], f"{what} RA low"), f"{what}: no lower RA")
+            high = present(parse_float(line[9:16], f"{what} RA high"), f"{what}: no upper RA")
+            south = present(parse_float(line[17:25], f"{what} Dec"), f"{what}: no declination")
+            require(0.0 <= low < high <= 24.0 and -90.0 <= south <= 90.0, f"{what}: bad row")
+            rows.append((low, high, south, constellations.resolve(line[26:29], what)))
+        require(len(rows) == 357, f"{path.name}: expected 357 boundary rows, found {len(rows)}")
+        require({row[3] for row in rows} == set(constellations.canonical.values()),
+                f"{path.name}: does not cover exactly the 88 constellations")
+        return cls(tuple(rows))
+
+    def find(self, ra: float, dec: float, what: str) -> str:
+        """The IAU abbreviation of the constellation that contains a J2000.0 position."""
+        ra_1875, dec_1875 = precess(ra, dec, JD_J2000, JD_B1875)
+        hours = ra_1875 / 15.0
+        for low, high, south, abbreviation in self.rows:
+            if south <= dec_1875 and low <= hours < high:
+                return abbreviation
+        raise BuildError(f"{what}: no constellation contains ({ra}, {dec})")
+
+
+# ------------------------------------------------------------------------------------------
+# CDS catalogues
+# ------------------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class SharplessRegion:
+    """One row of Sharpless' catalogue of HII regions, with the J2000.0 position."""
+
+    number: int
+    ra: float
+    dec: float
+    diameter: float  # arcminutes, the largest extent
+    form: int  # 1 circular, 2 elliptical, 3 irregular
+    brightness: int  # 1 faintest ... 3 brightest
+
+
+def _fixed_int(text: str, what: str) -> int:
+    """An integer field of a fixed-width record; a blank field is 0 (as in the CDS files)."""
+    value = text.strip()
+    if not value:
+        return 0
+    require(re.fullmatch(r"\d{1,9}", value) is not None, f"{what}: not an integer: {text!r}")
+    return int(value)
+
+
+def _signed_degrees(sign: str, degrees: str, minutes: str, seconds: str, what: str) -> float:
+    require(sign in "+- ", f"{what}: bad sign {sign!r}")
+    value = (_fixed_int(degrees, what) + _fixed_int(minutes, what) / 60.0
+             + _fixed_int(seconds, what) / 3600.0)
+    return -value if sign == "-" else value
+
+
+def _read_text_lines(path: Path) -> list[str]:
+    """The lines of a plain or gzip-compressed ASCII file."""
+    opener = gzip.open if path.suffix == ".gz" else open
+    try:
+        with opener(path, "rt", encoding="ascii", newline="") as handle:
+            return handle.read().splitlines()
+    except (OSError, UnicodeError, EOFError) as error:
+        raise BuildError(f"cannot read {path}: {error}") from error
+
+
+def read_sharpless(path: Path) -> list[SharplessRegion]:
+    """Parses VII/20 ``catalog.dat``. Positions are at B1900.0 and are precessed to J2000.0."""
+    regions = []
+    for number, line in enumerate(_read_text_lines(path), start=1):
+        what = f"Sharpless line {number}"
+        require(len(line) >= 57, f"{what}: short record")
+        sh2 = _fixed_int(line[0:4], what)
+        hours = (_fixed_int(line[20:22], what) * 3600.0 + _fixed_int(line[22:24], what) * 60.0
+                 + _fixed_int(line[24:27], what) / 10.0) / 3600.0
+        dec = _signed_degrees(line[27], line[28:30], line[30:32], line[32:34], what)
+        ra, de = precess(hours * 15.0, dec, JD_B1900, JD_J2000)
+        diameter, form, brightness = (_fixed_int(line[48:52], what), _fixed_int(line[52:53], what),
+                                      _fixed_int(line[54:55], what))
+        require(1 <= sh2 <= 313 and diameter > 0 and form in (1, 2, 3) and brightness in (1, 2, 3)
+                and 0.0 <= hours < 24.0 and -90.0 <= dec <= 90.0, f"{what}: values out of range")
+        regions.append(SharplessRegion(sh2, ra, de, float(diameter), form, brightness))
+    require([r.number for r in regions] == list(range(1, 314)),
+            "Sharpless: expected the regions 1 to 313 in order")
+    return regions
+
+
+@dataclass(frozen=True)
+class BarnardObject:
+    """One of Barnard's dark objects, with the J2000.0 position of the CDS file."""
+
+    designation: str  # "33", "67a"
+    ra: float
+    dec: float
+    b1875: tuple[float, float]  # the original position, to cross-check the J2000.0 one
+    diameter: float | None  # arcminutes
+
+
+def read_barnard(path: Path) -> list[BarnardObject]:
+    """Parses VII/220A ``barnard.dat``."""
+    objects = []
+    for number, line in enumerate(_read_text_lines(path), start=1):
+        what = f"Barnard line {number}"
+        line = line.ljust(44)
+        designation = line[1:5].strip().lower()
+        require(re.fullmatch(r"\d{1,3}[a-z]?", designation) is not None,
+                f"{what}: bad Barnard number {line[1:5]!r}")
+        ra_1875 = (_fixed_int(line[5:7], what) + _fixed_int(line[8:10], what) / 60.0
+                   + _fixed_int(line[11:13], what) / 3600.0) * 15.0
+        de_1875 = _signed_degrees(line[14], line[15:17], line[18:20], "0", what)
+        ra = (_fixed_int(line[22:24], what) + _fixed_int(line[25:27], what) / 60.0
+              + _fixed_int(line[28:30], what) / 3600.0) * 15.0
+        dec = _signed_degrees(line[32], line[33:35], line[36:38], "0", what)
+        size = parse_float(line[39:44], f"{what} diameter")
+        require(0.0 <= ra < 360.0 and -90.0 <= dec <= 90.0 and (size is None or 0.0 < size <= 600.0),
+                f"{what}: values out of range")
+        objects.append(BarnardObject(designation, ra, dec, (ra_1875, de_1875), size))
+    require(len(objects) == 349, f"Barnard: expected 349 objects, found {len(objects)}")
+    require(len({o.designation for o in objects}) == 349, "Barnard: designations repeat")
+    return objects
+
+
+@dataclass(frozen=True)
+class LyndsCloud:
+    """One Lynds dark cloud, with the J2000.0 position and its area-equivalent diameter."""
+
+    number: int
+    ra: float
+    dec: float
+    area: float  # square degrees
+    opacity: int  # 1 lightest ... 6 darkest
+    barnard: tuple[str, ...]  # Barnard objects the cloud contains, as in the source
+
+    @property
+    def diameter(self) -> float:
+        """Diameter in arcminutes of the circle that has the cloud's area."""
+        return 2.0 * math.sqrt(self.area / math.pi) * 60.0
+
+
+def read_lynds(path: Path) -> list[LyndsCloud]:
+    """Parses VII/7A ``ldn``. Positions are at B1950.0 and are precessed to J2000.0.
+
+    The four clouds at the end of the file that have no LDN number are skipped.
+    """
+    clouds = []
+    for number, line in enumerate(_read_text_lines(path), start=1):
+        what = f"Lynds line {number}"
+        line = line.ljust(92)
+        if not line[0:4].strip():
+            continue
+        ldn = _fixed_int(line[0:4], what)
+        hours = _fixed_int(line[5:7], what) + (parse_float(line[8:12], f"{what} RA") or 0.0) / 60.0
+        dec = _signed_degrees(line[15], line[16:18], line[19:21], "0", what)
+        area = present(parse_float(line[36:43], f"{what} area"), f"{what}: no area")
+        opacity = _fixed_int(line[44:45], what)
+        ra, de = precess(hours * 15.0, dec, JD_B1950, JD_J2000)
+        require(1 <= ldn <= 1802 and 0.0 <= hours < 24.0 and -90.0 <= dec <= 90.0
+                and 0.0 <= area < 100.0 and 0 <= opacity <= 6, f"{what}: values out of range")
+        barnard = tuple(token.lower() for token in
+                        (line[60 + 4 * k:64 + 4 * k].strip() for k in range(8)) if token)
+        clouds.append(LyndsCloud(ldn, ra, de, area, opacity, barnard))
+    require(len(clouds) == 1787, f"Lynds: expected 1,787 numbered clouds, found {len(clouds)}")
+    require(len({c.number for c in clouds}) == len(clouds), "Lynds: numbers repeat")
+    return clouds
+
+
+@dataclass(frozen=True)
+class OpenClusterRecord:
+    """A Collinder, Melotte, Trumpler or Stock cluster of the Dias catalogue (J2000.0)."""
+
+    catalogue: str
+    number: int
+    ra: float
+    dec: float
+    diameter: float  # arcminutes
+
+    @property
+    def designation(self) -> str:
+        return f"{self.catalogue} {self.number}"
+
+    @property
+    def object_id(self) -> str:
+        return f"{OPEN_CLUSTER_CATALOGUES[self.catalogue]}{self.number}"
+
+
+def read_dias(path: Path) -> list[OpenClusterRecord]:
+    """Parses B/ocl ``clusters.dat``; returns the clusters of :data:`OPEN_CLUSTER_CATALOGUES`."""
+    clusters = []
+    for number, line in enumerate(_read_text_lines(path), start=1):
+        what = f"Dias line {number}"
+        require(len(line) >= 36, f"{what}: short record")
+        line = line.ljust(47)
+        match = re.fullmatch(r"([A-Za-z]+) (\d+)", line[0:17].strip())
+        if match is None or match.group(1) not in OPEN_CLUSTER_CATALOGUES:
+            continue
+        ra = (_fixed_int(line[18:20], what) + _fixed_int(line[21:23], what) / 60.0
+              + _fixed_int(line[24:26], what) / 3600.0) * 15.0
+        dec = _signed_degrees(line[27], line[28:30], line[31:33], line[34:36], what)
+        size = parse_float(line[41:47], f"{what} diameter")
+        require(0.0 <= ra < 360.0 and -90.0 <= dec <= 90.0, f"{what}: position out of range")
+        if size is not None and size > 0.0:
+            clusters.append(OpenClusterRecord(match.group(1), int(match.group(2)), ra, dec, size))
+    return clusters
+
+
+# ------------------------------------------------------------------------------------------
+# Building the catalog
+# ------------------------------------------------------------------------------------------
+
+@dataclass
+class DsoDraft:
+    """A catalog object while it is assembled; :func:`draft_item` turns it into JSON."""
+
+    id: str
+    kind: str
+    ra: float
+    de: float
+    origin: str  # openngc, sharpless, barnard, lynds or dias
+    messier: int | None = None
+    ngc: list[int] = field(default_factory=list)
+    ic: list[int] = field(default_factory=list)
+    cat: list[str] = field(default_factory=list)
+    names: list[str] = field(default_factory=list)
+    constellation: str | None = None
+    v_mag: float | None = None
+    b_mag: float | None = None
+    major: float | None = None
+    minor: float | None = None
+    position_angle: float | None = None
+    hubble: str = ""
+    surface_brightness: float | None = None
+    legacy: bool = False  # selected by the first (pre-Caldwell) rule
+    caldwell: int | None = None
+    sharpless_size: float | None = None  # of the Sharpless 2 region this object is or contains
+    sharpless_brightness: int | None = None
+    opacity: int | None = None
+
+    @property
+    def magnitude(self) -> float | None:
+        """The magnitude the apps show: V, else B."""
+        return self.v_mag if self.v_mag is not None else self.b_mag
+
+    def designations(self) -> list[str]:
+        """Every catalogue designation in compact form: ``M31``, ``NGC224``, ``C14``, ``Sh2-155``."""
+        found = [self.id] if re.fullmatch(r"(?:M|NGC|IC)\d+", self.id) is None else []
+        if self.messier is not None:
+            found.append(f"M{self.messier}")
+        found += [f"NGC{n}" for n in self.ngc] + [f"IC{n}" for n in self.ic]
+        return found + self.cat
+
+
+def _row_cross_identifications(row: NgcRow) -> list[str]:
+    """Caldwell, Sharpless 2, Melotte and Collinder designations from the Identifiers column."""
+    found = []
+    for token in row.identifiers:
+        match = _IDENTIFIER.fullmatch(token)
+        if match:
+            found.append(f"{_IDENTIFIER_PREFIXES[match.group(1)]}{int(match.group(2))}")
+    return found
+
+
+def _cat_sort_key(designation: str) -> tuple[int, int]:
+    """Caldwell first, then Sharpless, Melotte and Collinder numbers; ascending within each."""
+    order = {"C": 0, "Sh2-": 1, "Mel": 2, "Cl": 3, "Tr": 4, "St": 5, "B": 6, "LDN": 7}
+    prefix = re.match(r"[A-Za-z]+(?:2-)?", designation).group(0)  # type: ignore[union-attr]
+    return order.get(prefix, 9), int(re.search(r"\d+", designation[len(prefix):]).group(0))  # type: ignore[union-attr]
+
+
+def openngc_drafts(rows: Mapping[str, NgcRow], messier: Mapping[str, int],
+                   designations: Mapping[str, dict[str, list[int]]], forced: set[str],
+                   constellations: ConstellationNames) -> dict[str, DsoDraft]:
+    """The OpenNGC objects of the first and the extended selection, keyed by row name.
+
+    Beyond the selection rules, every Caldwell object and every row in ``forced`` (those the
+    hand-made tables refer to) is taken.
+    """
+    drafts: dict[str, DsoDraft] = {}
+    caldwell_rows: dict[int, str] = {}
+    for row in rows.values():
+        if row.kind in EXCLUDED_DSO_TYPES:
+            continue
+        for designation in _row_cross_identifications(row):
+            if designation.startswith("C") and designation[1].isdigit():
+                number = int(designation[1:])
+                require(number not in caldwell_rows,
+                        f"Caldwell {number} is on {caldwell_rows.get(number)} and {row.name}")
+                caldwell_rows[number] = row.name
+        own = re.fullmatch(r"C(\d{3})", row.name)  # the four Caldwell objects OpenNGC lists as C###
+        if own:
+            caldwell_rows[int(own.group(1))] = row.name
+
+    caldwell_of = {name: number for number, name in caldwell_rows.items()}
+    for row in rows.values():
+        if row.kind in EXCLUDED_DSO_TYPES:
+            continue
+        number = messier.get(row.name)
+        names = _ordered_names(row)
+        legacy = number is not None or _qualifies(row, bool(names))
+        if not (legacy or row.name in caldwell_of or row.name in forced or _extended_qualifies(row)):
+            continue
+        what = f"OpenNGC {row.name}"
+        require(row.kind in DSO_TYPES, f"{what}: unexpected type {row.kind!r}")
+        draft = DsoDraft(
+            id=_object_id(row, number), kind=row.kind,
+            ra=wrap_degrees(rounded(right_ascension_degrees(row.ra, f"{what} RA"), 6)),
+            de=rounded(declination_degrees(row.dec, f"{what} Dec"), 6),
+            origin="openngc", messier=number, names=list(names), legacy=legacy,
+            caldwell=caldwell_of.get(row.name), v_mag=row.v_mag, b_mag=row.b_mag,
+            major=row.major_axis, minor=row.minor_axis, position_angle=row.position_angle,
+            hubble=row.hubble, surface_brightness=row.surface_brightness)
+        by_catalogue = designations.get(row.name, {})
+        draft.ngc = list(by_catalogue.get("NGC", []))
+        draft.ic = list(by_catalogue.get("IC", []))
+        if row.constellation.strip():
+            draft.constellation = constellations.resolve(
+                row.constellation, what, aliases=OPENNGC_CONSTELLATION_ALIASES)
+        cat = [c for c in _row_cross_identifications(row) if not c.startswith("C") or not c[1:].isdigit()]
+        if draft.caldwell is not None and not re.fullmatch(r"C\d+", draft.id):
+            cat.append(f"C{draft.caldwell}")
+        own_id = _object_id(row, None)
+        if number is not None and own_id != f"M{number}" and not _OPENNGC_NAME.fullmatch(row.name):
+            cat.append(own_id)  # M45 is also Melotte 22
+        draft.cat = sorted(dict.fromkeys(cat), key=_cat_sort_key)
+        drafts[row.name] = draft
+    return drafts
+
+
+def drop_foreign_numbers(drafts: Mapping[str, DsoDraft], report: Report) -> None:
+    """Removes NGC/IC cross-references that point at another object of the catalog.
+
+    An NGC or IC number belongs to the object that bears it as its name. OpenNGC lists a few
+    cross-references to numbers that are galaxies in their own right (NGC 7418 and NGC 7368 both
+    "are" IC 1459, which is another galaxy 35 arcminutes away); the first release never met
+    them because it listed neither of the two.
+    """
+    owners = {draft.id: draft for draft in drafts.values()}
+    for draft in drafts.values():
+        for numbers, prefix in ((draft.ngc, "NGC"), (draft.ic, "IC")):
+            for number in list(numbers):
+                owner = owners.get(f"{prefix}{number}")
+                if owner is not None and owner is not draft:
+                    numbers.remove(number)
+                    report.note(f"dsos: {draft.id} does not carry {prefix} {number}: it is "
+                                f"a listed object of its own")
+
+
+def sharpless_drafts(regions: Sequence[SharplessRegion], drafts: dict[str, DsoDraft],
+                     boundaries: ConstellationBoundaries, report: Report) -> list[DsoDraft]:
+    """Adds the Sharpless 2 regions: as designations of OpenNGC objects or as new objects."""
+    by_number = {r.number: r for r in regions}
+    identified: dict[int, str] = dict(SHARPLESS_IDENTIFICATIONS)
+    for name, draft in drafts.items():
+        for designation in draft.cat:
+            if designation.startswith("Sh2-"):
+                number = int(designation[4:])
+                require(identified.get(number, name) == name,
+                        f"Sh2-{number} is {identified.get(number)} in the table but {name} in OpenNGC")
+                identified[number] = name
+    merged = 0
+    for number, row_name in sorted(identified.items()):
+        region = present(by_number.get(number), f"Sh2-{number}: not in the catalogue")
+        target = present(drafts.get(row_name), f"Sh2-{number}: {row_name} is not in the catalog")
+        separation = angular_separation((region.ra, region.dec), (target.ra, target.de))
+        require(separation <= max(0.25, region.diameter / 120.0),
+                f"Sh2-{number} is {separation:.2f} degrees from {row_name}")
+        designation = f"Sh2-{number}"
+        if designation not in target.cat:
+            target.cat.append(designation)
+            target.cat.sort(key=_cat_sort_key)
+        target.sharpless_size = float(region.diameter)
+        target.sharpless_brightness = region.brightness
+        merged += 1
+    created = []
+    for region in regions:
+        if region.number in identified:
+            continue
+        what = f"Sh2-{region.number}"
+        constellation = boundaries.find(region.ra, region.dec, what)
+        name = SHARPLESS_NAMES.get(region.number)
+        if name is not None:
+            require(name[0] == constellation,
+                    f"{what} ({name[1][0]}) lies in {constellation}, not {name[0]}")
+        draft = DsoDraft(
+            id=what, kind=SHARPLESS_TYPES.get(region.number, "HII"), origin="sharpless",
+            ra=rounded(region.ra, 6), de=rounded(region.dec, 6), constellation=constellation,
+            names=list(name[1]) if name else [], major=float(region.diameter),
+            minor=float(region.diameter) if region.form == 1 else None,
+            sharpless_size=float(region.diameter), sharpless_brightness=region.brightness)
+        created.append(draft)
+    for number, (constellation, names) in SHARPLESS_NAMES.items():
+        require(number not in identified, f"Sh2-{number} ({names[0]}) is an OpenNGC object already")
+    report.note(f"dsos: Sharpless 2: {merged} regions are designations of OpenNGC objects, "
+                f"{len(created)} are new objects")
+    return created
+
+
+def barnard_drafts(objects: Sequence[BarnardObject], existing: Mapping[str, DsoDraft],
+                   boundaries: ConstellationBoundaries, report: Report) -> list[DsoDraft]:
+    """Adds Barnard's dark objects that OpenNGC does not list (it has B 33, the Horsehead)."""
+    by_id = {draft.id: draft for draft in existing.values()}
+    created, skipped = [], 0
+    for item in objects:
+        identifier = f"B{item.designation}"
+        what = f"Barnard {item.designation}"
+        # The CDS positions come from precessing Barnard's 1875 ones; check the two agree.
+        precessed = precess(item.b1875[0], item.b1875[1], JD_B1875, JD_J2000)
+        require(angular_separation(precessed, (item.ra, item.dec)) < 0.3,
+                f"{what}: the J2000 position is far from the precessed 1875 position")
+        if identifier in by_id:
+            require(angular_separation((by_id[identifier].ra, by_id[identifier].de),
+                                       (item.ra, item.dec)) < 0.2,
+                    f"{what}: far from the OpenNGC position")
+            skipped += 1
+            continue
+        constellation = boundaries.find(item.ra, item.dec, what)
+        name = BARNARD_NAMES.get(item.designation)
+        if name is not None:
+            require(name[0] == constellation,
+                    f"{what} ({name[1]}) lies in {constellation}, not {name[0]}")
+        created.append(DsoDraft(
+            id=identifier, kind="DrkN", origin="barnard", ra=rounded(item.ra, 6),
+            de=rounded(item.dec, 6), constellation=constellation,
+            names=[name[1]] if name else [], major=item.diameter))
+    for designation in BARNARD_NAMES:
+        require(any(item.designation == designation for item in objects),
+                f"Barnard {designation}: not in the catalogue")
+    report.note(f"dsos: Barnard: {len(created)} new dark nebulae, {skipped} already in OpenNGC")
+    return created
+
+
+def lynds_drafts(clouds: Sequence[LyndsCloud], boundaries: ConstellationBoundaries,
+                 report: Report) -> list[DsoDraft]:
+    """Adds the darkest and the largest Lynds clouds, and the named ones (see the cut above)."""
+    by_number = {c.number: c for c in clouds}
+    for number in LYNDS_NAMES:
+        require(number in by_number, f"LDN {number}: not in the catalogue")
+    created = []
+    for cloud in clouds:
+        keep = (cloud.opacity >= LYNDS_DARKEST_OPACITY
+                or cloud.area >= LYNDS_MIN_AREA_SQUARE_DEGREES or cloud.number in LYNDS_NAMES)
+        if not keep:
+            continue
+        what = f"LDN {cloud.number}"
+        constellation = boundaries.find(cloud.ra, cloud.dec, what)
+        name = LYNDS_NAMES.get(cloud.number)
+        if name is not None:
+            require(name[0] == constellation,
+                    f"{what} ({name[1]}) lies in {constellation}, not {name[0]}")
+        created.append(DsoDraft(
+            id=f"LDN{cloud.number}", kind="DrkN", origin="lynds", ra=rounded(cloud.ra, 6),
+            de=rounded(cloud.dec, 6), constellation=constellation,
+            names=[name[1]] if name else [], major=rounded(cloud.diameter, 2),
+            opacity=cloud.opacity))
+    report.note(f"dsos: Lynds: {len(created)} of {len(clouds)} clouds (opacity {LYNDS_DARKEST_OPACITY} "
+                f"or at least {LYNDS_MIN_AREA_SQUARE_DEGREES:g} square degree, or named)")
+    return created
+
+
+def open_cluster_drafts(clusters: Sequence[OpenClusterRecord], drafts: Mapping[str, DsoDraft],
+                        boundaries: ConstellationBoundaries, report: Report) -> list[DsoDraft]:
+    """Adds the large Collinder, Melotte, Trumpler and Stock clusters the catalog lacks.
+
+    ``drafts`` are the OpenNGC objects by row name. A cluster that one of them already carries as
+    a designation (Melotte 22 is the Pleiades, Melotte 25 the Hyades) is not added again.
+    """
+    by_designation = {c.designation: c for c in clusters}
+    known = {designation for draft in drafts.values() for designation in draft.designations()}
+    for designation in list(OPEN_CLUSTER_NAMES) + list(OPEN_CLUSTER_IDENTIFICATIONS):
+        require(designation in by_designation, f"{designation}: not in the Dias catalogue")
+    created, recognized = [], 0
+    for cluster in clusters:
+        if not OPEN_CLUSTER_MIN_SIZE_ARCMIN <= cluster.diameter <= OPEN_CLUSTER_MAX_SIZE_ARCMIN:
+            continue
+        what = cluster.designation
+        row_name = OPEN_CLUSTER_IDENTIFICATIONS.get(what)
+        if row_name is not None:
+            target = present(drafts.get(row_name), f"{what}: {row_name} is not in the catalog")
+            require(angular_separation((cluster.ra, cluster.dec), (target.ra, target.de))
+                    <= cluster.diameter / 120.0, f"{what}: far from {row_name}")
+            target.cat.append(cluster.object_id)
+            target.cat.sort(key=_cat_sort_key)
+            recognized += 1
+            continue
+        if cluster.object_id in known:
+            recognized += 1
+            continue
+        constellation = boundaries.find(cluster.ra, cluster.dec, what)
+        name = OPEN_CLUSTER_NAMES.get(what)
+        if name is not None:
+            require(name[0] == constellation,
+                    f"{what} ({name[1]}) lies in {constellation}, not {name[0]}")
+        created.append(DsoDraft(
+            id=cluster.object_id, kind="OCl", origin="dias", ra=rounded(cluster.ra, 6),
+            de=rounded(cluster.dec, 6), constellation=constellation,
+            names=[name[1]] if name else [], major=cluster.diameter))
+    report.note(f"dsos: Dias: {len(created)} large clusters added, {recognized} already in the catalog")
+    return created
+
+
+# ------------------------------------------------------------------------------------------
+# Prominence
+# ------------------------------------------------------------------------------------------
+
+def dso_prominence(draft: DsoDraft, showpieces: frozenset[str]) -> int:
+    """How conspicuous an object is, from 1 (showpiece) to 4 (obscure).
+
+    1. Showpiece: Messier and Caldwell objects, the hand-picked :data:`SHOWPIECES`, and anything
+       brighter than magnitude 4.
+    2. Prominent: brighter than magnitude 8; named objects brighter than magnitude 10 or larger
+       than 30'; nebulae of at least 60', and Sharpless regions of at least 60' when of
+       brightness class 2 or 3 (also when they are an NGC/IC object); named dark nebulae and
+       Barnard objects of at least 3 degrees; Dias clusters of at least 2 degrees.
+    3. Notable: everything the first selection rule picked (so no object of the first release
+       is unlisted); any other named object; nebulae of at least 10'; Sharpless regions of at
+       least 30', or 10' when of the brightest class; Barnard objects of at least 1 degree;
+       Lynds clouds that are at least 3 degrees across, or opaque (class 6) and at least 20'
+       across; open clusters and associations of at least 30'.
+    4. Obscure: the rest. Found by search and drawn at narrow fields only.
+
+    Plain stars (`*`, `**`, a few named entries inherited from NGC/IC) are never above 3. Dark
+    nebulae have no magnitude and are rated by name, size and, for Lynds clouds, opacity. A size is
+    the major axis in arcminutes.
+    """
+    size = draft.major or 0.0
+    magnitude = draft.magnitude
+    named = bool(draft.names)
+    is_dark = draft.kind == "DrkN"
+    is_nebula = draft.kind in NEBULA_TYPES and not is_dark
+    if draft.messier is not None or draft.caldwell is not None or draft.id in showpieces:
+        return 1
+    if draft.kind in PLAIN_STAR_TYPES:
+        return 3 if draft.legacy else 4
+    if magnitude is not None and magnitude <= PROMINENCE_SHOWPIECE_MAGNITUDE:
+        return 1
+    if magnitude is not None and magnitude <= PROMINENCE_BRIGHT_MAGNITUDE:
+        return 2
+    if named and ((magnitude is not None and magnitude <= PROMINENCE_NOTABLE_MAGNITUDE)
+                  or size >= PROMINENCE_NOTABLE_CLUSTER_ARCMIN):
+        return 2
+    sharpless_size = draft.sharpless_size or 0.0
+    if sharpless_size >= PROMINENCE_LARGE_NEBULA_ARCMIN and (draft.sharpless_brightness or 0) >= 2:
+        return 2
+    if is_nebula and size >= PROMINENCE_LARGE_NEBULA_ARCMIN and draft.origin == "openngc":
+        return 2
+    if is_dark and named:
+        return 2
+    if is_dark and draft.origin != "lynds" and size >= PROMINENCE_LARGE_DARK_ARCMIN:
+        return 2
+    if draft.origin == "dias" and size >= 2 * 60.0:
+        return 2
+    if draft.legacy or named:
+        return 3
+    if is_nebula and size >= PROMINENCE_NOTABLE_NEBULA_ARCMIN:
+        return 3
+    if sharpless_size >= SHARPLESS_NOTABLE_ARCMIN or (
+            draft.sharpless_brightness == 3 and sharpless_size >= SHARPLESS_BRIGHT_NOTABLE_ARCMIN):
+        return 3
+    if draft.origin == "lynds":
+        if size >= PROMINENCE_LARGE_DARK_ARCMIN or (
+                (draft.opacity or 0) >= LYNDS_DARKEST_OPACITY and size >= LYNDS_NOTABLE_OPAQUE_ARCMIN):
+            return 3
+    elif is_dark and size >= PROMINENCE_NOTABLE_DARK_ARCMIN:
+        return 3
+    if draft.kind in CLUSTER_TYPES and size >= PROMINENCE_NOTABLE_CLUSTER_ARCMIN:
+        return 3
+    return 4
+
+
+# ------------------------------------------------------------------------------------------
+# Output
+# ------------------------------------------------------------------------------------------
+
+def draft_item(draft: DsoDraft, prominence: int) -> Item:
+    """The JSON object of a draft (keys in the order the file documents)."""
+    what = f"object {draft.id}"
+    obj: Item = {"id": draft.id}
+    if draft.messier is not None:
+        obj["m"] = draft.messier
+    if draft.ngc:
+        obj["ngc"] = draft.ngc
+    if draft.ic:
+        obj["ic"] = draft.ic
+    if draft.cat:
+        obj["cat"] = draft.cat
+    if draft.names:
+        obj["names"] = draft.names
+    obj["t"] = draft.kind
+    obj["ra"] = draft.ra
+    obj["de"] = draft.de
+    if draft.constellation:
+        obj["c"] = draft.constellation
+    for key, value, places, low, high in (
+        ("vm", draft.v_mag, 2, -30.0, 40.0), ("bm", draft.b_mag, 2, -30.0, 40.0),
+        ("maj", draft.major, 2, 0.0, 100000.0), ("min", draft.minor, 2, 0.0, 100000.0),
+        ("pa", draft.position_angle, 1, 0.0, 360.0), ("sb", draft.surface_brightness, 2, 0.0, 40.0),
+    ):
+        if value is not None:
+            require_range(value, low, high, f"{what} {key}")
+            obj[key] = rounded(value, places)
+    if draft.hubble:
+        obj["h"] = draft.hubble
+    obj["p"] = prominence
+    return obj
+
+
+_NATURAL_PART = re.compile(r"\d+|\D+")
+
+
+def _natural_key(identifier: str) -> tuple[tuple[int, int, str], ...]:
+    """Sorts ``B2`` before ``B10`` and ``Sh2-9`` before ``Sh2-10``."""
+    return tuple((0, int(part), "") if part.isdigit() else (1, 0, part)
+                 for part in _NATURAL_PART.findall(identifier))
+
+
+def _dso_sort_key(obj: Item) -> tuple[int, int, str, tuple[tuple[int, int, str], ...]]:
+    """Messier by number, then NGC, then IC by number, then the rest in natural order of the id."""
+    identifier = str(obj["id"])
+    if "m" in obj:
+        return (0, obj["m"], "", ())
+    match = re.fullmatch(r"(NGC|IC)(\d+)(.*)", identifier)
+    if match:
+        return (1 if match.group(1) == "NGC" else 2, int(match.group(2)), match.group(3), ())
+    return (3, 0, "", _natural_key(identifier))
+
+
+def build_dsos(files: Mapping[tuple[str, str], Path], constellations: ConstellationNames,
+               boundaries: ConstellationBoundaries, report: Report) -> list[Item]:
+    """Builds the deep-sky catalog (see the module docstring and Tools/README.md for the rules)."""
     rows: dict[str, NgcRow] = {}
-    for row in read_ngc_rows(ngc_path) + read_ngc_rows(addendum_path):
+    for row in read_ngc_rows(files[OPENNGC_CSV]) + read_ngc_rows(files[OPENNGC_ADDENDUM_CSV]):
         require(row.name not in rows, f"OpenNGC lists {row.name} twice")
         rows[row.name] = row
 
@@ -1158,61 +2159,29 @@ def build_dsos(ngc_path: Path, addendum_path: Path, constellations: Constellatio
                         "by the conventional identification")
     designations = _designations(rows)
 
-    objects: list[Item] = []
-    for row in rows.values():
-        if row.kind in EXCLUDED_DSO_TYPES:
-            continue
-        number = messier.get(row.name)
-        names = _ordered_names(row)
-        if number is None and not _qualifies(row, bool(names)):
-            continue
-        what = f"OpenNGC {row.name}"
-        require(row.kind in DSO_TYPES, f"{what}: unexpected type {row.kind!r}")
-        right_ascension = right_ascension_degrees(row.ra, f"{what} RA")
-        declination = declination_degrees(row.dec, f"{what} Dec")
+    forced = set(SHARPLESS_IDENTIFICATIONS.values()) | set(OPEN_CLUSTER_IDENTIFICATIONS.values())
+    drafts = openngc_drafts(rows, messier, designations, forced, constellations)
+    report.note(f"dsos: OpenNGC: {len(drafts)} objects ({sum(d.legacy for d in drafts.values())} "
+                "by the first rule)")
+    drop_foreign_numbers(drafts, report)
 
-        obj: Item = {"id": _object_id(row, number)}
-        if number is not None:
-            obj["m"] = number
-        for key, prefix in (("ngc", "NGC"), ("ic", "IC")):
-            numbers = designations.get(row.name, {}).get(prefix)
-            if numbers:
-                obj[key] = numbers
-        if names:
-            obj["names"] = list(names)
-        obj["t"] = row.kind
-        obj["ra"] = wrap_degrees(rounded(right_ascension, 6))
-        obj["de"] = rounded(declination, 6)
-        if row.constellation.strip():
-            obj["c"] = constellations.resolve(row.constellation, what,
-                                              aliases=OPENNGC_CONSTELLATION_ALIASES)
-        for key, value, places, low, high in (
-            ("vm", row.v_mag, 2, -30.0, 40.0), ("bm", row.b_mag, 2, -30.0, 40.0),
-            ("maj", row.major_axis, 2, 0.0, 100000.0), ("min", row.minor_axis, 2, 0.0, 100000.0),
-            ("pa", row.position_angle, 1, 0.0, 360.0), ("sb", row.surface_brightness, 2, 0.0, 40.0),
-        ):
-            if value is not None:
-                require_range(value, low, high, f"{what} {key}")
-                obj[key] = rounded(value, places)
-        if row.hubble:
-            obj["h"] = row.hubble
-        objects.append(obj)
+    new_drafts: list[DsoDraft] = []
+    new_drafts += sharpless_drafts(read_sharpless(files[SHARPLESS_DAT]), drafts, boundaries, report)
+    new_drafts += barnard_drafts(read_barnard(files[BARNARD_DAT]), drafts, boundaries, report)
+    new_drafts += lynds_drafts(read_lynds(files[LYNDS_DAT]), boundaries, report)
+    new_drafts += open_cluster_drafts(read_dias(files[DIAS_DAT]), drafts, boundaries, report)
 
-    ids = [obj["id"] for obj in objects]
-    require(len(ids) == len(set(ids)), "deep-sky object ids are not unique")
+    everything = list(drafts.values()) + new_drafts
+    require(len({d.id for d in everything}) == len(everything), "deep-sky object ids are not unique")
+    showpieces = frozenset(SHOWPIECES)
+    missing = showpieces - {d.id for d in everything}
+    require(not missing, f"showpieces are not in the catalog: {sorted(missing)}")
+
+    objects = [draft_item(d, dso_prominence(d, showpieces)) for d in everything]
     objects.sort(key=_dso_sort_key)
+    levels = [sum(1 for o in objects if o["p"] == level) for level in range(1, 5)]
+    report.note("dsos: prominence 1/2/3/4: " + " / ".join(str(n) for n in levels))
     return objects
-
-
-def _dso_sort_key(obj: Item) -> tuple[int, int, str]:
-    """Messier by number, then NGC, then IC by number, then the rest by id."""
-    identifier = str(obj["id"])
-    if "m" in obj:
-        return (0, obj["m"], "")
-    match = re.fullmatch(r"(NGC|IC)(\d+)(.*)", identifier)
-    if match:
-        return (1 if match.group(1) == "NGC" else 2, int(match.group(2)), match.group(3))
-    return (3, 0, identifier)
 
 
 # ==========================================================================================
@@ -1591,15 +2560,52 @@ def validate_stars(stars: Sequence[Item], abbreviations: set[str]) -> None:
     require(by_hip.get(87937, {}).get("n") is not None, "Barnard's Star is not named")
 
 
-def validate_dsos(objects: Sequence[Item], abbreviations: set[str]) -> None:
+# Caldwell objects that must be where the Caldwell list puts them (Moore 1995): Caldwell number
+# -> NGC/IC designation of the object. A sample of the 109, spread over every kind of object.
+CALDWELL_CHECKS: dict[int, tuple[str, int]] = {
+    1: ("NGC", 188), 2: ("NGC", 40), 4: ("NGC", 7023), 5: ("IC", 342), 6: ("NGC", 6543),
+    11: ("NGC", 7635), 13: ("NGC", 457), 19: ("IC", 5146), 20: ("NGC", 7000),
+    27: ("NGC", 6888), 31: ("IC", 405), 33: ("NGC", 6992), 34: ("NGC", 6960),
+    38: ("NGC", 4565), 39: ("NGC", 2392), 49: ("NGC", 2238), 55: ("NGC", 7009),
+    63: ("NGC", 7293), 65: ("NGC", 253), 77: ("NGC", 5128), 80: ("NGC", 5139),
+    92: ("NGC", 3372), 94: ("NGC", 4755), 103: ("NGC", 2070), 106: ("NGC", 104),
+}
+# Required deep-sky objects of the new catalogues: (id, constellation, a name it carries).
+CATALOGUE_CHECKS: tuple[tuple[str, str, str], ...] = (
+    ("B33", "Ori", "Horsehead Nebula"), ("B72", "Oph", "Snake Nebula"),
+    ("B78", "Oph", "Pipe Nebula"), ("LDN1622", "Ori", "Boogeyman Nebula"),
+    ("LDN1235", "Cep", "Shark Nebula"), ("Sh2-129", "Cep", "Flying Bat Nebula"),
+    ("Sh2-240", "Tau", "Spaghetti Nebula"), ("Sh2-132", "Cep", "Lion Nebula"),
+    ("C9", "Cep", "Cave Nebula"), ("Mel20", "Per", "Alpha Persei Cluster"),
+    ("Cl399", "Vul", "Coathanger Asterism"),
+)
+# Positions (J2000, degrees) of a few objects from the sources' own coordinates, to pin the
+# precession of the B1900.0, B1950.0 and B1875.0 positions: id -> (ra, dec, tolerance).
+POSITION_CHECKS: dict[str, tuple[float, float, float]] = {
+    "B33": (85.2458, -2.4583, 0.05),        # Horsehead, OpenNGC
+    "Sh2-129": (317.94, 59.96, 0.3),        # Sharpless' own center; the nebula spans 2.3 degrees
+    "Sh2-274": (112.28, 13.26, 0.1),        # Medusa Nebula (Abell 21), SIMBAD 07 29 08 +13 14.2
+    "Sh2-290": (133.55, 8.92, 0.1),         # Abell 31, SIMBAD 08 54 13 +08 53.9
+    "LDN1622": (88.50, 1.83, 0.4),          # the Boogeyman Nebula, about 05 54 +01 50
+}
+DSO_MAX_BYTES = 600 * 1024
+
+
+def validate_dsos(objects: Sequence[Item], abbreviations: set[str],
+                  files: Mapping[tuple[str, str], Path],
+                  boundaries: ConstellationBoundaries) -> None:
     """Sanity checks on the deep-sky catalog."""
-    require(300 <= len(objects) <= 3000, f"unexpected deep-sky object count {len(objects)}")
+    require(1500 <= len(objects) <= 6000, f"unexpected deep-sky object count {len(objects)}")
     by_id = {obj["id"]: obj for obj in objects}
     require(len(by_id) == len(objects), "deep-sky ids are not unique")
     for obj in objects:
         _check_position(obj, f"object {obj['id']}")
         require(obj["t"] in DSO_TYPES, f"{obj['id']}: bad type {obj['t']!r}")
-        require("c" not in obj or obj["c"] in abbreviations, f"{obj['id']}: bad constellation")
+        require("c" in obj and obj["c"] in abbreviations, f"{obj['id']}: bad constellation")
+        require(PROMINENCE_RANGE[0] <= obj["p"] <= PROMINENCE_RANGE[1],
+                f"{obj['id']}: prominence {obj['p']} out of range")
+        require(len(obj.get("names", [])) == len(set(obj.get("names", []))),
+                f"{obj['id']}: repeated names")
     messier = sorted(obj["m"] for obj in objects if "m" in obj)
     require(messier == list(range(1, MESSIER_COUNT + 1)),
             f"Messier objects are not exactly 1..{MESSIER_COUNT}: {messier}")
@@ -1614,6 +2620,62 @@ def validate_dsos(objects: Sequence[Item], abbreviations: set[str]) -> None:
     for kind, value in REQUIRED_DSOS:
         found = value.casefold() in names if kind == "name" else (kind, value) in designations
         require(found, f"required target missing: {kind} {value}")
+
+    # No NGC/IC number and no cross-catalogue designation belongs to two objects.
+    owners: dict[str, str] = {}
+    for obj in objects:
+        claimed = ([f"NGC{n}" for n in obj.get("ngc", [])] + [f"IC{n}" for n in obj.get("ic", [])]
+                   + list(obj.get("cat", [])))
+        if re.fullmatch(r"(?:M|NGC|IC)\d+", obj["id"]) is None:
+            claimed.append(obj["id"])
+        for designation in claimed:
+            require(designation not in owners,
+                    f"{designation} belongs to {owners.get(designation)} and {obj['id']}")
+            owners[designation] = obj["id"]
+        for designation in obj.get("cat", []):
+            require(re.fullmatch(r"(?:C|Sh2-|Mel|Cl|Tr|St)\d{1,3}", designation) is not None,
+                    f"{obj['id']}: unexpected cross designation {designation!r}")
+
+    caldwell = sorted(int(d[1:]) for d in owners if re.fullmatch(r"C\d+", d))
+    require(caldwell == list(range(1, CALDWELL_COUNT + 1)),
+            f"Caldwell objects are not exactly 1..{CALDWELL_COUNT}: {caldwell}")
+    for number, (prefix, ngc_number) in CALDWELL_CHECKS.items():
+        holder = by_id[owners[f"C{number}"]]
+        require(ngc_number in holder.get({"NGC": "ngc", "IC": "ic"}[prefix], []),
+                f"Caldwell {number} should be {prefix} {ngc_number}, it is {holder['id']}")
+        require(holder["p"] == 1, f"Caldwell {number} is not a showpiece")
+    require(all(obj["p"] == 1 for obj in objects if "m" in obj), "a Messier object is not a showpiece")
+    sharpless = sorted(int(d[4:]) for d in owners if d.startswith("Sh2-"))
+    require(sharpless == list(range(1, 314)), "Sharpless regions 1..313 are not each in exactly one object")
+    barnard_rows = read_barnard(files[BARNARD_DAT])
+    require(all(f"B{b.designation}" in owners for b in barnard_rows),
+            "a Barnard object is missing")
+    lynds = [obj for obj in objects if obj["id"].startswith("LDN")]
+    require(250 <= len(lynds) <= 600, f"unexpected number of Lynds clouds: {len(lynds)}")
+    for obj_id, constellation, name in CATALOGUE_CHECKS:
+        obj = by_id.get(obj_id)
+        require(obj is not None and obj.get("c") == constellation and name in obj.get("names", []),
+                f"{obj_id} ({name}) is missing, misplaced or unnamed")
+    for obj_id, (ra, dec, tolerance) in POSITION_CHECKS.items():
+        obj = by_id.get(obj_id)
+        require(obj is not None and angular_separation((ra, dec), (obj["ra"], obj["de"])) <= tolerance,
+                f"{obj_id} is missing or misplaced")
+    require(by_id["Sh2-274"]["t"] == "PN" and by_id["Sh2-240"]["t"] == "SNR",
+            "Sharpless type overrides are missing")
+
+    # The constellation lookup must reproduce OpenNGC's own constellations for its objects.
+    openngc_const = {row.name: row.constellation for row in
+                     read_ngc_rows(files[OPENNGC_CSV]) + read_ngc_rows(files[OPENNGC_ADDENDUM_CSV])}
+    checked = 0
+    for obj in objects:
+        stem = re.sub(r"^([A-Za-z]+)(\d+)$", lambda m: f"{m.group(1)}{int(m.group(2)):04d}", obj["id"])
+        original = openngc_const.get(stem)
+        if original and obj["id"][0] in "NI":
+            expected = OPENNGC_CONSTELLATION_ALIASES.get(original.strip().lower(), original.strip())
+            require(boundaries.find(obj["ra"], obj["de"], obj["id"]) == expected,
+                    f"{obj['id']}: the constellation boundaries disagree with OpenNGC ({expected})")
+            checked += 1
+    require(checked > 1000, f"only {checked} constellations cross-checked")
 
 
 def validate_constellations(entries: Sequence[Item]) -> None:
@@ -1677,8 +2739,9 @@ def build_documents(lock: Lock, files: Mapping[tuple[str, str], Path], report: R
 
     stars = build_stars(files[HYG_CSV], constellations, report)
     validate_stars(stars, abbreviations)
-    dsos = build_dsos(files[OPENNGC_CSV], files[OPENNGC_ADDENDUM_CSV], constellations, report)
-    validate_dsos(dsos, abbreviations)
+    boundaries = ConstellationBoundaries.read(files[ROMAN_DAT], constellations)
+    dsos = build_dsos(files, constellations, boundaries, report)
+    validate_dsos(dsos, abbreviations, files, boundaries)
     entries = build_constellations(files[D3_CONSTELLATIONS], files[D3_LINES], report)
     validate_constellations(entries)
     levels = build_milky_way(files[D3_MILKY_WAY], report)
@@ -1689,7 +2752,11 @@ def build_documents(lock: Lock, files: Mapping[tuple[str, str], Path], report: R
                    generated=True), "stars", stars),
         "dsos.json": render_document(
             header("openngc", ", compiled from NED, HyperLEDA, SIMBAD, HEASARC and H. Corwin's "
-                   "NGC/IC notes", generated=True), "objects", dsos),
+                   "NGC/IC notes; with the catalogues of Sharpless (1959), Barnard (1927), Lynds "
+                   "(1962) and Dias et al. (2002) as distributed by CDS VizieR "
+                   "(" + ", ".join(f"{lock.sources[k].url[len(CDS_FTP):]}"
+                                   for k in ("sharpless", "barnard", "lynds", "dias", "roman"))
+                   + ")", generated=True), "objects", dsos),
         "constellations.json": render_document(
             header("d3celestial", "; IAU names and genitives checked against the IAU list",
                    generated=False), "constellations", entries),
@@ -1698,6 +2765,8 @@ def build_documents(lock: Lock, files: Mapping[tuple[str, str], Path], report: R
                    generated=False), "levels", levels),
     }
     validate_milky_way(levels, len(documents["milkyway.json"]))
+    require(len(documents["dsos.json"]) <= DSO_MAX_BYTES,
+            f"dsos.json is {len(documents['dsos.json'])} bytes (limit {DSO_MAX_BYTES})")
     report.note(f"counts: {len(stars)} stars, {len(dsos)} deep-sky objects, "
                 f"{len(entries)} constellations, "
                 f"{sum(len(lv['polygons']) + len(lv.get('holes', [])) for lv in levels)} "
@@ -1730,15 +2799,21 @@ def differences(out_dir: Path, documents: Mapping[str, bytes]) -> list[str]:
 
 
 def check_attribution(lock: Lock, attribution: Path) -> None:
-    """Warns if ATTRIBUTION.md does not mention a locked commit."""
+    """Warns if ATTRIBUTION.md does not mention a locked commit or a CDS catalogue directory."""
     try:
         text = attribution.read_text(encoding="utf-8")
     except OSError:
         warn(f"{attribution} not found; attributions cannot be cross-checked")
         return
     for key, entry in lock.sources.items():
-        if entry.commit not in text:
-            warn(f"ATTRIBUTION.md does not mention {key} commit {entry.commit}; update it")
+        if entry.commit:
+            if entry.commit not in text:
+                warn(f"ATTRIBUTION.md does not mention {key} commit {entry.commit}; update it")
+        else:
+            catalogue = entry.url[len(CDS_FTP):]
+            if catalogue not in text:
+                warn(f"ATTRIBUTION.md does not mention the CDS catalogue {catalogue} ({key}); "
+                     "update it")
 
 
 def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -1759,6 +2834,10 @@ def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--ref", action="append", default=[], metavar="KEY=REF",
                         help="with --refresh-lock: track REF (branch or tag) for source KEY; "
                              f"keys: {', '.join(SOURCES_BY_KEY)}")
+    parser.add_argument("--only", action="append", default=[], metavar="KEY",
+                        help="with --refresh-lock: refresh just the source KEY (repeatable) and "
+                             "keep the other entries and the lock date; keys: "
+                             f"{', '.join(SOURCES_BY_KEY)}")
     parser.add_argument("--check", action="store_true",
                         help="do not write; fail if --out differs from a fresh build")
     arguments = parser.parse_args(argv)
@@ -1770,6 +2849,11 @@ def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         arguments.overrides[key] = ref
     if arguments.overrides and not arguments.refresh_lock:
         parser.error("--ref requires --refresh-lock")
+    if arguments.only and not arguments.refresh_lock:
+        parser.error("--only requires --refresh-lock")
+    for key in arguments.only:
+        if key not in SOURCES_BY_KEY:
+            parser.error(f"--only expects one of {sorted(SOURCES_BY_KEY)}: {key!r}")
     if arguments.refresh_lock and arguments.check:
         parser.error("--check cannot be combined with --refresh-lock")
     return arguments
@@ -1780,7 +2864,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if arguments.refresh_lock:
             lock = refresh_lock(load_previous_lock(arguments.lock), arguments.overrides,
-                                arguments.cache)
+                                arguments.cache, arguments.only)
         else:
             require(arguments.lock.is_file(),
                     f"{arguments.lock} does not exist; create it with --refresh-lock")

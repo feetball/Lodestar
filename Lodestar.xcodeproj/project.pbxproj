@@ -8,19 +8,111 @@
 
 /* Begin PBXBuildFile section */
 		FE25125ABC52A6127E35EDD3 /* LodestarKit in Frameworks */ = {isa = PBXBuildFile; productRef = ACE5B1E4619B270952F86331 /* LodestarKit */; };
+		4E1381F5C975A7F1BF5A056C /* LodestarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8E660F307D4898B71608BC44 /* LodestarKit */; };
+		F1B95F8C83C8E44E915453A9 /* LodestarKit in Frameworks */ = {isa = PBXBuildFile; productRef = D44897513ABEA51A5013C0AB /* LodestarKit */; };
+		BF5AF8AD975BAEDBFFEB80D4 /* LodestarKit in Frameworks */ = {isa = PBXBuildFile; productRef = 42EDA9832C08580F106AC7A7 /* LodestarKit */; };
+		9644BEA80B1B743483572BDD /* LodestarWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 73123B3B815BFE1955974D0F /* LodestarWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5B638F59995D03F8A694FE57 /* LodestarWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 14F59B0B4F05E92CDA4FEA4B /* LodestarWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		97E6B80157135BF6C95BBB65 /* LodestarWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5E4F0ABD6BEB1CBC6D0F7BD5 /* LodestarWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4C8956368F58D179DBBDBC5A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0817833A3BDCE7A78E62BF20 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2E11B7E484052958DF65C839;
+			remoteInfo = LodestarWidgets;
+		};
+		AB38929207FBFF1D8BFB6075 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0817833A3BDCE7A78E62BF20 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4921D7AD8C4E78802A0DB4B2;
+			remoteInfo = LodestarWatch;
+		};
+		C12B941D186EB2F94663C003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0817833A3BDCE7A78E62BF20 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3CC2B0E09CF09C6758A17F36;
+			remoteInfo = LodestarWatchWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5947687D800107EA332D15F1 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				5B638F59995D03F8A694FE57 /* LodestarWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B5A2515E355E97CCF68B19DC /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9644BEA80B1B743483572BDD /* LodestarWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B1FFBE7E5C7B35B4DAA931A6 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				97E6B80157135BF6C95BBB65 /* LodestarWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4AB31F5524E14B365EEE5178 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6DB7E4A7A5B1276871B5316B /* Lodestar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lodestar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8EEF4607D527C1909082598C /* ATTRIBUTION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ATTRIBUTION.md; sourceTree = "<group>"; };
 		B62AC3F1FEBD20550A1609F9 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		73123B3B815BFE1955974D0F /* LodestarWidgets.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = LodestarWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E9F6952480DE46963BFC0B45 /* Widgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Widgets-Info.plist; sourceTree = "<group>"; };
+		14F59B0B4F05E92CDA4FEA4B /* LodestarWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LodestarWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		51B095D88C611A7E59BEF5BF /* Watch-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Watch-Info.plist; sourceTree = "<group>"; };
+		5E4F0ABD6BEB1CBC6D0F7BD5 /* LodestarWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = LodestarWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		37090EC76DD148C4410E3D21 /* WatchWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = WatchWidgets-Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F23611DD04DF96FEE6BCA90B /* Lodestar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Lodestar;
+			sourceTree = "<group>";
+		};
+		B2F37188737C624F47ED867F /* LodestarWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LodestarWidgets;
+			sourceTree = "<group>";
+		};
+		A0CA399B6490A8EE0AF7B56A /* LodestarWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LodestarWatch;
+			sourceTree = "<group>";
+		};
+		7F294A3DE999FAD6BC6A24EF /* LodestarWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LodestarWatchWidgets;
+			sourceTree = "<group>";
+		};
+		F26A35D81BEEDA43EF371B9F /* WidgetShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = WidgetShared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +126,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9DABAA99AE40AA01526245DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4E1381F5C975A7F1BF5A056C /* LodestarKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E58EBC2811606F7D19AA89A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F1B95F8C83C8E44E915453A9 /* LodestarKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7F1D06F63912591671F586A1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF5AF8AD975BAEDBFFEB80D4 /* LodestarKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -41,6 +157,9 @@
 			isa = PBXGroup;
 			children = (
 				4AB31F5524E14B365EEE5178 /* Info.plist */,
+				E9F6952480DE46963BFC0B45 /* Widgets-Info.plist */,
+				51B095D88C611A7E59BEF5BF /* Watch-Info.plist */,
+				37090EC76DD148C4410E3D21 /* WatchWidgets-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -49,6 +168,9 @@
 			isa = PBXGroup;
 			children = (
 				6DB7E4A7A5B1276871B5316B /* Lodestar.app */,
+				73123B3B815BFE1955974D0F /* LodestarWidgets.appex */,
+				14F59B0B4F05E92CDA4FEA4B /* LodestarWatch.app */,
+				5E4F0ABD6BEB1CBC6D0F7BD5 /* LodestarWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -57,6 +179,10 @@
 			isa = PBXGroup;
 			children = (
 				F23611DD04DF96FEE6BCA90B /* Lodestar */,
+				B2F37188737C624F47ED867F /* LodestarWidgets */,
+				A0CA399B6490A8EE0AF7B56A /* LodestarWatch */,
+				7F294A3DE999FAD6BC6A24EF /* LodestarWatchWidgets */,
+				F26A35D81BEEDA43EF371B9F /* WidgetShared */,
 				7300DEB357DE8463E2C6D7E9 /* Config */,
 				B62AC3F1FEBD20550A1609F9 /* README.md */,
 				8EEF4607D527C1909082598C /* ATTRIBUTION.md */,
@@ -74,10 +200,14 @@
 				41CA384BE7A47D567168CAA7 /* Sources */,
 				5E4A7DEA6A61E7B1D17E7280 /* Frameworks */,
 				227D91D374C3C13953043D25 /* Resources */,
+				5947687D800107EA332D15F1 /* Embed Watch Content */,
+				B5A2515E355E97CCF68B19DC /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				54E45BE80456F585FD4DE094 /* PBXTargetDependency */,
+				E2908A34D651174A33392863 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F23611DD04DF96FEE6BCA90B /* Lodestar */,
@@ -90,6 +220,80 @@
 			productReference = 6DB7E4A7A5B1276871B5316B /* Lodestar.app */;
 			productType = "com.apple.product-type.application";
 		};
+		2E11B7E484052958DF65C839 /* LodestarWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 400678E0BCA347C8748E4825 /* Build configuration list for PBXNativeTarget "LodestarWidgets" */;
+			buildPhases = (
+				97BB70B20E8C131FBFF8221E /* Sources */,
+				9DABAA99AE40AA01526245DA /* Frameworks */,
+				CE1E4572973D9D23E5F5556B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B2F37188737C624F47ED867F /* LodestarWidgets */,
+				F26A35D81BEEDA43EF371B9F /* WidgetShared */,
+			);
+			name = LodestarWidgets;
+			packageProductDependencies = (
+				8E660F307D4898B71608BC44 /* LodestarKit */,
+			);
+			productName = LodestarWidgets;
+			productReference = 73123B3B815BFE1955974D0F /* LodestarWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		4921D7AD8C4E78802A0DB4B2 /* LodestarWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A2D8C869902BCEEF727F4E0 /* Build configuration list for PBXNativeTarget "LodestarWatch" */;
+			buildPhases = (
+				62700250AB332ED074ACEA90 /* Sources */,
+				E58EBC2811606F7D19AA89A5 /* Frameworks */,
+				62377B05BD38F2353D5084AD /* Resources */,
+				B1FFBE7E5C7B35B4DAA931A6 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				62D3AB9E2328D2761F00B014 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A0CA399B6490A8EE0AF7B56A /* LodestarWatch */,
+				F26A35D81BEEDA43EF371B9F /* WidgetShared */,
+			);
+			name = LodestarWatch;
+			packageProductDependencies = (
+				D44897513ABEA51A5013C0AB /* LodestarKit */,
+			);
+			productName = LodestarWatch;
+			productReference = 14F59B0B4F05E92CDA4FEA4B /* LodestarWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3CC2B0E09CF09C6758A17F36 /* LodestarWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 39A222D1C8B781F026568DF3 /* Build configuration list for PBXNativeTarget "LodestarWatchWidgets" */;
+			buildPhases = (
+				C5689E7EA8D0448E1CC33C85 /* Sources */,
+				7F1D06F63912591671F586A1 /* Frameworks */,
+				8ECD038CAE0F0B37017FEE37 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7F294A3DE999FAD6BC6A24EF /* LodestarWatchWidgets */,
+				F26A35D81BEEDA43EF371B9F /* WidgetShared */,
+			);
+			name = LodestarWatchWidgets;
+			packageProductDependencies = (
+				42EDA9832C08580F106AC7A7 /* LodestarKit */,
+			);
+			productName = LodestarWatchWidgets;
+			productReference = 5E4F0ABD6BEB1CBC6D0F7BD5 /* LodestarWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -101,6 +305,15 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					73A44D73BD0A9490BBE31D77 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					2E11B7E484052958DF65C839 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					4921D7AD8C4E78802A0DB4B2 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					3CC2B0E09CF09C6758A17F36 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -123,12 +336,36 @@
 			projectRoot = "";
 			targets = (
 				73A44D73BD0A9490BBE31D77 /* Lodestar */,
+				2E11B7E484052958DF65C839 /* LodestarWidgets */,
+				4921D7AD8C4E78802A0DB4B2 /* LodestarWatch */,
+				3CC2B0E09CF09C6758A17F36 /* LodestarWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		227D91D374C3C13953043D25 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CE1E4572973D9D23E5F5556B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		62377B05BD38F2353D5084AD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8ECD038CAE0F0B37017FEE37 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -145,7 +382,46 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		97BB70B20E8C131FBFF8221E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		62700250AB332ED074ACEA90 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C5689E7EA8D0448E1CC33C85 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		54E45BE80456F585FD4DE094 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2E11B7E484052958DF65C839 /* LodestarWidgets */;
+			targetProxy = 4C8956368F58D179DBBDBC5A /* PBXContainerItemProxy */;
+		};
+		E2908A34D651174A33392863 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4921D7AD8C4E78802A0DB4B2 /* LodestarWatch */;
+			targetProxy = AB38929207FBFF1D8BFB6075 /* PBXContainerItemProxy */;
+		};
+		62D3AB9E2328D2761F00B014 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3CC2B0E09CF09C6758A17F36 /* LodestarWatchWidgets */;
+			targetProxy = C12B941D186EB2F94663C003 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3CDA5F0852B2BF5487599EF7 /* Release */ = {
@@ -164,7 +440,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lodestar shows the live camera view behind its sky overlay so you can line up your tripod. Video is processed on your iPhone only and is never recorded, stored, or shared.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never collected or tracked.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never tracked, and it leaves your iPhone only for the optional cloud forecast, rounded to about 10 km.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "magnetometer gyroscope accelerometer";
@@ -175,7 +451,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -206,7 +482,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Lodestar shows the live camera view behind its sky overlay so you can line up your tripod. Video is processed on your iPhone only and is never recorded, stored, or shared.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never collected or tracked.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Lodestar uses your location on this iPhone to work out where stars and planets appear in your sky and to find true north. It is never tracked, and it leaves your iPhone only for the optional cloud forecast, rounded to about 10 km.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = "magnetometer gyroscope accelerometer";
@@ -217,7 +493,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -351,6 +627,188 @@
 			};
 			name = Debug;
 		};
+		58E868419A7938957B36D032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		C7AFC1639523B74EB85442C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C05E2E1F085F08C0480045D0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Watch-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		3C5E97FB9E1D397595CAF1D9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Watch-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		A6B22AB149556FC9CB160795 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/WatchWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.watchkitapp.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		17454E9292561EE03C0B4FCA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 39489Q7GDR;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/WatchWidgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Lodestar;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = net.kuecker.Lodestar.watchkitapp.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -372,6 +830,33 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		400678E0BCA347C8748E4825 /* Build configuration list for PBXNativeTarget "LodestarWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C7AFC1639523B74EB85442C2 /* Debug */,
+				58E868419A7938957B36D032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A2D8C869902BCEEF727F4E0 /* Build configuration list for PBXNativeTarget "LodestarWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C5E97FB9E1D397595CAF1D9 /* Debug */,
+				C05E2E1F085F08C0480045D0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		39A222D1C8B781F026568DF3 /* Build configuration list for PBXNativeTarget "LodestarWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17454E9292561EE03C0B4FCA /* Debug */,
+				A6B22AB149556FC9CB160795 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -383,6 +868,21 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		ACE5B1E4619B270952F86331 /* LodestarKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 68C9B931311DA9455BF178B3 /* XCLocalSwiftPackageReference "LodestarKit" */;
+			productName = LodestarKit;
+		};
+		8E660F307D4898B71608BC44 /* LodestarKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 68C9B931311DA9455BF178B3 /* XCLocalSwiftPackageReference "LodestarKit" */;
+			productName = LodestarKit;
+		};
+		D44897513ABEA51A5013C0AB /* LodestarKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 68C9B931311DA9455BF178B3 /* XCLocalSwiftPackageReference "LodestarKit" */;
+			productName = LodestarKit;
+		};
+		42EDA9832C08580F106AC7A7 /* LodestarKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 68C9B931311DA9455BF178B3 /* XCLocalSwiftPackageReference "LodestarKit" */;
 			productName = LodestarKit;

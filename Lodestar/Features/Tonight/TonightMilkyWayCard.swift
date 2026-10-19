@@ -7,6 +7,8 @@ struct TonightMilkyWayCard: View {
 
     let summary: NightSummary
     let timeZone: TimeZone
+    /// Whether the site's skyline decides when the core is visible.
+    var appliesSkyline = false
 
     private var core: MilkyWayCoreVisibility { summary.milkyWayCore }
 
@@ -18,10 +20,14 @@ struct TonightMilkyWayCard: View {
                             + " photographed.")
             } else if core.visibleIntervals.isEmpty {
                 TonightNote(text: "The Galactic Centre stays below"
-                            + " \(Int(MilkyWayCoreVisibility.minimumAltitude))\u{00B0} while it is dark.")
+                            + " \(Int(MilkyWayCoreVisibility.minimumAltitude))\u{00B0}"
+                            + (appliesSkyline ? " or behind your skyline" : "") + " while it is dark.")
                 horizonRows
             } else {
                 visibleRows
+            }
+            if appliesSkyline, summary.hasAstronomicalDarkness {
+                TonightSkylineNote(detail: "the core counts only while it clears the skyline.")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -32,10 +38,10 @@ struct TonightMilkyWayCard: View {
     @ViewBuilder
     private var horizonRows: some View {
         if let rise = core.riseTransitSet.rise {
-            InfoRow(label: "Rises", value: AppFormat.time(rise, in: timeZone))
+            InfoRow(label: appliesSkyline ? "Clears the skyline" : "Rises", value: AppFormat.time(rise, in: timeZone))
         }
         if let set = core.riseTransitSet.set {
-            InfoRow(label: "Sets", value: AppFormat.time(set, in: timeZone))
+            InfoRow(label: appliesSkyline ? "Sinks behind the skyline" : "Sets", value: AppFormat.time(set, in: timeZone))
         }
     }
 
@@ -59,7 +65,8 @@ struct TonightMilkyWayCard: View {
                 value: core.maxAltitude.map { AngleFormatter.formatDegrees($0, decimals: 0) } ?? AppFormat.missing)
         InfoRow(label: "Direction", value: directionText)
         TonightNote(text: "Visible means at least \(Int(MilkyWayCoreVisibility.minimumAltitude))\u{00B0} above the"
-                    + " horizon during astronomical darkness. Direction and height are for the best time.",
+                    + " horizon" + (appliesSkyline ? " and your skyline" : "")
+                    + " during astronomical darkness. Direction and height are for the best time.",
                     style: .footnote)
     }
 }

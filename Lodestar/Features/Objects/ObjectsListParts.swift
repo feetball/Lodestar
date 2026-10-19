@@ -90,3 +90,20 @@ struct ObjectsLocationNotice: View {
         }
     }
 }
+
+/// A list row saying that the recorded skyline decides what is visible and when objects rise.
+struct ObjectsSkylineNotice: View {
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Label {
+            Text("Skyline applied: \u{201C}Behind skyline\u{201D} and the rising times follow your recorded skyline.")
+                .fixedSize(horizontal: false, vertical: true)
+        } icon: {
+            Image(systemName: "mountain.2")
+        }
+        .font(.footnote)
+        .foregroundStyle(palette.secondaryText)
+        .accessibilityElement(children: .combine)
+    }
+}

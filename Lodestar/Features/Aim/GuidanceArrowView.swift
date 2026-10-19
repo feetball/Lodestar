@@ -76,26 +76,28 @@ private struct AimArrowContent: View {
                 .stroke(palette.positive, lineWidth: 5)
                 .frame(width: 2 * radius, height: 2 * radius)
             Image(systemName: "checkmark")
-                .font(.system(size: 40, weight: .bold))
+                .font(.system(size: 34, weight: .bold))
                 .foregroundStyle(palette.positive)
                 .rotationEffect(.degrees(rotation.degrees))
-                .offset(rotation.rotated(CGSize(width: 0, height: -Self.labelOffset)))
-            label("On target", color: palette.positive, size: 22)
+                .offset(rotation.rotated(CGSize(width: 0, height: -0.32 * radius)))
+            label("On target", color: palette.positive, size: 22, offset: -0.72 * radius)
         }
     }
 
-    /// Distance of the texts from the reticle: inside the ring, below the reticle as the reader sees it.
-    private static let labelOffset: CGFloat = 50
+    /// Distance of the distance readout from the reticle: inside the ring, above the reticle as the reader sees it.
+    /// The texts stay in the upper half of the ring because the panels at the bottom of the screen can reach up over
+    /// the lower half (with a mount connected, for example).
+    private static let labelOffset: CGFloat = -50
 
-    /// A text that turns with the HUD so it reads upright.
-    private func label(_ text: String, color: Color, size: CGFloat) -> some View {
+    /// A text that turns with the HUD so it reads upright, `offset` points from the reticle (negative is up).
+    private func label(_ text: String, color: Color, size: CGFloat, offset: CGFloat = labelOffset) -> some View {
         Text(text)
             .font(.system(size: size, weight: .semibold, design: .rounded))
             .monospacedDigit()
             .foregroundStyle(color)
             .shadow(color: .black.opacity(0.7), radius: 3)
             .rotationEffect(.degrees(rotation.degrees))
-            .offset(rotation.rotated(CGSize(width: 0, height: Self.labelOffset)))
+            .offset(rotation.rotated(CGSize(width: 0, height: offset)))
     }
 }
 

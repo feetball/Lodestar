@@ -73,7 +73,7 @@ struct SkyChartSurface: View {
 
     private func planisphere(_ viewport: PlanisphereViewport) -> some View {
         PlanisphereCanvas(content: content, viewport: viewport, palette: palette, layers: layers,
-                          selectedDirection: model.selection?.horizontal.unitVector)
+                          selectedDirection: model.selection?.horizontal.unitVector, mosaic: MosaicDisplay.current)
             .equatable()
     }
 
@@ -179,7 +179,26 @@ struct SkyChartSurface: View {
             parts.append("The Sun, Moon and planets are all below the horizon.")
         }
         parts += visibleBodies.map(description(of:))
+        if let smallBodies = SmallBodyChartMarkers.spokenSummary(content.scene.smallBodies) {
+            parts.append(smallBodies)
+        }
+        let deepSkyCount = content.scene.deepSky.count
+        if layers.deepSkyObjects, deepSkyCount > 0 {
+            parts.append("\(deepSkyCount) deep-sky \(deepSkyCount == 1 ? "object" : "objects") above the horizon are drawn.")
+        }
+        if let skyline = content.scene.skyline {
+            parts.append("The ground below your recorded skyline is shaded; the skyline rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
+        }
+        if let mosaic = MosaicDisplay.current {
+            parts.append(mosaicDescription(mosaic))
+        }
         return parts.joined(separator: " ")
+    }
+
+    /// "Mosaic of 12 panels: panel 3 is being shot."
+    private func mosaicDescription(_ mosaic: MosaicDisplay) -> String {
+        let panels = "Mosaic of \(mosaic.count) \(mosaic.count == 1 ? "panel" : "panels")"
+        return mosaic.step < mosaic.count ? "\(panels): panel \(mosaic.step + 1) is being shot." : "\(panels): all shot."
     }
 
     private func description(of body: SkyChartBodyMarker) -> String {
@@ -197,6 +216,13 @@ struct SkyChartSurface: View {
                     .accessibilityHint("Shows the object's card")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityAction { model.select(body.object) }
+            }
+            ForEach(content.scene.smallBodies) { marker in
+                Color.clear
+                    .accessibilityLabel(SmallBodyChartMarkers.description(marker))
+                    .accessibilityHint("Shows the object's card")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { model.select(marker.object) }
             }
         }
     }

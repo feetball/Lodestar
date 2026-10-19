@@ -12,6 +12,6 @@ head until it is in your frame.
 - Star alignment and Gyro Lock for accuracy beyond the phone's compass
 - Search and browse 9,000+ stars and 690+ deep-sky objects, the planets, the Moon and the Milky Way core
 - Tonight: twilight, darkness windows, the Moon, the Milky Way core and the best targets of the night
-- Red night-vision mode, and everything works offline
+- Red night-vision mode, and everything works offline; optional online data (satellite passes, comets, a cloud forecast) is off until you switch it on
 
 [Support](support.html) · [Privacy policy](privacy.html) · [Source code](https://github.com/feetball/Lodestar)

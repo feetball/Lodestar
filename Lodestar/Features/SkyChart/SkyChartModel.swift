@@ -10,6 +10,8 @@ struct SkyChartInputs: Equatable, Sendable {
     let date: Date
     let options: SkySnapshotOptions
     let target: CelestialObject?
+    /// The mosaic being shot, whose panels are drawn.
+    let mosaic: MosaicPlan?
     /// Whether the catalog was loaded when these inputs were made (the chart cannot be built before).
     let isCatalogLoaded: Bool
 }
@@ -21,6 +23,8 @@ struct SkyChartSelection: Equatable {
     var horizontal: HorizontalCoordinate
     /// The current magnitude, when known (the Sun, Moon and planets change theirs).
     var magnitude: Double?
+    /// Distance, elongation and warnings of a selected comet or asteroid; `nil` for any other object.
+    var smallBody: SmallBodyInfo?
 }
 
 /// Builds the sky chart's scene off the main actor and holds what the chart shows: the scene,
@@ -56,8 +60,9 @@ final class SkyChartModel {
 
         func build() -> (scene: SkyChartScene, paths: SkyChartPaths) {
             let snapshot = SkySnapshotBuilder.build(catalog: catalog, observer: inputs.observer.observer,
-                                                    date: inputs.date, options: inputs.options, target: inputs.target)
-            let scene = SkyChartSceneBuilder.build(from: snapshot)
+                                                    date: inputs.date, options: inputs.options, target: inputs.target,
+                                                    mosaic: inputs.mosaic)
+            let scene = SkyChartSceneBuilder.build(from: snapshot, horizon: inputs.observer.horizon)
             return (scene, SkyChartPaths(scene: scene))
         }
     }
@@ -125,7 +130,8 @@ final class SkyChartModel {
     private static func selection(for object: CelestialObject, in scene: SkyChartScene) -> SkyChartSelection {
         let frame = SkyFrame(date: scene.date, observer: scene.observer)
         return SkyChartSelection(object: object, horizontal: frame.horizontal(of: object, refraction: true),
-                                 magnitude: frame.currentMagnitude(of: object))
+                                 magnitude: frame.currentMagnitude(of: object),
+                                 smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) })
     }
 
     // MARK: Zoom and pan

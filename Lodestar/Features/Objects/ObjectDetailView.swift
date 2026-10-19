@@ -43,6 +43,7 @@ private struct ObjectDetailContent: View {
                         .frame(minHeight: 300)
                         .card(palette)
                 }
+                SmallBodyTailCard(detail: snapshot?.current.smallBody)
                 ObjectDetailPhotographyCard(object: object, snapshot: snapshot, lens: app.lensSetup,
                                             timeZone: context?.timeZone ?? .autoupdatingCurrent)
                 if ObjectDetailAboutCard.hasContent(for: object) {
@@ -53,7 +54,7 @@ private struct ObjectDetailContent: View {
             .padding(.vertical, 12)
         }
         .screenBackground(palette)
-        .navigationTitle(object.name)
+        .navigationTitle(SmallBodyText.displayName(object))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: context) {
             await keepSnapshotFresh(for: context)
@@ -135,6 +136,9 @@ struct ObjectDetailHeader: View {
         if let magnitude = object.magnitude {
             StatusChip(systemImage: "sparkle", text: AppFormat.magnitude(magnitude))
         }
+        if object.isDeepSky {
+            StatusChip(systemImage: "star.circle", text: object.prominence.displayName)
+        }
         if object.category == .sun {
             StatusChip(systemImage: "exclamationmark.triangle", text: "Solar filter required", tone: .warning)
         }
@@ -144,9 +148,11 @@ struct ObjectDetailHeader: View {
         Button {
             app.aim(at: object)
         } label: {
-            Label("Aim at \(object.name)", systemImage: "scope")
-                .lineLimit(2)
+            // Comet designations are long; with large text the name wraps instead of being cut off.
+            Label("Aim at \(SmallBodyText.displayName(object))", systemImage: "scope")
+                .lineLimit(4)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.lodestarPrimary)

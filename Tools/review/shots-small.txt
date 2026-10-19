@@ -1,0 +1,20 @@
+# name | modes | launch arguments | options  (a 4.7-inch iPhone with the text size of the run, night mode)
+tonight|n|tab=tonight comets=1 online=1|pages=10
+objects|n|tab=objects comets=1|pages=3
+settings|n|tab=settings online=1|pages=8
+events-calendar|n|screen=events-calendar|pages=4
+event-meteorShower|n|screen=event-meteorShower|pages=5
+comets-list|n|screen=comets-list|pages=3
+comet-detail|n|screen=comet-detail|pages=5
+star-trails|n|screen=star-trails|pages=4
+time-lapse|n|screen=time-lapse|pages=3
+mosaic|n|screen=mosaic target=dso.M31|pages=4
+mount-sheet|n|screen=mount-sheet target=special.ncp|pages=4
+mount-sw-sheet-aligned|n|screen=mount-sw-sheet-aligned|pages=5
+mount-sw-sync|n|screen=mount-sw-sync|pages=3
+skyline|n|screen=skyline|
+aim-mount|n|screen=aim-mount target=special.ncp|
+widgets|n|screen=widgets|pages=4
+satellite-passes|n|screen=satellite-passes|pages=3
+satellite-pass-detail|n|screen=satellite-pass-detail|pages=5
+aim-satellite|n|screen=aim-satellite|

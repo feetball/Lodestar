@@ -46,39 +46,57 @@ extension SkyOverlayRenderer {
 
     // MARK: Deep-sky objects
 
-    /// Fainter objects are left out the wider the view, so a wide view stays readable.
-    static func deepSkyMagnitudeCutoff(forFieldOfView fieldOfView: Double) -> Double {
+    /// The least prominent objects that get a name at this field of view (degrees along the long side of the screen):
+    /// none in the widest views, then the showpieces, the prominent objects, the notable ones and finally all of them as
+    /// the view narrows, so a wide view stays readable.
+    static func deepSkyNameProminence(forFieldOfView fieldOfView: Double) -> Int {
         switch fieldOfView {
-        case 70...: return 7
-        case 40...: return 8.5
-        case 20...: return 10
-        default: return .infinity
+        case 70...: return 0
+        case 45...: return 1
+        case 30...: return 2
+        case 22...: return 3
+        default: return 4
         }
     }
 
-    /// Names are shown in views narrower than this many degrees.
-    static let deepSkyNameFieldOfView = 40.0
+    /// Obscure objects (prominence 4) are left out of views at least this wide, in degrees.
+    static let obscureHiddenFieldOfView = 70.0
+    /// The most deep-sky symbols drawn in one frame.
+    static let deepSkySymbolLimit = 300
     /// The most deep-sky names shown at once.
-    static let deepSkyNameLimit = 12
+    static let deepSkyNameLimit = 16
 
     mutating func drawDeepSky(in context: GraphicsContext) {
-        guard configuration.showDeepSkyObjects, let markers = content?.deepSky, !markers.isEmpty else { return }
-        let cutoff = Self.deepSkyMagnitudeCutoff(forFieldOfView: fieldOfView)
-        let shown = Array(markers.prefix { ($0.magnitude ?? .infinity) <= cutoff })
+        guard configuration.showDeepSkyObjects, let content, !content.deepSky.isEmpty else { return }
+        let nameProminence = Self.deepSkyNameProminence(forFieldOfView: fieldOfView)
+        let leavesOutObscure = fieldOfView >= Self.obscureHiddenFieldOfView
+        let directions = leavesOutObscure ? content.deepSkyCommonDirections : content.deepSkyDirections
         var outlines = Path()
+        var darkOutlines = Path()
+        var symbols = 0
         var namesShown = 0
         let nameStyle = AimLabelStyle(size: 11, weight: .regular, color: palette.deepSkyMarker)
-        for (marker, point) in zip(shown, projector.points(shown.map(\.direction))) {
+        // The markers are ordered by prominence, so the symbol limit keeps the most prominent ones.
+        for (marker, point) in zip(content.deepSky, projector.points(directions)) {
             guard let point, isVisible(point, margin: 16) else { continue }
+            guard symbols < Self.deepSkySymbolLimit else { break }
+            symbols += 1
             let extent = min(max(marker.diameter * pointsPerDegree, 8), 44)
-            outlines.addPath(symbol(for: marker.shape, at: point, extent: extent))
-            if fieldOfView < Self.deepSkyNameFieldOfView, namesShown < Self.deepSkyNameLimit {
+            if marker.isDark {
+                darkOutlines.addPath(symbol(for: marker.shape, at: point, extent: extent))
+            } else {
+                outlines.addPath(symbol(for: marker.shape, at: point, extent: extent))
+            }
+            if marker.prominence <= nameProminence, !marker.isHidden, namesShown < Self.deepSkyNameLimit {
                 addLabel(marker.name, near: point, offset: CGSize(width: 0, height: extent / 2 + 10), style: nameStyle,
-                         priority: 6)
+                         priority: marker.prominence <= 2 ? 6 : 7)
                 namesShown += 1
             }
         }
         context.stroke(outlines, with: .color(palette.deepSkyMarker), lineWidth: 1)
+        // Dark nebulae are shadows, not light sources: drawn fainter and dashed.
+        context.stroke(darkOutlines, with: .color(palette.deepSkyMarker.opacity(0.6)),
+                       style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
     }
 
     /// The chart symbol for a deep-sky object: ellipse for galaxies, circle with a dot for clusters, square for
@@ -131,7 +149,7 @@ extension SkyOverlayRenderer {
         let style = AimLabelStyle(size: 11, weight: .regular, color: palette.primaryText.opacity(0.9))
         var namesShown = 0
         for (star, point) in zip(content.namedStars, projector.points(content.namedStars.map(\.direction))) {
-            guard namesShown < Self.starNameLimit, let point, isVisible(point, margin: 0), star.direction.z >= 0 else { continue }
+            guard namesShown < Self.starNameLimit, let point, isVisible(point, margin: 0), !star.isHidden else { continue }
             addLabel(star.name, near: point, offset: CGSize(width: 0, height: -14), style: style, priority: 4)
             namesShown += 1
         }
@@ -145,7 +163,7 @@ extension SkyOverlayRenderer {
         let style = AimLabelStyle(size: 12, weight: .semibold, color: palette.planetMarker)
         for (body, point) in zip(bodies, projector.points(bodies.map(\.direction))) {
             guard let point, isVisible(point, margin: 24) else { continue }
-            let opacity = body.direction.z < 0 ? 0.5 : 1
+            let opacity = (content?.skyline?.mask.isBelow(body.direction) ?? (body.direction.z < 0)) ? 0.5 : 1
             let color = palette.planetMarker.opacity(opacity)
             let disc = body.angularDiameter * pointsPerDegree / 2
             let radius: CGFloat

@@ -15,11 +15,13 @@ private struct ObjectsSearchKey: Equatable {
     let isCatalogReady: Bool
 }
 
-/// Identifies one position-tracking run: another observer, another catalog, other off-list objects or leaving the
-/// tab restart it.
+/// Identifies one position-tracking run: another observer or skyline, another catalog, another catalogue list, other
+/// off-list objects or leaving the tab restart it.
 private struct ObjectsTrackingKey: Equatable {
     let observer: Observer?
+    let skyline: HorizonProfile?
     let catalogID: ObjectIdentifier?
+    let catalogue: ObjectsCatalogueFilter
     let extraIDs: [String]
     let isTabSelected: Bool
 }
@@ -39,6 +41,8 @@ struct ObjectsView: View {
     @AppStorage("lodestar.objects.sortOrder") private var sortOrder = ObjectsSortOrder.name
     @AppStorage("lodestar.objects.aboveHorizonOnly") private var showsOnlyAboveHorizon = false
     @AppStorage("lodestar.objects.hideFaint") private var hidesFaintObjects = false
+    @AppStorage("lodestar.objects.catalogue") private var catalogueFilter = ObjectsCatalogueFilter.all
+    @AppStorage("lodestar.objects.popularOnly") private var showsOnlyPopular = false
 
     @State private var query = ""
     @State private var searchOutcome = ObjectsSearchOutcome.empty
@@ -77,6 +81,14 @@ struct ObjectsView: View {
         .task(id: trackingKey) {
             await trackPositions()
         }
+        .onChange(of: catalogueFilter) { _, newFilter in
+            // A catalogue is read by number; the other lists by name.
+            if newFilter != .all, sortOrder == .name {
+                sortOrder = .number
+            } else if newFilter == .all, sortOrder == .number {
+                sortOrder = .name
+            }
+        }
     }
 
     // MARK: Content
@@ -102,21 +114,39 @@ struct ObjectsView: View {
         let sections = displayedSections(catalog: catalog, index: index)
         let favorites = Set(app.settings.favoriteObjectIDs)
         let timeZone = app.observerContext?.timeZone ?? .autoupdatingCurrent
+        let showsProminence = catalogueFilter != .all || sortOrder == .prominence || grouping == .prominence
         return List {
+            if !isShowingResults {
+                Section {
+                    ObjectsCatalogueChips(selection: $catalogueFilter)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
             if app.observerContext == nil, !isShowingResults {
                 Section {
                     ObjectsLocationNotice()
+                        .listRowBackground(palette.surface)
+                }
+            } else if hasSkyline, !isShowingResults {
+                Section {
+                    ObjectsSkylineNotice()
                         .listRowBackground(palette.surface)
                 }
             }
             ForEach(sections) { section in
                 Section {
                     ForEach(section.objects) { object in
-                        row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone)
+                        row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone,
+                            showsProminence: showsProminence)
+                    }
+                    // Favorite comets and asteroids without a current orbit stay in the list.
+                    ForEach(section.unavailable, id: \.self) { id in
+                        SmallBodyNoOrbitRow(id: id) { app.settingsStore.toggleFavorite(id) }
                     }
                 } header: {
                     ObjectsSectionHeader(title: section.title, systemImage: section.systemImage,
-                                         count: section.objects.count)
+                                         count: section.objects.count + section.unavailable.count)
                 }
             }
         }
@@ -131,13 +161,14 @@ struct ObjectsView: View {
         }
     }
 
-    private func row(for object: CelestialObject, isFavorite: Bool, timeZone: TimeZone) -> some View {
+    private func row(for object: CelestialObject, isFavorite: Bool, timeZone: TimeZone,
+                      showsProminence: Bool) -> some View {
         Button {
             path.append(object)
         } label: {
             HStack(spacing: 8) {
                 ObjectRow(object: object, position: positions.position(for: object.id), isFavorite: isFavorite,
-                          timeZone: timeZone)
+                          timeZone: timeZone, showsProminence: showsProminence)
                 // The system's disclosure indicator is grey, which is not night-safe.
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
@@ -178,7 +209,7 @@ struct ObjectsView: View {
             ObjectsSwipeGlyph.image(systemName: "scope", color: palette.onAccent)
         }
         .tint(palette.accent)
-        .accessibilityLabel("Aim at \(object.name)")
+        .accessibilityLabel("Aim at \(SmallBodyText.displayName(object))")
     }
 
     @ViewBuilder
@@ -198,6 +229,8 @@ struct ObjectsView: View {
                 Button("Reset Filters") {
                     showsOnlyAboveHorizon = false
                     hidesFaintObjects = false
+                    showsOnlyPopular = false
+                    catalogueFilter = .all
                 }
                 .buttonStyle(.lodestarSecondary)
             }
@@ -214,7 +247,7 @@ struct ObjectsView: View {
             }
             ObjectsOptionsMenu(grouping: $grouping, sortOrder: $sortOrder,
                                showsOnlyAboveHorizon: $showsOnlyAboveHorizon, hidesFaintObjects: $hidesFaintObjects,
-                               isCustomized: options.isCustomized, hasLocation: app.observerContext != nil)
+                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized, hasLocation: app.observerContext != nil)
                 .disabled(isSearching)
         }
     }
@@ -223,7 +256,17 @@ struct ObjectsView: View {
 
     private var options: ObjectsListOptions {
         ObjectsListOptions(grouping: grouping, sortOrder: sortOrder, showsOnlyAboveHorizon: showsOnlyAboveHorizon,
-                           hidesFaintObjects: hidesFaintObjects)
+                           hidesFaintObjects: hidesFaintObjects, catalogue: catalogueFilter,
+                           showsOnlyPopular: showsOnlyPopular)
+    }
+
+    /// The site's recorded skyline, when it has one.
+    private var skyline: HorizonProfile? {
+        ObjectsHorizon.skyline(of: app.observerContext)
+    }
+
+    private var hasSkyline: Bool {
+        skyline != nil
     }
 
     private var trimmedQuery: String {
@@ -260,6 +303,13 @@ struct ObjectsView: View {
         return candidates.filter { !$0.isListed && seen.insert($0.id).inserted }
     }
 
+    /// The objects of the chosen catalogue that the browse listing does not include (the obscure ones), whose
+    /// positions are tracked too.
+    private var catalogueObjects: [CelestialObject] {
+        guard catalogueFilter != .all, let catalog = app.catalog.catalog else { return [] }
+        return catalogueFilter.objects(in: catalog).filter { !$0.isListed }
+    }
+
     /// Changes when a different catalog becomes available.
     private var catalogID: ObjectIdentifier? {
         app.catalog.catalog.map { ObjectIdentifier($0) }
@@ -271,7 +321,9 @@ struct ObjectsView: View {
 
     private var trackingKey: ObjectsTrackingKey {
         ObjectsTrackingKey(observer: app.observerContext?.observer,
+                           skyline: skyline,
                            catalogID: catalogID,
+                           catalogue: catalogueFilter,
                            extraIDs: offListObjects.map(\.id),
                            isTabSelected: app.selectedTab == .objects)
     }
@@ -308,8 +360,8 @@ struct ObjectsView: View {
             positions.clear()
             return
         }
-        await positions.keepFresh(observer: observer, clock: app.clock) {
-            (app.catalog.catalog?.listedObjects ?? []) + offListObjects
+        await positions.keepFresh(observer: observer, skyline: skyline, clock: app.clock) {
+            (app.catalog.catalog?.listedObjects ?? []) + offListObjects + catalogueObjects
         }
     }
 }

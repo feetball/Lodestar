@@ -6,6 +6,7 @@ struct ObjectsOptionsMenu: View {
     @Binding var sortOrder: ObjectsSortOrder
     @Binding var showsOnlyAboveHorizon: Bool
     @Binding var hidesFaintObjects: Bool
+    @Binding var showsOnlyPopular: Bool
     /// Filled when any option differs from the default list.
     let isCustomized: Bool
     /// The horizon filter needs an observer.
@@ -39,6 +40,9 @@ struct ObjectsOptionsMenu: View {
                 Toggle(isOn: $hidesFaintObjects) {
                     Label("Hide Faint (mag > \(Int(ObjectsListOptions.faintMagnitudeLimit)))",
                           systemImage: "eye.slash")
+                }
+                Toggle(isOn: $showsOnlyPopular) {
+                    Label("Popular Only", systemImage: "star.circle")
                 }
             }
         } label: {

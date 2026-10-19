@@ -15,6 +15,8 @@ struct AlignmentSheet: View {
     @State private var rows: [AimAlignmentRow] = []
     @State private var selected: AimAlignmentCandidate?
     @State private var notice: AimAlignmentNotice?
+    /// Whether the sync also tells a connected GoTo mount that it points at the object.
+    @State private var syncsMount = true
 
     /// Seconds between the refreshes of the candidates' positions and of their order.
     private static let candidateRefreshInterval = 30.0
@@ -73,7 +75,8 @@ struct AlignmentSheet: View {
     /// The sync button, always in reach.
     private var footer: some View {
         VStack(spacing: 8) {
-            if selected != nil {
+            if let selected {
+                MountAlignmentSyncRow(isOn: $syncsMount, objectName: selected.object.name)
                 Button {
                     sync()
                 } label: {
@@ -168,12 +171,19 @@ struct AlignmentSheet: View {
             let alignment = try app.alignment.adding(point, mount: app.mountProfile)
             app.alignment = alignment
             notice = .success(successText(for: selected.object.name, alignment: alignment))
+            syncMountIfWanted(to: selected.object, observer: observer)
             deselect()
         } catch let error as AlignmentError {
             notice = .failure(error.aimMessage(forObject: selected.object.name))
         } catch {
             notice = .failure("The alignment could not be calculated. Try again.")
         }
+    }
+
+    /// The star is centred in the camera, which sits on the GoTo mount: the mount takes it as its position as well.
+    private func syncMountIfWanted(to object: CelestialObject, observer: Observer) {
+        guard syncsMount, MountService.shared.isConnected, MountService.shared.capabilities?.canSync == true else { return }
+        Task { await MountService.shared.syncMount(to: object, observer: observer) }
     }
 
     private func successText(for name: String, alignment: AlignmentModel) -> String {

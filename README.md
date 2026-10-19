@@ -29,15 +29,38 @@ tilt the tripod head until it is in your frame.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night, and a polar-scope clock for star trackers.
+- **Events calendar** — meteor showers (with hourly rates and the radiant's altitude from your site), lunar and
+  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
+  and where to look and a button to aim at it.
+- **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
+  order, guided panel by panel in Aim), and star-trail and time-lapse planners.
+- **Real skyline** — sweep the phone along the horizon to record trees, buildings and mountains; rise and set
+  times, Tonight and the charts then use the site's own skyline.
+- **Comets and asteroids** — 216 bright asteroids built in and, optionally, the daily comet file: brightness
+  estimates, elongation warnings, a Bright Comets list, and the direction of a comet's ion tail with the camera
+  tilt that lays it along the frame.
+- **GoTo mounts** — connect over Wi-Fi to OnStep/LX200, Celestron NexStar and SynScan, ASCOM Alpaca and the
+  Sky-Watcher AZ-GTi / Star Adventurer GTi (with home position and star alignment); Go to, Sync, nudge arrows and
+  an always-available Stop, with altitude limits and a built-in simulated mount to try it without hardware.
+- **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
+  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast (MET
+  Norway, location rounded to about 10 km).
+- **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
+  rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
+  at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
+  worked out on the device for where you are (Core Location in the widget, no App Group, no network),
+  and a tap opens the Tonight tab. The watch app adds a small Tonight screen.
 - **Night mode** — a pure red-on-black interface (no green or blue light at all), automatic after
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
-- **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected
-  or sent anywhere.
+- **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected.
+  The optional online data downloads from CelesTrak, the Minor Planet Center and MET Norway only when you turn it
+  on, and a GoTo mount is reached over the local network only.
 
 ## Requirements
 
-- Xcode 16 or newer (tested design targets Xcode 16 and Xcode 26), iOS 17.0+ deployment target.
+- Xcode 16 or newer (tested design targets Xcode 16 and Xcode 26), iOS 17.0+ deployment target
+  (watchOS 10.0+ for the watch app and its complications).
 - An iPhone with gyroscope and magnetometer (every iPhone that runs iOS 17). The simulator has no
   motion sensors, so aiming only works on a device.
 - A bracket that holds the phone rigidly on the camera (hot-shoe phone mount, L-bracket clamp, …).
@@ -76,7 +99,12 @@ Lodestar/            iOS app (SwiftUI, Observation, Swift 5 mode with complete c
   App/ Model/ Theme/ Shared/     app state, settings, palette (normal + red night), shared views
   Services/          location, device motion (CoreMotion), camera (AVFoundation + CoreImage),
                      haptics/audio, screen brightness, catalog loading, time-zone lookup
-  Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools
+  Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools, Widgets (links, watch link)
+LodestarWidgets/     iOS widget extension: the Home Screen layouts of the Tonight widget
+LodestarWatch/       Apple Watch app (watchOS 10, embedded in the iPhone app): the Tonight screen
+LodestarWatchWidgets/  watch complications
+WidgetShared/        what the three share: tonight's entries from LodestarKit (no catalog), the location,
+                     the timeline provider, the Lock Screen / complication views and the widget look
 LodestarKit/         Swift package, Foundation only, builds and tests on macOS and Linux
   Foundation/        time scales, coordinates, precession/nutation/aberration, refraction, SkyFrame
   Ephemeris/         Sun & planets (VSOP87), Moon (ELP-2000/82 after Meeus), rise/set, twilight, phases
@@ -109,6 +137,7 @@ Key design points:
 
 ```
 cd LodestarKit && swift test          # 700+ tests: worked examples from Meeus and Skyfield/JPL fixtures
+cd WidgetTests && swift test          # the widgets' entries and wording (WidgetShared/Core, no Xcode needed)
 ```
 
 The `Lodestar` scheme's Test action runs the same package tests in Xcode.
@@ -116,7 +145,9 @@ The `Lodestar` scheme's Test action runs the same package tests in Xcode.
 ## Continuous integration and releases
 
 - **GitHub Actions** (`.github/workflows/ci.yml`) compiles the app with the newest Xcode for the
-  simulator and for devices, and runs the LodestarKit tests, on every push and pull request.
+  simulator and for devices, and runs the LodestarKit tests, on every push and pull request. The
+  `Lodestar` scheme also builds the widget extension, the watch app and the complications, and
+  `Tools/check-embedded-products.sh` checks that all three end up inside the app.
 - **Xcode Cloud** (workflow "Default") builds and archives the app on every push to `main` and
   delivers each build to TestFlight's internal testing group. Xcode Cloud signs the builds and
   assigns the build numbers; workflows are managed in App Store Connect under the app's
@@ -142,9 +173,12 @@ confirmed on hardware. *Settings ▸ About ▸ Sensor Diagnostics* helps with th
 ## Privacy
 
 Lodestar has no accounts, analytics, ads or tracking, and it never collects your data: location, motion
-and camera data are processed on the device. The only network use is Apple's: map tiles in the site
-picker, and Apple's geocoding service, which receives a site's coordinates to look up its time zone while
-you add or edit a site. See `Lodestar/Resources/PrivacyInfo.xcprivacy`.
+and camera data are processed on the device. The network is used by Apple (map tiles in the site picker,
+and the geocoding service, which receives a site's coordinates to look up its time zone while you add or
+edit a site) and by the optional downloads in Settings ▸ Online Data, which are off until switched on:
+CelesTrak, the Minor Planet Center and MET Norway see the IP address, and MET Norway also the location
+rounded to about 10 km. GoTo mount control talks to the mount on the local network only. See
+`docs/privacy.md` and `Lodestar/Resources/PrivacyInfo.xcprivacy`.
 
 ## Data and credits
 

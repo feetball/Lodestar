@@ -34,6 +34,7 @@ struct SkySnapshot: Sendable {
         /// Major axis in degrees, when known.
         let majorAxis: Double?
         var id: String { object.id }
+        var prominence: Prominence { object.prominence }
     }
 
     struct ConstellationFigure: Sendable, Identifiable {
@@ -49,6 +50,18 @@ struct SkySnapshot: Sendable {
         let level: Int
         let polygons: [[Vector3]]
         let holes: [[Vector3]]
+    }
+
+    /// One frame of the active mosaic, as apparent directions at the snapshot's instant.
+    struct MosaicPanelOutline: Sendable, Identifiable {
+        /// The panel's index in `MosaicPlan.panels`.
+        let index: Int
+        /// Place in the shooting order, from 0.
+        let shootingPosition: Int
+        let center: Vector3
+        /// Top left, top right, bottom right, bottom left; the edges between them are great-circle arcs.
+        let corners: [Vector3]
+        var id: Int { index }
     }
 
     /// The current target's apparent position.
@@ -67,6 +80,10 @@ struct SkySnapshot: Sendable {
     let constellations: [ConstellationFigure]
     let milkyWay: [MilkyWayBand]
     let target: Target?
+    /// The panels of the active mosaic in the order of `MosaicPlan.panels`; empty without a mosaic.
+    let mosaic: [MosaicPanelOutline]
+    /// The comets and asteroids to draw: the target and the bright ones, target first, then brightest first.
+    let smallBodies: [SmallBodyMarker]
 
     /// The local frame used to build the snapshot (for horizon/grid drawing and inverse lookups).
     var frame: SkyFrame { SkyFrame(date: date, observer: observer) }
@@ -78,8 +95,16 @@ struct SkySnapshotOptions: Sendable, Equatable {
     var includeConstellations = true
     var includeDeepSky = true
     var includeMilkyWay = true
-    /// Deep-sky objects fainter than this are left out (objects without a magnitude are kept).
-    var deepSkyMagnitudeLimit: Double = 10
+    /// Deep-sky objects are drawn up to this prominence: `.showpiece` only the best known, `.obscure` everything.
+    var deepSkyProminence: Prominence = .prominent
+    /// Comets and asteroids brighter than this magnitude are included, and the target whatever its brightness.
+    var smallBodyMagnitudeLimit = SmallBodySkyMarkers.defaultMagnitudeLimit
+
+    /// The prominence for the "deep-sky detail" setting (1 showpieces … 4 everything); out-of-range values are
+    /// pulled into range.
+    static func prominence(forSetting value: Int) -> Prominence {
+        Prominence(rawValue: min(max(value, 1), 4)) ?? .prominent
+    }
 }
 
 enum SkySnapshotBuilder {
@@ -88,7 +113,8 @@ enum SkySnapshotBuilder {
 
     /// Computes the snapshot. Pure and `Sendable`-safe: call it from a detached task.
     static func build(catalog: Catalog, observer: Observer, date: Date,
-                      options: SkySnapshotOptions, target: CelestialObject?) -> SkySnapshot {
+                      options: SkySnapshotOptions, target: CelestialObject?,
+                      mosaic: MosaicPlan? = nil) -> SkySnapshot {
         let frame = SkyFrame(date: date, observer: observer)
         let atmosphere = observer.atmosphere
 
@@ -118,13 +144,14 @@ enum SkySnapshotBuilder {
 
         var deepSky: [SkySnapshot.DeepSky] = []
         if options.includeDeepSky {
-            for object in catalog.listedObjects {
-                guard case .fixed(let position, _) = object.position,
-                      [.galaxies, .nebulae, .clusters, .special].contains(object.group) else { continue }
-                if let magnitude = object.magnitude, magnitude > options.deepSkyMagnitudeLimit { continue }
+            func add(_ object: CelestialObject) {
+                guard case .fixed(let position, _) = object.position else { return }
                 deepSky.append(SkySnapshot.DeepSky(object: object, direction: direction(ofJ2000: position),
-                                       majorAxis: object.angularSize.map { $0.majorArcminutes / 60 }))
+                                                   majorAxis: object.angularSize.map { $0.majorArcminutes / 60 }))
             }
+            catalog.deepSkyObjects(upTo: options.deepSkyProminence).forEach(add)
+            // The galactic centre and the other fixed special places are showpieces.
+            catalog.objects(in: .special).filter { $0.prominence <= options.deepSkyProminence }.forEach(add)
         }
 
         let constellations: [SkySnapshot.ConstellationFigure] = options.includeConstellations
@@ -148,8 +175,23 @@ enum SkySnapshotBuilder {
             return SkySnapshot.Target(object: object, direction: horizontal.unitVector, horizontal: horizontal)
         }
 
+        let smallBodies = SmallBodySkyMarkers.build(smallBodies: catalog.smallBodies, frame: frame, target: target,
+                                                    magnitudeLimit: options.smallBodyMagnitudeLimit)
+
         return SkySnapshot(date: date, observer: observer, stars: stars, bodies: bodies, deepSky: deepSky,
-                           constellations: constellations, milkyWay: milkyWay, target: targetPosition)
+                           constellations: constellations, milkyWay: milkyWay, target: targetPosition,
+                           mosaic: mosaic.map { mosaicOutlines(of: $0, frame: frame) } ?? [],
+                           smallBodies: smallBodies)
+    }
+
+    /// The panels of `plan` at the instant of `frame`, with refraction like everything else on screen.
+    private static func mosaicOutlines(of plan: MosaicPlan, frame: SkyFrame) -> [SkySnapshot.MosaicPanelOutline] {
+        let pointings = MosaicGuidance.pointings(for: plan, frame: frame, refraction: true)
+        return zip(plan.panels, pointings).map { panel, pointing in
+            SkySnapshot.MosaicPanelOutline(index: panel.index, shootingPosition: panel.shootingPosition,
+                                           center: pointing.direction.unitVector,
+                                           corners: pointing.corners.map(\.unitVector))
+        }
     }
 
     /// Catalog identifier of a solar-system body ("sun", "moon", "planet.mars").

@@ -399,6 +399,15 @@ Nothing downloaded is executed or unpickled; the ephemeris is read as data by `j
   differs by less than 0.01 arcsec at the instants of `stars_apparent.json` (Arcturus, 43 years
   from J2000, is the worst case).
 
+## Satellite fixtures (`Tools/make_satellite_fixtures.py`)
+
+| File | Contents |
+| --- | --- |
+| `sgp4_ver.tle`, `sgp4_tcppver.out` | SGP4 verification element sets and the C++ reference output (Vallado et al. 2006, CelesTrak) |
+| `satellite_omm_sample.json`, `satellite_stations.json`, `satellite_stations.tle`, `satellite_starlink_sample.json` | CelesTrak GP snapshots (OMM JSON and TLE) taken 2026-10-18 |
+| `satellite_reference.json` | Skyfield 1.55 + DE421 passes, looks and shadow transitions for several sites |
+| `satellite_streaks.json` | Skyfield frame crossings for a 2,976-satellite constellation |
+
 ## Provenance and licences
 
 Skyfield (MIT licence, Brandon Rhodes), JPL DE440s (public domain, Park et al. 2021, NASA/JPL),

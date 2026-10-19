@@ -34,6 +34,7 @@ private struct ReferenceSearch {
         let order = objects.indices.sorted { first, second in
             let a = objects[first], b = objects[second]
             if a.isListed != b.isListed { return a.isListed }
+            if a.prominence != b.prominence { return a.prominence < b.prominence }
             if a.rankingMagnitude != b.rankingMagnitude { return a.rankingMagnitude < b.rankingMagnitude }
             let nameA = SearchText.key(for: a.name).bytes, nameB = SearchText.key(for: b.name).bytes
             if SearchText.naturalPrecedes(nameA, nameB) { return true }

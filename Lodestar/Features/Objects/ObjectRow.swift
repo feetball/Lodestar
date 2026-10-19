@@ -13,6 +13,8 @@ struct ObjectRow: View {
     var isFavorite = false
     /// The observer's time zone, for rising times.
     var timeZone: TimeZone = .current
+    /// Whether to name how prominent a deep-sky object is (the catalogue lists and the prominence order).
+    var showsProminence = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -31,13 +33,13 @@ struct ObjectRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ObjectsFormat.spokenSummary(of: object, position: position, isFavorite: isFavorite,
-                                                        in: timeZone))
+                                                        in: timeZone, showsProminence: showsProminence))
     }
 
     private var names: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(object.name)
+                Text(SmallBodyText.displayName(object))
                     .font(.body.weight(.semibold))
                     .foregroundStyle(palette.primaryText)
                     .lineLimit(2)
@@ -53,10 +55,17 @@ struct ObjectRow: View {
                         .foregroundStyle(palette.accent)
                 }
             }
-            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude))
+            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude, position: position))
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-                .lineLimit(1)
+                // The kind, magnitude, elongation and warnings of a comet or an asteroid take two lines.
+                .lineLimit(object.smallBody == nil ? 1 : 2)
+            if let line = ObjectsFormat.catalogueLine(of: object, showsProminence: showsProminence) {
+                Text(line)
+                    .font(.caption)
+                    .foregroundStyle(palette.tertiaryText)
+                    .lineLimit(1)
+            }
         }
     }
 
@@ -69,7 +78,7 @@ struct ObjectRow: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(palette.accent)
                 } else {
-                    Text("Below horizon")
+                    Text(ObjectsFormat.hiddenText(for: position))
                         .font(.subheadline)
                         .foregroundStyle(palette.tertiaryText)
                     if let rising = ObjectsFormat.risingText(for: position, in: timeZone) {

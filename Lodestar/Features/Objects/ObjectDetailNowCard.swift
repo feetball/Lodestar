@@ -34,15 +34,19 @@ struct ObjectDetailNowCard: View {
 
     @ViewBuilder
     private func rows(for current: ObjectDetailCurrent) -> some View {
-        let isUp = current.horizontal.altitude > 0
+        let isUp = current.horizontal.altitude > 0 && !current.isBehindSkyline
         StatusChip(systemImage: isUp ? "arrow.up.right" : "arrow.down.right",
-                   text: isUp ? "Above the horizon" : "Below the horizon",
+                   text: isUp ? "Above the horizon" : (current.isBehindSkyline ? "Behind the skyline" : "Below the horizon"),
                    tone: isUp ? .positive : .neutral)
         InfoRow(label: "Altitude", value: AppFormat.altitude(current.horizontal.altitude))
         InfoRow(label: "Azimuth", value: AppFormat.azimuth(current.horizontal.azimuth))
         InfoRow(label: "RA (of date)", value: AppFormat.rightAscension(current.equatorial, style: style))
         InfoRow(label: "Dec (of date)", value: AppFormat.declination(current.equatorial, style: style))
-        if let magnitude = current.magnitude {
+        if current.isSmallBody {
+            // A comet or an asteroid: badges, brightness estimate, distances, elongation and phase.
+            SmallBodyNowRows(detail: current.smallBody)
+        }
+        if !current.isSmallBody, let magnitude = current.magnitude {
             InfoRow(label: "Brightness", value: AppFormat.magnitude(magnitude))
         }
         if let size = current.angularSize {

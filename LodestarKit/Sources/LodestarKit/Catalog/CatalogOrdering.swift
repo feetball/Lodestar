@@ -22,14 +22,21 @@ enum CatalogOrdering {
         let nameKey: [UInt8]
         let magnitude: Double
         let isListed: Bool
+        let prominence: Int
         let id: String
     }
 
     static func items(for objects: [CelestialObject]) -> [Item] {
         objects.enumerated().map { index, object in
             Item(index: index, name: object.name, nameKey: SearchText.key(for: object.name).bytes,
-                 magnitude: object.rankingMagnitude, isListed: object.isListed, id: object.id)
+                 magnitude: object.rankingMagnitude, isListed: object.isListed,
+                 prominence: object.prominence.rawValue, id: object.id)
         }
+    }
+
+    /// The values of one object that is not part of a table (its `index` is 0).
+    static func item(for object: CelestialObject) -> Item {
+        items(for: [object])[0]
     }
 
     static func sorted(_ objects: [CelestialObject], by order: CatalogSortOrder) -> [CelestialObject] {
@@ -59,10 +66,12 @@ enum CatalogOrdering {
         return nameOrder(lhs, rhs)
     }
 
-    /// Listed objects first, then brighter first, then alphabetical: the order of equally good
-    /// search matches.
+    /// Listed objects first, then more prominent ones, then brighter first, then alphabetical: the order of
+    /// equally good search matches. Prominence comes before brightness so that a showpiece without a
+    /// magnitude (the Horsehead Nebula) is not outranked by a faint galaxy.
     static func searchOrder(_ lhs: Item, _ rhs: Item) -> Bool {
         if lhs.isListed != rhs.isListed { return lhs.isListed }
+        if lhs.prominence != rhs.prominence { return lhs.prominence < rhs.prominence }
         return magnitudeOrder(lhs, rhs)
     }
 }

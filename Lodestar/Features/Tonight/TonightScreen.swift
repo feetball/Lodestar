@@ -33,6 +33,7 @@ struct TonightScreen: View {
                 } else {
                     TonightPendingCard()
                 }
+                EventsUpcomingCard(context: context)
                 TonightPolarCard(observer: context.observer, timeZone: context.timeZone)
             }
             .padding(.horizontal, 16)

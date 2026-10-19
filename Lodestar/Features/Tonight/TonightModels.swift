@@ -35,6 +35,9 @@ struct TonightTarget: Identifiable, Sendable {
     let peakAzimuth: Double
     /// The hours of darkness the object spends at or above `TonightCalculator.minimumTargetAltitude`.
     let hoursAboveMinimum: Double
+    /// The line under the name in place of the catalog description: a comet's or asteroid's magnitude estimate and
+    /// elongation.
+    var note: String?
 
     var id: String { object.id }
 }
@@ -59,6 +62,10 @@ struct TonightReport: Sendable {
     let tonightStart: Date
     /// How many nights this one is after tonight: 1 is tomorrow night, -1 is last night.
     let nightsFromTonight: Int
+    /// Whether the site's recorded skyline was applied to the Moon, the Milky Way core, the planets and the targets.
+    let appliesSkyline: Bool
+    /// The comets that are bright tonight; `nil` while the catalog has not been loaded (the card is left out).
+    var smallBodies: [SmallBodyListEntry]?
 
     /// Local noon of the date this night starts on.
     var nightStart: Date { summary.night.start }

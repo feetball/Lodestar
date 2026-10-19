@@ -40,6 +40,13 @@ struct ObjectDetailCurrent: Sendable {
     let illuminatedFraction: Double?
     /// The Moon's phase; set only for the Moon.
     let moonPhase: MoonPhaseInfo?
+    /// `true` when the object is above the horizon but hidden behind the site's recorded skyline.
+    let isBehindSkyline: Bool
+    /// `true` for a comet or an asteroid, whose distances and warnings are in `smallBody`.
+    var isSmallBody = false
+    /// A comet's or asteroid's distances, elongation, phase, magnitude estimate, warnings and tail; `nil` when its
+    /// orbit cannot be evaluated.
+    var smallBody: SmallBodyDetail?
 }
 
 /// One point of the altitude curve.
@@ -78,7 +85,8 @@ struct ObjectDetailNight: Sendable {
     let twilight: NightTwilight
     /// The hours of astronomical darkness, if the Sun gets that low.
     let darkness: DateInterval?
-    /// The object's rise, transit and set within `interval`, with the horizon of `RiseSetCalculator`.
+    /// The object's rise, transit and set within `interval`, with the horizon of `RiseSetCalculator` (or the site's
+    /// skyline, see `appliesSkyline`).
     let events: RiseTransitSet
     /// Apparent altitude at transit.
     let transitAltitude: Double?
@@ -87,8 +95,12 @@ struct ObjectDetailNight: Sendable {
     let twilightBands: [ObjectDetailTwilightBand]
     /// The instants of the time axis labels, on local hours.
     let hourTicks: [Date]
-    /// Where the object is highest while it is dark; `nil` when there is no darkness.
+    /// Where the object is highest while it is dark; `nil` when there is no darkness, or, with a skyline, when the
+    /// object stays behind it.
     let bestInDarkness: ObjectDetailPeak?
+    /// Whether the site's recorded skyline decided `events` and `bestInDarkness`: then a rise is the object clearing
+    /// the skyline and a set is it sinking behind it.
+    let appliesSkyline: Bool
 
     /// When this night is over and "tonight" means the next one.
     var expiry: Date { twilight.sunrise ?? interval.end }

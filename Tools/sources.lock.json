@@ -93,6 +93,96 @@
           "bytes": 40558
         }
       }
+    },
+    "sharpless": {
+      "title": "Catalogue of HII Regions (Sharpless 1959), CDS VII/20",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/VII/20",
+      "license": "CDS-VizieR-terms",
+      "retrieved": "2026-10-18",
+      "files": {
+        "catalog.dat.gz": {
+          "role": "data",
+          "sha256": "7ef4f74a2dfe6ebbb5237de101a6432d1af1491a39a10bdd93372122df1b896b",
+          "bytes": 8137
+        },
+        "ReadMe": {
+          "role": "legal",
+          "sha256": "33f43604a70374b32bc23af1362f7c5e9f3d69e52393dfddd28cae0f7c766989",
+          "bytes": 4083
+        }
+      }
+    },
+    "barnard": {
+      "title": "Barnard's Catalogue of 349 Dark Objects in the Sky (Barnard 1927), CDS VII/220A",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/VII/220A",
+      "license": "CDS-VizieR-terms",
+      "retrieved": "2026-10-18",
+      "files": {
+        "barnard.dat": {
+          "role": "data",
+          "sha256": "07285d0872fbfdb6b240206179a0bee770b777da44841ba21a09df825482341c",
+          "bytes": 15076
+        },
+        "ReadMe": {
+          "role": "legal",
+          "sha256": "0e3712b7ced37610a36123436acce1d6b4d71189b88f008bfc60faa8352045f4",
+          "bytes": 4996
+        }
+      }
+    },
+    "lynds": {
+      "title": "Lynds' Catalogue of Dark Nebulae (Lynds 1962), CDS VII/7A",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/VII/7A",
+      "license": "CDS-VizieR-terms",
+      "retrieved": "2026-10-18",
+      "files": {
+        "ldn": {
+          "role": "data",
+          "sha256": "44be8ef67fddbc43d5b96dad97a798e2cfe110526cc8654e50cf323f0f328832",
+          "bytes": 108608
+        },
+        "ReadMe": {
+          "role": "legal",
+          "sha256": "2d87ae5873240d401ff3bcf89015e2c97666e60a5ea161bbdeb7918add389eb7",
+          "bytes": 6848
+        }
+      }
+    },
+    "dias": {
+      "title": "Optically visible open clusters and candidates, v3.5 (Dias et al. 2002), CDS B/ocl",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/B/ocl",
+      "license": "CDS-VizieR-terms",
+      "retrieved": "2026-10-18",
+      "files": {
+        "clusters.dat": {
+          "role": "data",
+          "sha256": "b7dc52fd30bca59b931a6f41ca4f59d1b5d747f1513a921dde98e213baf742e2",
+          "bytes": 269687
+        },
+        "ReadMe": {
+          "role": "legal",
+          "sha256": "810acbd8052beadb8d1ceeacdbfb28226a827684ad4c83792eae661cf22ad0d0",
+          "bytes": 11380
+        }
+      }
+    },
+    "roman": {
+      "title": "Identification of a constellation from a position (Roman 1987), CDS VI/42",
+      "url": "https://cdsarc.cds.unistra.fr/ftp/VI/42",
+      "license": "CDS-VizieR-terms",
+      "retrieved": "2026-10-18",
+      "files": {
+        "data.dat": {
+          "role": "data",
+          "sha256": "daf9e2b39ec57446d862a445276ae2ea50490ee455540972906098f5f9187957",
+          "bytes": 10710
+        },
+        "ReadMe": {
+          "role": "legal",
+          "sha256": "b6a3e9ec21f902df084406e97d71754671c5787bee1cf49c109b3bc8cfc50ab9",
+          "bytes": 3902
+        }
+      }
     }
   }
 }

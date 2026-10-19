@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import LodestarKit
 
 /// Dot sizes and colours of the stars on the chart. Stars are drawn in batches that share a size
@@ -75,10 +76,53 @@ struct SkyChartDeepSkyMarker: Sendable, Identifiable {
     let id: String
     let point: CGPoint
     let group: ObjectGroup
-    /// Apparent magnitude; objects without one count as 9.5 when deciding what to show.
+    /// Apparent magnitude, when known (dark nebulae have none).
     let magnitude: Double?
     /// The object's largest dimension in radians, when known.
     let extent: Double?
+    /// 1 for the showpieces of the sky … 4 for the obscure objects.
+    let prominence: Int
+    /// Dark nebulae are drawn in a muted style.
+    let isDark: Bool
+}
+
+/// The site's recorded skyline in chart space (the horizon circle has radius 1; a skyline above the horizon runs inside
+/// it).
+struct SkyChartSkyline: Sendable {
+    /// The chart beyond the skyline, up to a circle well outside the horizon circle: the ground. Fill it with the
+    /// even–odd rule inside the horizon circle.
+    let ground: Path
+    /// The skyline as one closed outline.
+    let line: Path
+    /// The highest point of the skyline in degrees.
+    let highestAltitude: Double
+
+    /// Radius of the circle the ground reaches out to, in chart units.
+    private static let groundRadius = 3.0
+
+    init(profile: HorizonProfile) {
+        let points = profile.polyline(from: 0, to: 360, step: 1).dropLast().map { point in
+            PlanisphereProjection.chartPoint(HorizontalCoordinate(azimuth: point.azimuth, altitude: point.altitude).unitVector)
+        }
+        line = PlanisphereShapes.polyline(points, closed: true)
+        var ground = Path(ellipseIn: PlanisphereBounds.square(around: .zero, radius: CGFloat(Self.groundRadius)))
+        ground.addPath(line)
+        self.ground = ground
+        highestAltitude = profile.maximumAltitude
+    }
+}
+
+/// A panel of the active mosaic in chart space.
+struct SkyChartMosaicPanel: Sendable {
+    /// Place in the shooting order, from 0.
+    let shootingPosition: Int
+    /// The outline above the horizon, to be stroked.
+    let outline: Path
+    /// The closed panel, to be filled while it is the current one; `nil` for a panel too far below the horizon for the
+    /// projection to close it.
+    let fill: Path?
+    /// The panel's centre, or `nil` below the horizon.
+    let center: CGPoint?
 }
 
 /// The aiming target.
@@ -118,12 +162,13 @@ struct SkyChartLabel: Sendable, Identifiable {
 /// Something a tap can select.
 struct SkyChartPickable: Sendable {
     enum Kind: Sendable {
-        case target, body, deepSky, star
+        case target, body, smallBody, deepSky, star
 
         /// Scales the distance to a tap: objects that are rarer or more important win ties.
         var distanceBias: CGFloat {
             switch self {
             case .target, .body: return 0.5
+            case .smallBody: return 0.6
             case .deepSky: return 0.8
             case .star: return 1
             }
@@ -150,9 +195,15 @@ struct SkyChartScene: Sendable {
     let bodies: [SkyChartBodyMarker]
     let deepSky: [SkyChartDeepSkyMarker]
     let target: SkyChartTargetMarker?
+    /// The site's recorded skyline; `nil` for an open horizon.
+    let skyline: SkyChartSkyline?
+    /// The panels of the active mosaic in the order of the plan; empty without one.
+    let mosaic: [SkyChartMosaicPanel]
     /// Highest priority first.
     let labels: [SkyChartLabel]
     let pickables: [SkyChartPickable]
+    /// The comets and asteroids above the horizon: the target and the bright ones.
+    let smallBodies: [SkyChartSmallBodyMarker]
 }
 
 extension SkyChartScene {
@@ -178,13 +229,15 @@ enum SkyChartSceneBuilder {
     /// The most labels of each kind a scene carries; the views place as many as fit.
     private static let constellationLabelLimit = 60
     private static let starLabelLimit = 30
-    private static let deepSkyLabelLimit = 50
+    /// Deep-sky labels per prominence (1…4): the most prominent kinds are named first and most densely.
+    private static let deepSkyLabelLimits = [1: 140, 2: 120, 3: 100, 4: 60]
     /// Only stars at least this bright get a name label.
     private static let starLabelMagnitude = 3.2
     /// Label anchors this far above the horizon (sine of the altitude) or higher are kept.
     private static let labelHorizon = 0.03
 
-    static func build(from snapshot: SkySnapshot) -> SkyChartScene {
+    /// - Parameter horizon: The site's recorded skyline, or `nil` for an open horizon.
+    static func build(from snapshot: SkySnapshot, horizon: HorizonProfile? = nil) -> SkyChartScene {
         let sun = snapshot.bodies.first { $0.object.id == "sun" }
         let bodies = snapshot.bodies.map { bodyMarker($0, sun: sun) }
         let deepSky = deepSkyMarkers(snapshot.deepSky)
@@ -197,6 +250,8 @@ enum SkyChartSceneBuilder {
         labels += starLabels(snapshot.stars)
         labels += deepSkyLabels(snapshot.deepSky)
         labels += bodies.filter(\.isAboveHorizon).map(bodyLabel)
+        let smallBodies = SmallBodyChartMarkers.build(snapshot.smallBodies, targetID: snapshot.target?.object.id)
+        labels += SmallBodyChartMarkers.labels(smallBodies)
         if let target, target.isAboveHorizon {
             labels.append(SkyChartLabel(id: "target.\(target.object.id)", text: target.object.name, style: .target,
                                         point: PlanisphereProjection.chartPoint(target.direction),
@@ -210,8 +265,11 @@ enum SkyChartSceneBuilder {
             constellationLines: constellationLines,
             milkyWay: milkyWay(snapshot),
             bodies: bodies, deepSky: deepSky, target: target,
+            skyline: horizon.map(SkyChartSkyline.init(profile:)),
+            mosaic: mosaicPanels(snapshot.mosaic),
             labels: labels,
-            pickables: pickables(snapshot, bodies: bodies, target: target))
+            pickables: pickables(snapshot, bodies: bodies, target: target) + SmallBodyChartMarkers.pickables(smallBodies),
+            smallBodies: smallBodies)
     }
 
     // MARK: Stars
@@ -318,22 +376,53 @@ enum SkyChartSceneBuilder {
         objects.filter { $0.direction.z >= 0 }.map { item in
             SkyChartDeepSkyMarker(id: item.object.id, point: PlanisphereProjection.chartPoint(item.direction),
                                   group: item.object.group, magnitude: item.object.magnitude,
-                                  extent: item.majorAxis.map { AstroMath.radians($0) })
+                                  extent: item.majorAxis.map { AstroMath.radians($0) },
+                                  prominence: item.prominence.rawValue, isDark: item.object.category == .darkNebula)
         }
     }
 
+    /// The names of the deep-sky objects. A wide chart names only the showpieces and the prominent objects; the rest
+    /// get names as the chart is zoomed in, and the label placer drops any that would overlap a more important one.
     private static func deepSkyLabels(_ objects: [SkySnapshot.DeepSky]) -> [SkyChartLabel] {
-        let visible = objects.filter { $0.direction.z > labelHorizon }
-        let brightest = visible.sorted {
+        let ranked = objects.filter { $0.direction.z > labelHorizon }.sorted {
+            if $0.prominence != $1.prominence { return $0.prominence < $1.prominence }
             let (a, b) = (rankingMagnitude($0.object), rankingMagnitude($1.object))
             return a != b ? a < b : $0.object.id < $1.object.id
         }
-        return brightest.prefix(deepSkyLabelLimit).map { item in
-            let magnitude = rankingMagnitude(item.object)
-            let zoom: CGFloat = magnitude <= 5 ? 1.8 : (magnitude <= 7 ? 2.8 : (magnitude <= 9 ? 4 : 5))
-            return SkyChartLabel(id: "deepSky.\(item.object.id)", text: item.object.name, style: .deepSky,
-                                 point: PlanisphereProjection.chartPoint(item.direction),
-                                 priority: 25 - Int(min(magnitude, 20) / 2), minimumZoom: zoom, offset: 7)
+        var counts: [Int: Int] = [:]
+        var labels: [SkyChartLabel] = []
+        for item in ranked {
+            let level = item.prominence.rawValue
+            guard counts[level, default: 0] < (deepSkyLabelLimits[level] ?? 0) else { continue }
+            counts[level, default: 0] += 1
+            labels.append(SkyChartLabel(id: "deepSky.\(item.object.id)", text: item.object.name, style: .deepSky,
+                                        point: PlanisphereProjection.chartPoint(item.direction),
+                                        priority: deepSkyLabelPriority[level - 1],
+                                        minimumZoom: deepSkyLabelZoom[level - 1], offset: 7))
+        }
+        return labels
+    }
+
+    /// Label priority and the zoom from which the name appears, for prominence 1…4.
+    private static let deepSkyLabelPriority = [26, 24, 17, 12]
+    private static let deepSkyLabelZoom: [CGFloat] = [1, 1.6, 3, 4.5]
+
+    // MARK: Skyline and mosaic
+
+    private static func mosaicPanels(_ outlines: [SkySnapshot.MosaicPanelOutline]) -> [SkyChartMosaicPanel] {
+        outlines.map { panel in
+            var outline = Path()
+            for polyline in PlanisphereProjection.visiblePolylines(through: panel.corners + [panel.corners[0]],
+                                                                    maximumStep: 3) {
+                outline.addPath(PlanisphereShapes.polyline(polyline))
+            }
+            // A panel that reaches the nadir cannot be closed on the chart; it is only outlined.
+            let fill = panel.center.z > -0.3
+                ? PlanisphereShapes.polyline(PlanisphereProjection.ring(through: panel.corners, maximumStep: 3), closed: true)
+                : nil
+            return SkyChartMosaicPanel(
+                shootingPosition: panel.shootingPosition, outline: outline, fill: fill,
+                center: panel.center.z > labelHorizon ? PlanisphereProjection.chartPoint(panel.center) : nil)
         }
     }
 

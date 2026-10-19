@@ -7,7 +7,24 @@
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
 	<key>NSPrivacyCollectedDataTypes</key>
-	<array/>
+	<array>
+		<!-- Optional Cloud forecast (off by default): the observing location rounded to 0.1 degree (about 10 km) is the
+		     coordinates of the request to MET Norway (api.met.no), a third party. The developer never receives it and the
+		     app keeps no copy beyond the forecast cached on the device. Declared because the provider can log the request
+		     for longer than the moment it takes to answer it. Not linked to the user, not used for tracking. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCoarseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPrivacyAccessedAPITypes</key>
 	<array>
 		<dict>

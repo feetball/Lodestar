@@ -14,19 +14,21 @@ struct PlanisphereCanvas: View, Equatable {
     let layers: SkyChartLayerOptions
     /// Where the selected object is, in the local frame; it gets a ring.
     let selectedDirection: Vector3?
+    /// The step of the mosaic being shot, or `nil` without one.
+    let mosaic: MosaicDisplay?
 
     nonisolated static func == (lhs: PlanisphereCanvas, rhs: PlanisphereCanvas) -> Bool {
         lhs.content == rhs.content && lhs.viewport == rhs.viewport && lhs.palette == rhs.palette
-            && lhs.layers == rhs.layers && lhs.selectedDirection == rhs.selectedDirection
+            && lhs.layers == rhs.layers && lhs.selectedDirection == rhs.selectedDirection && lhs.mosaic == rhs.mosaic
     }
 
     var body: some View {
         let renderer = PlanisphereRenderer(content: content, viewport: viewport, palette: palette, layers: layers,
-                                           selectedDirection: selectedDirection)
+                                           selectedDirection: selectedDirection, mosaic: mosaic)
         Canvas { context, _ in
             renderer.draw(into: &context)
         } symbols: {
-            PlanisphereSymbols(content: content, palette: palette)
+            PlanisphereSymbols(content: content, palette: palette, mosaic: mosaic)
         }
         .accessibilityHidden(true)
     }
@@ -40,9 +42,10 @@ struct PlanisphereCanvas: View, Equatable {
 private struct PlanisphereSymbols: View, Equatable {
     let content: SkyChartContent
     let palette: Palette
+    let mosaic: MosaicDisplay?
 
     nonisolated static func == (lhs: PlanisphereSymbols, rhs: PlanisphereSymbols) -> Bool {
-        lhs.content == rhs.content && lhs.palette == rhs.palette
+        lhs.content == rhs.content && lhs.palette == rhs.palette && lhs.mosaic == rhs.mosaic
     }
 
     var body: some View {
@@ -53,6 +56,12 @@ private struct PlanisphereSymbols: View, Equatable {
                 .textCase(label.style == .constellation ? .uppercase : nil)
                 .foregroundStyle(label.style.color(in: palette))
                 .tag(label.id)
+        }
+        if let mosaic, mosaic.step < mosaic.count {
+            Text("Panel \(mosaic.step + 1) of \(mosaic.count)")
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundStyle(palette.guidance)
+                .tag(PlanisphereRenderer.mosaicLabelID)
         }
         ForEach(PlanisphereCardinal.all) { cardinal in
             Text(cardinal.title)

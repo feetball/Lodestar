@@ -17,6 +17,9 @@ struct DataCredit: Identifiable, Sendable {
 }
 
 extension DataCredit {
+    /// CDS's terms for the catalogues it distributes.
+    static let cdsTermsURL = URL(string: "https://cds.unistra.fr/vizier-org/licences_vizier.html")
+
     static let all: [DataCredit] = [
         DataCredit(
             id: "hyg", name: "HYG Database v4.1", usedFor: "Stars",
@@ -35,8 +38,58 @@ extension DataCredit {
             sourceURL: URL(string: "https://github.com/mattiaverga/OpenNGC"),
             notice: "Compiled from the NASA/IPAC Extragalactic Database (NED), HyperLEDA, SIMBAD (CDS, Strasbourg), "
                 + "HEASARC and Harold Corwin's NGC/IC notes. Changes for Lodestar: converted to compact JSON; "
-                + "selected the Messier objects, all named objects and the catalog objects brighter than "
-                + "magnitude 10; merged duplicates; coordinates in degrees; a few common names added."),
+                + "selected the Messier objects, all named objects, the catalog objects brighter than magnitude 11.5 "
+                + "and the larger nebulae and clusters; merged duplicates; coordinates in degrees; a few common "
+                + "names added. The Caldwell numbers come from OpenNGC\u{2019}s identifiers."),
+        DataCredit(
+            id: "sharpless", name: "Sharpless 2 catalogue", usedFor: "Emission nebulae (H II regions)",
+            author: "S. Sharpless, via CDS (VII/20)",
+            license: "CDS terms of use", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/20"),
+            notice: "S. Sharpless, A Catalogue of H II Regions, Astrophysical Journal Supplement 4, 257 (1959). A "
+                + "factual compilation (positions, sizes, classes) distributed by CDS, Strasbourg, through VizieR."),
+        DataCredit(
+            id: "barnard", name: "Barnard dark nebulae", usedFor: "Dark nebulae",
+            author: "E. E. Barnard, via CDS (VII/220A)",
+            license: "CDS terms of use", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/220A"),
+            notice: "E. E. Barnard, A Photographic Atlas of Selected Regions of the Milky Way (1927). The "
+                + "machine-readable version is by J. Takahashi and M. Ohishi (NAOJ), with diameters and notes by "
+                + "Bill Gray and corrections by Mati Morel, distributed by CDS, Strasbourg, through VizieR."),
+        DataCredit(
+            id: "lynds", name: "Lynds dark nebulae", usedFor: "Dark nebulae and dark clouds",
+            author: "B. T. Lynds, via CDS (VII/7A)",
+            license: "CDS terms of use", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VII/7A"),
+            notice: "B. T. Lynds, Catalogue of Dark Nebulae, Astrophysical Journal Supplement 7, 1 (1962), prepared "
+                + "by J. Marcout and F. Ochsenbein from T. Nagy\u{2019}s version at the Astronomical Data Center. "
+                + "Lodestar uses the clouds of opacity 6 or larger than one square degree, and the named ones. "
+                + "Distributed by CDS, Strasbourg, through VizieR."),
+        DataCredit(
+            id: "dias", name: "Optically visible open clusters and candidates", usedFor: "Open clusters",
+            author: "W. S. Dias and co-authors, via CDS (B/ocl)",
+            license: "CDS terms of use", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/B/ocl"),
+            notice: "W. S. Dias, B. S. Alessi, A. Moitinho and J. R. D. L\u{00E9}pine, Astronomy & Astrophysics 389, "
+                + "871 (2002), version 3.5. Lodestar uses a selection of Collinder, Melotte, Trumpler and Stock "
+                + "clusters. Distributed by CDS, Strasbourg, through VizieR."),
+        DataCredit(
+            id: "iau-boundaries", name: "Constellation boundaries", usedFor: "The constellation of a deep-sky object",
+            author: "N. G. Roman, after E. Delporte, via CDS (VI/42)",
+            license: "CDS terms of use", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://cdsarc.cds.unistra.fr/viz-bin/cat/VI/42"),
+            notice: "N. G. Roman, Identification of a constellation from a position, Publications of the "
+                + "Astronomical Society of the Pacific 99, 695 (1987), after the boundaries of the IAU adopted from "
+                + "E. Delporte (1930). Used for the objects that OpenNGC does not place in a constellation. "
+                + "Distributed by CDS, Strasbourg, through VizieR."),
+        DataCredit(
+            id: "vizier", name: "VizieR catalogue access tool", usedFor: "Distribution of the five catalogues above",
+            author: "CDS, Strasbourg, France",
+            license: "Acknowledgement requested", licenseURL: DataCredit.cdsTermsURL,
+            sourceURL: URL(string: "https://vizier.cds.unistra.fr/"),
+            notice: "This research has made use of the VizieR catalogue access tool, CDS, Strasbourg, France "
+                + "(DOI: 10.26093/cds/vizier). The original description of the VizieR service was published in 2000, "
+                + "A&AS 143, 23."),
         DataCredit(
             id: "d3-celestial", name: "d3-celestial", usedFor: "Constellation figures and Milky Way outlines",
             author: "Olaf Frohn",
@@ -57,6 +110,47 @@ extension DataCredit {
             license: "Published scientific theories", licenseURL: nil, sourceURL: nil,
             notice: "VSOP87 planetary theory (Astronomy & Astrophysics 202, 309, 1988) and the lunar theory of "
                 + "Meeus, Astronomical Algorithms, 2nd ed. Planetary magnitudes follow Mallama & Hilton (2018)."),
+        DataCredit(
+            id: "imo", name: "IMO Meteor Shower Calendar 2026", usedFor: "Meteor showers",
+            author: "International Meteor Organization, edited by J\u{00FC}rgen Rendtel",
+            license: "Published data, cited with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://www.imo.net"),
+            notice: "The activity periods, peak times, rates, radiant positions and drift, and entry speeds of the "
+                + "meteor showers are entered by hand from the 2026 Meteor Shower Calendar (IMO INFO 3-25, "
+                + "\u{00A9} International Meteor Organization). The radiant drift rates are least-squares fits to the "
+                + "calendar's radiant tables."),
+        DataCredit(
+            id: "celestrak", name: "CelesTrak orbital data",
+            usedFor: "Satellite passes and Starlink streak warnings (optional download)",
+            author: "Dr. T. S. Kelso, CelesTrak",
+            license: "Free to use with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://celestrak.org"),
+            notice: "Orbital data: CelesTrak, T. S. Kelso. General-perturbations element sets derived from the US "
+                + "Space Force's public tracking data, downloaded only if you switch on Satellite passes or Starlink "
+                + "streak warnings in Settings \u{25B8} Online Data. Positions are computed on the phone with SGP4, a "
+                + "port of the reference implementation by D. A. Vallado, P. Crawford, R. Hujsak and T. S. Kelso "
+                + "(AIAA 2006-6753). The brightness of the ISS, Tiangong and Hubble follows the intrinsic magnitudes "
+                + "published by Heavens-Above."),
+        DataCredit(
+            id: "mpc", name: "IAU Minor Planet Center comet elements",
+            usedFor: "Comets (optional download)",
+            author: "IAU Minor Planet Center, Smithsonian Astrophysical Observatory",
+            license: "Free to use with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://minorplanetcenter.net"),
+            notice: "Orbital elements: IAU Minor Planet Center. The comet orbit file (CometEls.txt) is downloaded "
+                + "only if you switch on Comets in Settings \u{25B8} Online Data. Lodestar computes the positions "
+                + "on the phone from the elements; the magnitudes are the observers' estimates published with them."),
+        DataCredit(
+            id: "met-norway", name: "MET Norway weather forecast",
+            usedFor: "Cloud forecast (optional download)",
+            author: "The Norwegian Meteorological Institute (MET Norway)",
+            license: "CC BY 4.0", licenseURL: URL(string: "https://creativecommons.org/licenses/by/4.0/"),
+            sourceURL: URL(string: "https://api.met.no/"),
+            notice: "Weather forecast from MET Norway (Locationforecast 2.0), downloaded only if you switch on Cloud "
+                + "forecast in Settings \u{25B8} Online Data, for your location rounded to about 10 km. MET Norway "
+                + "licenses its data under CC BY 4.0 and the Norwegian Licence for Open Government Data 2.0. Lodestar "
+                + "shows the cloud-cover values as forecast; the clear-spell summary is its own, and MET Norway does "
+                + "not endorse Lodestar."),
     ]
 }
 
@@ -65,10 +159,16 @@ struct DataCreditsView: View {
     /// The credit line from ATTRIBUTION.md, shown first.
     private static let creditLine = "Star data: HYG Database v4.1 (astronexus, CC BY-SA 4.0). Deep-sky data: OpenNGC "
         + "by Mattia Verga (CC BY-SA 4.0), compiled from NED, HyperLEDA, SIMBAD, HEASARC and H. Corwin's NGC/IC "
-        + "notes. Constellation figures and Milky Way outlines: d3-celestial by Olaf Frohn (BSD-3-Clause), the "
-        + "latter after Jose R. Vieira's Milky Way Outline Catalog. Geomagnetic model: WMM2025 by NOAA NCEI and "
-        + "the British Geological Survey (public domain). Planetary theory: VSOP87 (Bretagnon & Francou, IMCCE); "
-        + "lunar theory after J. Meeus."
+        + "notes, with the Sharpless 2, Barnard and Lynds nebula catalogues, the open clusters of Dias et al. and "
+        + "the constellation boundaries of Roman and Delporte, distributed by CDS through VizieR. This research has "
+        + "made use of the VizieR catalogue access tool, CDS, Strasbourg, France (DOI: 10.26093/cds/vizier; "
+        + "original description: A&AS 143, 23, 2000). Constellation figures and Milky Way outlines: d3-celestial "
+        + "by Olaf Frohn (BSD-3-Clause), the latter after Jose R. Vieira's Milky Way Outline Catalog. Meteor "
+        + "showers: IMO Meteor Shower Calendar 2026 (\u{00A9} International Meteor Organization). Geomagnetic "
+        + "model: WMM2025 by NOAA NCEI and the British Geological Survey (public domain). Planetary theory: "
+        + "VSOP87 (Bretagnon & Francou, IMCCE); lunar theory after J. Meeus. Optional downloads: orbital data: "
+        + "CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather forecast from MET Norway "
+        + "(CC BY 4.0)."
 
     private static let bsdLicense = """
         Copyright (c) 2015, Olaf Frohn

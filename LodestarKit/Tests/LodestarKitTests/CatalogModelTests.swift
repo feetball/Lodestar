@@ -6,7 +6,8 @@ final class CatalogModelTests: XCTestCase {
 
     func testCategoryDisplayNames() {
         let names: [ObjectCategory: String] = [
-            .sun: "Sun", .moon: "Moon", .planet: "Planet", .star: "Star", .doubleStar: "Double Star",
+            .sun: "Sun", .moon: "Moon", .planet: "Planet", .comet: "Comet", .asteroid: "Asteroid", .star: "Star",
+            .doubleStar: "Double Star",
             .galaxy: "Galaxy", .galaxyGroup: "Galaxy Group", .emissionNebula: "Emission Nebula",
             .reflectionNebula: "Reflection Nebula", .darkNebula: "Dark Nebula", .nebula: "Nebula",
             .planetaryNebula: "Planetary Nebula", .supernovaRemnant: "Supernova Remnant",
@@ -15,12 +16,12 @@ final class CatalogModelTests: XCTestCase {
             .asterism: "Asterism", .milkyWay: "Milky Way", .celestialPole: "Celestial Pole",
             .custom: "Custom Target", .other: "Other",
         ]
-        XCTAssertEqual(ObjectCategory.allCases.count, 22)
+        XCTAssertEqual(ObjectCategory.allCases.count, 24)
         XCTAssertEqual(Set(names.keys), Set(ObjectCategory.allCases))
         for (category, name) in names {
             XCTAssertEqual(category.displayName, name)
         }
-        XCTAssertEqual(Set(ObjectCategory.allCases.map(\.displayName)).count, 22, "display names are unique")
+        XCTAssertEqual(Set(ObjectCategory.allCases.map(\.displayName)).count, 24, "display names are unique")
     }
 
     func testCategorySymbolNamesLookLikeSFSymbols() {
@@ -40,7 +41,7 @@ final class CatalogModelTests: XCTestCase {
         let verified: Set<String> = [
             "sun.max", "moon", "circle.circle", "star", "star.leadinghalf.filled", "hurricane", "circle.hexagongrid",
             "cloud.fill", "cloud.sun", "cloud.fog.fill", "cloud", "circle.dotted", "burst", "sparkles", "aqi.medium",
-            "cloud.moon", "aqi.low", "star.circle", "moon.stars", "scope", "plus.circle", "sparkle",
+            "cloud.moon", "aqi.low", "star.circle", "moon.stars", "scope", "plus.circle", "sparkle", "circle.fill",
         ]
         let used = Set(ObjectCategory.allCases.map(\.systemImageName)).union(ObjectGroup.allCases.map(\.systemImageName))
         XCTAssertEqual(used.subtracting(verified), [])
@@ -49,7 +50,7 @@ final class CatalogModelTests: XCTestCase {
 
     func testCategoryGroups() {
         let groups: [ObjectGroup: [ObjectCategory]] = [
-            .solarSystem: [.sun, .moon, .planet],
+            .solarSystem: [.sun, .moon, .planet, .comet, .asteroid],
             .stars: [.star, .doubleStar, .asterism],
             .galaxies: [.galaxy, .galaxyGroup],
             .nebulae: [.emissionNebula, .reflectionNebula, .darkNebula, .nebula, .planetaryNebula, .supernovaRemnant, .clusterWithNebula],

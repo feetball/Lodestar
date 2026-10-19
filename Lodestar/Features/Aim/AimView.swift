@@ -23,6 +23,10 @@ private struct AimScreen: View {
 
     init(app: AppModel) {
         _model = State(initialValue: AimViewModel(app: app))
+        #if DEBUG
+        // The visual review opens the sheet it asks for (`screen=mosaic`, `screen=mount-sheet`).
+        _sheet = State(initialValue: ScreenshotMode.current?.screen?.aimSheet)
+        #endif
     }
 
     /// The sensors, the timelines and the audio run only while this tab is showing and the app is in front.
@@ -97,6 +101,16 @@ private struct AimScreen: View {
             AlignmentSheet(model: model)
                 .presentationDetents([.fraction(0.45), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
+                .presentationDragIndicator(.visible)
+        case .mosaic:
+            AimMosaicSheet(model: model)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        case .mount:
+            // Like the alignment sheet, it stays small by default so the sky behind it can still be seen.
+            MountAimSheet(model: model)
+                .presentationDetents([.fraction(0.5), .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.5)))
                 .presentationDragIndicator(.visible)
         }
     }

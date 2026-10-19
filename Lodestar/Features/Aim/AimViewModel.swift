@@ -39,9 +39,13 @@ final class AimViewModel {
     var alignmentTarget: CelestialObject?
 
     @ObservationIgnored private var hasHUDRotation = false
+    /// Whether the engine is leading the guidance to a satellite.
+    @ObservationIgnored private var hadSatellite = false
     @ObservationIgnored private var pinchStartFieldOfView: Double?
     @ObservationIgnored private var pinchStartCameraZoom: Double?
     @ObservationIgnored private var wasOnTarget: Bool?
+    /// The session revision and clock second the mosaic guidance was last refreshed for.
+    @ObservationIgnored private var lastMosaicRefresh: (revision: Int, date: Date)?
 
     init(app: AppModel) {
         self.app = app
@@ -58,8 +62,19 @@ final class AimViewModel {
 
     // MARK: Derived state
 
-    /// The object guidance leads to: the alignment sheet's choice, else the app's target.
-    var guidanceTarget: CelestialObject? { alignmentTarget ?? app.target }
+    /// The mosaic being shot, shared with the Sky chart.
+    var mosaicSession: MosaicSession { MosaicSession.shared }
+
+    /// The object guidance leads to: the alignment sheet's choice, else the app's target. There is none while a satellite
+    /// is the target (`satelliteSource`).
+    var guidanceTarget: CelestialObject? { alignmentTarget ?? (app.satelliteAim.source == nil ? app.target : nil) }
+
+    /// The satellite, or the peak of its pass, that guidance leads to instead of an object. The alignment sheet's choice
+    /// of a star comes first, and a mosaic in progress replaces it as it replaces the target.
+    var satelliteSource: SatelliteAimSource? { alignmentTarget == nil ? app.satelliteAim.source : nil }
+
+    /// The Starlink streak warning for the framing: worked out about once a second.
+    let streak = SatelliteStreakMonitor()
 
     /// The optics of the camera picture behind the sky, or `nil` when the virtual lens is in use: whenever the
     /// picture is not wanted or not running.
@@ -83,7 +98,8 @@ final class AimViewModel {
     /// What the sky snapshot depends on, or `nil` while it cannot be built (no location, catalog not loaded).
     func skyInputs(for configuration: AimConfiguration) -> AimSkyInputs? {
         guard let context = app.observerContext, app.catalog.loadState == .loaded else { return nil }
-        return AimSkyInputs(observer: context.observer, options: configuration.skyOptions, target: guidanceTarget)
+        return AimSkyInputs(observer: context.observer, options: configuration.skyOptions, target: guidanceTarget,
+                            horizon: context.horizon, mosaic: mosaicSession.plan)
     }
 
     // MARK: Configuration
@@ -147,6 +163,9 @@ final class AimViewModel {
     }
 
     private func step() {
+        refreshMosaicGuidance(force: false)
+        refreshSatelliteGuidance()
+        streak.tick(model: self)
         guard let frame = engine.frame() else { return }
         updateHUDRotation(gravity: frame.sample.gravity)
         guard let guidance = frame.guidance else {
@@ -176,6 +195,81 @@ final class AimViewModel {
     func stopFeedback() {
         app.feedback.stopGuidanceAudio()
         wasOnTarget = nil
+    }
+
+    // MARK: Mosaic
+
+    /// Starts shooting `plan`: the guidance leads to its first panel.
+    func startMosaic(plan: MosaicPlan, title: String) {
+        mosaicSession.start(plan: plan, title: title)
+        refreshMosaicGuidance(force: true)
+    }
+
+    /// The current panel has been shot: guidance moves on to the next one.
+    func mosaicShotTaken() {
+        mosaicSession.advance()
+        refreshMosaicGuidance(force: true)
+    }
+
+    /// Goes back to the previous panel.
+    func mosaicPrevious() {
+        mosaicSession.goBack()
+        refreshMosaicGuidance(force: true)
+    }
+
+    /// Ends the mosaic; guidance leads to the target again.
+    func finishMosaic() {
+        mosaicSession.finish()
+        refreshMosaicGuidance(force: true)
+    }
+
+    /// Points the guidance at the current panel's place in the sky at the clock's time. A panel of an equatorial plan
+    /// moves with the stars, so this runs about once a second while a mosaic is shot, and at once when the panel
+    /// changes. It costs microseconds: one panel, not the plan.
+    private func refreshMosaicGuidance(force: Bool) {
+        let session = mosaicSession
+        guard let plan = session.plan else {
+            if lastMosaicRefresh != nil {
+                lastMosaicRefresh = nil
+                engine.setMosaic(active: false, aim: nil)
+                wasOnTarget = nil
+            }
+            return
+        }
+        let now = app.clock.now
+        if !force, let last = lastMosaicRefresh, last.revision == session.revision, last.date == now { return }
+        // A new panel starts without a remembered on-target state, so reaching it does not buzz for the old one.
+        if lastMosaicRefresh?.revision != session.revision { wasOnTarget = nil }
+        lastMosaicRefresh = (session.revision, now)
+        guard let panel = session.currentPanel, let context = app.observerContext else {
+            engine.setMosaic(active: true, aim: nil)
+            return
+        }
+        let pointing = MosaicGuidance.pointing(of: panel, in: plan, frame: SkyFrame(date: now, observer: context.observer))
+        engine.setMosaic(active: true, aim: AimMosaicAim(
+            panelIndex: panel.index, horizontal: pointing.direction, roll: pointing.roll,
+            orientation: plan.orientation, isAboveHorizon: pointing.isAboveHorizon,
+            lowestAltitude: pointing.lowestAltitude, onTargetThreshold: AimMosaicAim.onTargetThreshold(for: plan)))
+    }
+
+    // MARK: Satellite
+
+    /// Points the guidance at the satellite (or the peak of its pass) at the present moment. A followed satellite moves
+    /// across the sky, so this runs with every sensor tick: one `SatelliteSkyContext` and one look, a few microseconds.
+    /// Real time rather than the clock's second, which would make the target jump.
+    private func refreshSatelliteGuidance() {
+        guard let source = satelliteSource else {
+            if hadSatellite {
+                hadSatellite = false
+                engine.setSatellite(nil, sourceID: nil)
+                wasOnTarget = nil
+            }
+            return
+        }
+        // A new source starts without a remembered on-target state, so reaching it does not buzz for the old one.
+        if !hadSatellite || engine.satelliteSourceID != source.id { wasOnTarget = nil }
+        hadSatellite = true
+        engine.setSatellite(source.fix(at: Date()), sourceID: source.id)
     }
 
     // MARK: Zoom

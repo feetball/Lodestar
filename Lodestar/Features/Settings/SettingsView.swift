@@ -10,11 +10,13 @@ struct SettingsView: View {
             Form {
                 SettingsLocationSection()
                 SettingsMountSection()
+                SettingsMountControlSection()
                 SettingsCameraSection()
                 SettingsNightSection()
                 SettingsFeedbackSection()
                 SettingsSkyDisplaySection()
                 SettingsAtmosphereSection()
+                SettingsOnlineDataSection()
                 SettingsToolsSection()
                 SettingsAboutSection()
             }

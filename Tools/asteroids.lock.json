@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "lockedOn": "2026-10-18",
+  "source": {
+    "url": "https://www.minorplanetcenter.net/iau/MPCORB/MPCORB.DAT.gz",
+    "sha256": "a7c75d31ef594e55d93213fc5c7816a091b7a5aaf8fc62118140804a3b2376a3",
+    "bytes": 93812401,
+    "lastModified": "Sun, 18 Oct 2026 12:59:52 GMT",
+    "license": "MPC orbit data: keep the MPCORB header, credit the Minor Planet Center"
+  },
+  "selection": {
+    "peakMagnitudeLimit": 11.0,
+    "maximumAbsoluteMagnitude": 10.5,
+    "minimumSunDistanceAU": 0.4226,
+    "minimumEarthDistanceAU": 0.5,
+    "count": 216
+  },
+  "output": {
+    "sha256": "88ca8ca57757ff343f9d9ba328f2241bd8ff75db6ddcafd61c0a4e0953e5d742",
+    "bytes": 46716
+  }
+}

@@ -79,6 +79,65 @@ OpenNGC readme, are:
   <http://heasarc.gsfc.nasa.gov/>
 - Harold Corwin's NGC/IC Positions and Notes. <http://haroldcorwin.net/ngcic/index.html>
 
+### Additional deep-sky catalogues — `dsos.json`
+
+`Tools/build_catalogs.py` adds these catalogues to the OpenNGC selection (all pinned by URL and sha256 in
+`Tools/sources.lock.json`). They are factual compilations distributed by CDS/VizieR; the original authors are credited
+here as CDS asks.
+
+- **Sharpless 2** HII regions — S. Sharpless, ApJS 4, 257 (1959); CDS VII/20.
+- **Barnard** dark nebulae — E. E. Barnard, *A Photographic Atlas of Selected Regions of the Milky Way* (1927);
+  CDS VII/220A, machine-readable by J. Takahashi & M. Ohishi (NAOJ), diameters and notes by Bill Gray, corrections by
+  Mati Morel.
+- **Lynds** dark nebulae (opacity 6 or area ≥ 1 deg², plus named clouds) — B. T. Lynds, ApJS 7, 1 (1962); CDS VII/7A,
+  prepared by J. Marcout & F. Ochsenbein from T. Nagy's ADC version.
+- **Open clusters** (selected Collinder, Melotte, Trumpler and Stock clusters) — W. S. Dias et al., A&A 389, 871
+  (2002), version 3.5; CDS B/ocl.
+- **Constellation boundaries** for objects outside OpenNGC — N. G. Roman, PASP 99, 695 (1987), after Delporte (1930);
+  CDS VI/42.
+- **Caldwell** numbers come from OpenNGC's identifiers.
+
+This research has made use of the VizieR catalogue access tool, CDS, Strasbourg, France (DOI: 10.26093/cds/vizier).
+The original description of the VizieR service was published in 2000, A&AS 143, 23.
+
+### Meteor shower table — `events/MeteorShower`
+
+The meteor shower table (peak solar longitudes, activity periods, ZHR, radiant positions and drift, velocities) is
+hand-entered from the **IMO Meteor Shower Calendar 2026** (© International Meteor Organization), whose source is cited
+in the code. Radiant drift rates are least-squares fits to the calendar's radiant tables.
+
+### Satellite data and SGP4
+
+Satellite orbital elements are downloaded at run time from **CelesTrak** (Dr. T. S. Kelso, https://celestrak.org),
+free to use with credit; the app shows **"Orbital data: CelesTrak, T. S. Kelso"**. They are derived from public US Space
+Force tracking data. The download is optional (Settings > Online Data) and off by default. The SGP4/SDP4 propagator is a
+port of the reference implementation by D. A. Vallado, P. Crawford, R. Hujsak and T. S. Kelso ("Revisiting Spacetrack
+Report #3", AIAA 2006-6753), distributed by CelesTrak. Intrinsic magnitudes of the ISS, Tiangong and Hubble are from
+Heavens-Above.
+
+### Comet and asteroid orbits
+
+Comet orbital elements are downloaded at run time from the **IAU Minor Planet Center** (`CometEls.txt`, credit the
+MPC; the file's header is kept); the app shows **"Orbital elements: IAU Minor Planet Center"**. The download is optional
+(Settings > Online Data) and off by default. Single-object elements and the test reference positions come from
+**NASA/JPL** (SBDB and Horizons, public domain; credit requested). Test fixtures contain small extracts of both. The
+bundled `asteroids.txt` (bright asteroids, osculating epoch 2026-06-09) is an extract of the
+MPC orbit file and keeps the MPC header verbatim.
+
+### Cloud forecast
+
+The optional cloud forecast (Settings > Online Data, off by default) is downloaded at run time from **MET Norway**
+(The Norwegian Meteorological Institute), Locationforecast 2.0, `https://api.met.no/weatherapi/locationforecast/2.0/`.
+MET Norway licenses its data under the Norwegian Licence for Open Government Data (NLOD) 2.0 and
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/) (CC BY 4.0). The app
+shows **"Weather forecast from MET Norway"** (on the Tonight card: "Forecast: MET Norway") and states the changes it makes:
+it shows the cloud-cover values as forecast, for the night and place shown, and derives its own summary of the clear
+spells from them. MET Norway does not endorse Lodestar. Requests follow MET Norway's terms of service
+(https://api.met.no/doc/TermsOfService): an identifying `User-Agent`
+(`Lodestar/<version> (+https://feetball.github.io/Lodestar/support.html)`), coordinates rounded to 0.1 degree (at most four
+decimals), `If-Modified-Since` for repeat requests and no request before the response's `Expires` time. The server
+sees the app's IP address, the `User-Agent` and the rounded coordinates, and nothing about the person.
+
 ### d3-celestial — `constellations.json` and `milkyway.json`
 
 - **Title:** d3-celestial
@@ -189,6 +248,8 @@ the app.
 > the latter after Jose R. Vieira's Milky Way Outline Catalog.
 > Geomagnetic model: WMM2025 by NOAA NCEI and the British Geological Survey (public domain).
 > Planetary theory: VSOP87 (Bretagnon & Francou, IMCCE); lunar theory after J. Meeus.
+> Optional downloads: orbital data: CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather
+> forecast from MET Norway (CC BY 4.0).
 
 ## Reproducing and updating
 

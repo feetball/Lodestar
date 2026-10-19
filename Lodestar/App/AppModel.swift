@@ -41,6 +41,10 @@ final class AppModel {
     let catalog: CatalogService
     let feedback: FeedbackService
     let screen: ScreenController
+    /// The optional downloads (satellites, comets, cloud forecast); everything in it is off until switched on.
+    let online: OnlineDataService
+    /// The satellite Aim follows or waits for, if one was chosen from a pass.
+    let satelliteAim: SatelliteAimSession
 
     /// The selected tab. Changing it starts/stops the sensors that tab needs.
     var selectedTab: AppTab = .aim {
@@ -58,6 +62,16 @@ final class AppModel {
         didSet { if keepsMotionRunning != oldValue { syncServices() } }
     }
 
+    /// Keeps the camera picture running outside the Aim tab (the skyline recorder in Settings).
+    var keepsCameraRunning = false {
+        didSet { if keepsCameraRunning != oldValue { syncServices() } }
+    }
+
+    /// Keeps the screen from locking outside the Aim tab (the skyline recorder, whose sweep takes half a minute).
+    var keepsScreenAwake = false {
+        didSet { if keepsScreenAwake != oldValue { syncServices() } }
+    }
+
     /// Whether the Sun is below −6° at the observer (drives automatic night mode).
     private(set) var isSunBelowCivilTwilight = false
 
@@ -68,6 +82,8 @@ final class AppModel {
     @ObservationIgnored private var hasRequestedLocationThisLaunch = false
     @ObservationIgnored private var lastAlignmentContext: AlignmentContext?
     @ObservationIgnored private var lastSunEvaluation: (date: Date, observer: Observer)?
+    /// A recent target that was not in the catalog at launch (a downloaded comet whose file is applied later).
+    @ObservationIgnored private var pendingTargetID: String?
 
     init(settingsStore: SettingsStore = SettingsStore()) {
         self.settingsStore = settingsStore
@@ -78,9 +94,13 @@ final class AppModel {
         catalog = CatalogService()
         feedback = FeedbackService()
         screen = ScreenController()
+        online = OnlineDataService(catalog: catalog)
+        satelliteAim = SatelliteAimSession()
+        online.locationProvider = { [weak self] in self?.observerContext?.location }
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
+        catalog.onSmallBodiesChange = { [weak self] in self?.smallBodiesChanged() }
     }
 
     #if DEBUG
@@ -97,7 +117,8 @@ final class AppModel {
             settings.locationSource = .site(site.id)
         }
         settingsStore.settings = settings
-        selectedTab = demo.tab
+        selectedTab = demo.screen?.tab ?? demo.tab
+        if demo.addsFixtureComets { catalog.setDownloadedSmallBodies(ReviewFixtures.comets) }
         clock.freeze(at: demo.date)
         if let pointing = demo.pointing { motion.useScreenshotPointing(pointing) }
     }
@@ -131,7 +152,8 @@ final class AppModel {
         case .site(let id):
             guard let site = settings.savedSites.first(where: { $0.id == id }) else { return nil }
             return ObserverContext(observer: Observer(location: site.location, atmosphere: atmosphere),
-                                   timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id))
+                                   timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id),
+                                   horizon: site.horizon)
         }
     }
 
@@ -160,8 +182,8 @@ final class AppModel {
         startMaintenance()
         syncServices()
         await catalog.load()
-        if target == nil, let id = settings.recentObjectIDs.first, let object = catalog.object(id: id) {
-            target = object
+        if target == nil, let id = settings.recentObjectIDs.first {
+            if let object = catalog.object(id: id) { target = object } else { pendingTargetID = id }
         }
         #if DEBUG
         if let id = ScreenshotMode.current?.targetID, let object = catalog.object(id: id) {
@@ -169,6 +191,9 @@ final class AppModel {
         }
         #endif
         evaluateSun(force: true)
+        #if DEBUG
+        ReviewDriver.shared.start(app: self)
+        #endif
     }
 
     func handleScenePhase(_ phase: ScenePhase) {
@@ -177,6 +202,7 @@ final class AppModel {
         case .active:
             clock.start()
             startMaintenance()
+            online.onForeground()
         case .background:
             settingsStore.saveNow()
             clock.stop()
@@ -207,6 +233,8 @@ final class AppModel {
 
     /// Makes `object` the aiming target without changing tabs.
     func select(target object: CelestialObject) {
+        satelliteAim.stop()
+        pendingTargetID = nil
         target = object
         if !object.id.hasPrefix("custom.") {
             settingsStore.noteRecent(object.id)
@@ -214,7 +242,20 @@ final class AppModel {
     }
 
     func clearTarget() {
+        pendingTargetID = nil
         target = nil
+    }
+
+    /// Downloaded comets and asteroids replaced the catalog's small bodies: a target that is one of them follows its
+    /// refreshed object (newer elements; one that dropped out of the data keeps what it had), and a recent target
+    /// that only now resolves is restored.
+    private func smallBodiesChanged() {
+        if let current = target, current.smallBody != nil, let refreshed = catalog.object(id: current.id) {
+            target = refreshed
+        } else if target == nil, let id = pendingTargetID, let object = catalog.object(id: id) {
+            target = object
+        }
+        pendingTargetID = nil
     }
 
     // MARK: Alignment
@@ -264,7 +305,8 @@ final class AppModel {
         let backCameraAlongLens = mountProfile.cameraAxis.dot(DeviceAttitude.backCameraAxis) > 0.99
         let wantsPreview = settings.cameraPreviewEnabled && backCameraAlongLens
             && (!isNightModeActive || settings.cameraPreviewAtNight)
-        if active && onboarded && selectedTab == .aim && wantsPreview && observerContext != nil {
+        let aimWantsCamera = selectedTab == .aim && wantsPreview && observerContext != nil
+        if active && onboarded && (aimWantsCamera || keepsCameraRunning) {
             camera.start(nightFilter: isNightModeActive ? settings.nightIntensity : nil)
         } else {
             camera.stop()
@@ -273,7 +315,7 @@ final class AppModel {
         // Screen: dim at night, keep awake while aiming.
         if active {
             screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
-            screen.setIdleTimerDisabled(selectedTab == .aim && settings.keepScreenAwake)
+            screen.setIdleTimerDisabled((selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
         } else {
             screen.restore()
         }

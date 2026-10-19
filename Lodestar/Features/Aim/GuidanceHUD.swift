@@ -57,6 +57,7 @@ private struct AimHUDLayout: View {
         VStack(spacing: 8) {
             AimStatusChips(model: model)
             Spacer(minLength: 0)
+            MountAimStrip(model: model, sheet: $sheet)
             AimReadout(model: model, sheet: $sheet, isActive: isActive)
             AimControlsBar(model: model, sheet: $sheet)
         }
@@ -72,6 +73,7 @@ private struct AimHUDLayout: View {
             VStack(spacing: 8) {
                 AimStatusChips(model: model)
                 Spacer(minLength: 0)
+                MountAimStrip(model: model, sheet: $sheet)
                 AimReadout(model: model, sheet: $sheet, isActive: isActive)
             }
             .frame(maxWidth: Self.wideReadoutWidth)

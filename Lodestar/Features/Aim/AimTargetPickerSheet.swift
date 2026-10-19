@@ -65,7 +65,7 @@ struct AimTargetPickerSheet: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(palette.tertiaryText)
                 .accessibilityHidden(true)
-            TextField("", text: $query, prompt: Text("Search stars, planets, Messier, NGC\u{2026}").foregroundStyle(palette.tertiaryText))
+            TextField("", text: $query, prompt: Text("Search stars, planets, comets, Messier, NGC\u{2026}").foregroundStyle(palette.tertiaryText))
                 .textFieldStyle(.plain)
                 .foregroundStyle(palette.primaryText)
                 .tint(palette.accent)
@@ -185,10 +185,10 @@ struct AimTargetPickerSheet: View {
             HStack(spacing: 12) {
                 ObjectIcon(category: object.category)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(object.name)
+                    Text(SmallBodyText.displayName(object))
                         .font(.body.weight(.semibold))
                         .foregroundStyle(palette.primaryText)
-                    Text(object.subtitle)
+                    SmallBodySummaryText(object: object)
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
                 }

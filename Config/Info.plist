@@ -2,6 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Mount control. An ASCOM Alpaca server on the local network speaks plain http://; this exception is limited to
+	     local addresses (IP addresses, .local names), the rest of the app stays under App Transport Security. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- Mount control. Required for any connection to a device on the local network (the mount, its Wi-Fi adapter, an
+	     Alpaca server). No NSBonjourServices: Lodestar connects by IP address and does not browse Bonjour. UDP broadcast
+	     discovery of Alpaca servers would need the Multicast Networking entitlement, so the search sends unicast
+	     datagrams to every address of the subnet instead. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Lodestar connects to your telescope mount over your local network. Nothing is sent to the internet.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>net.kuecker.Lodestar</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lodestar</string>
+			</array>
+		</dict>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

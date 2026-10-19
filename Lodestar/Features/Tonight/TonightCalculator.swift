@@ -18,16 +18,24 @@ enum TonightCalculator {
         case .tonight: requested = tonight
         case .date(let date): requested = date
         }
-        let summary = NightPlanner.summary(nightStartingOn: requested, observer: context.observer,
-                                           timeZone: context.timeZone)
+        let flat = NightPlanner.summary(nightStartingOn: requested, observer: context.observer,
+                                        timeZone: context.timeZone)
+        // With a recorded skyline the Moon, the core, the planets and the targets are judged over it.
+        let skyline = TonightHorizon.skyline(of: context)
+        let summary = skyline.map { TonightHorizon.summary(flat, applying: $0) } ?? flat
         let tonightStart = localNoon(of: tonight, calendar: calendar)
         let nights = calendar.dateComponents([.day], from: calendar.startOfDay(for: tonightStart),
                                              to: calendar.startOfDay(for: summary.night.start)).day ?? 0
+        // Comets and asteroids are not deep-sky objects: they get their own card, and the clearly good ones join the
+        // targets.
+        let smallBodies = input.catalog.map { SmallBodyTonightPlanner.plan(catalog: $0, summary: summary, skyline: skyline) }
         return TonightReport(
             summary: summary, timeZone: context.timeZone,
             timeline: TonightTimelineModel(summary: summary, timeZone: context.timeZone),
-            targets: targets(for: summary, catalog: input.catalog),
-            tonightStart: tonightStart, nightsFromTonight: nights)
+            targets: targets(for: summary, catalog: input.catalog, skyline: skyline,
+                             movingTargets: smallBodies?.targets ?? []),
+            tonightStart: tonightStart, nightsFromTonight: nights, appliesSkyline: skyline != nil,
+            smallBodies: smallBodies?.bright)
     }
 
     /// An instant on the date of the night that is under way at `now`, or of the coming night once the Sun
@@ -51,15 +59,17 @@ enum TonightCalculator {
 
     // MARK: Best targets
 
-    private static func targets(for summary: NightSummary, catalog: Catalog?) -> TonightTargetsOutcome {
+    private static func targets(for summary: NightSummary, catalog: Catalog?, skyline: HorizonProfile?,
+                                movingTargets: [TonightTarget]) -> TonightTargetsOutcome {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
-        return .ranked(rankedTargets(in: catalog, summary: summary))
+        return .ranked(movingTargets + rankedTargets(in: catalog, summary: summary, skyline: skyline))
     }
 
     /// The listed deep-sky objects that climb to at least `minimumTargetAltitude` in the dark, best first, at
-    /// most `targetLimit` of them.
-    private static func rankedTargets(in catalog: Catalog, summary: NightSummary) -> [TonightTarget] {
+    /// most `targetLimit` of them. With a skyline an object counts only while it is above the skyline too.
+    private static func rankedTargets(in catalog: Catalog, summary: NightSummary,
+                                      skyline: HorizonProfile?) -> [TonightTarget] {
         var objects: [CelestialObject] = []
         var places: [EquatorialCoordinate] = []
         var motions: [ProperMotion?] = []
@@ -69,10 +79,19 @@ enum TonightCalculator {
             places.append(place)
             motions.append(motion)
         }
-        let visibilities = NightPlanner.visibility(ofFixed: places, properMotions: motions, during: summary,
+        let visibilities: [TargetVisibility]
+        if let skyline {
+            visibilities = NightPlanner.visibility(ofFixed: places, properMotions: motions, during: summary,
+                                                   darkness: .astronomical, minimumAltitude: minimumTargetAltitude,
+                                                   horizon: skyline)
+        } else {
+            visibilities = NightPlanner.visibility(ofFixed: places, properMotions: motions, during: summary,
                                                    darkness: .astronomical, minimumAltitude: minimumTargetAltitude)
+        }
         var candidates: [(object: CelestialObject, visibility: TargetVisibility, peak: Double, score: Double)] = []
         for (object, visibility) in zip(objects, visibilities) {
+            // Hidden targets are those with no usable stretch; their altitude says nothing (see API-horizon.md).
+            if skyline != nil, visibility.intervalsAboveMinimum.isEmpty { continue }
             guard let peak = visibility.maxAltitudeDuringDarkness, peak >= minimumTargetAltitude,
                   visibility.bestTime != nil else { continue }
             candidates.append((object, visibility, peak, score(of: object, peakAltitude: peak)))

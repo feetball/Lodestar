@@ -42,12 +42,16 @@ extension Catalog {
     /// "alpha1") and drops leading zeros of numbers. So "m31", "M 31", "Messier 31" and "M031" are the
     /// same query, as are "ngc224" and "NGC 0224", and "alpha cma", "alpha canis majoris" and "α CMa".
     /// It matches names, common names and the designations of every object: Messier, NGC and IC
-    /// numbers, Bayer and Flamsteed designations with the constellation as abbreviation or genitive,
-    /// and HR, HD and HIP numbers.
+    /// numbers, the numbers of the other deep-sky catalogues (Caldwell "C 14" and "Caldwell 14", Sharpless
+    /// "Sh2-155", "Sh 2-155" and "Sharpless 155", Barnard "B33" and "Barnard 33", Lynds "LDN 1622" and
+    /// "Lynds 1622", Collinder "Cr 399", Melotte "Mel 20", Trumpler "Tr 24", Stock "St 2"), Bayer and
+    /// Flamsteed designations with the constellation as abbreviation or genitive, and HR, HD and HIP numbers.
+    /// The comets and asteroids added with `withSmallBodies(_:)` are found by title, designation and name: "C/2023 A3",
+    /// "Tsuchinshan", "12P", "Pons-Brooks", "4 Vesta", "Vesta", "2024 YR4".
     ///
-    /// Results are ordered by `MatchKind`; matches of the same kind are ordered by listed objects
-    /// first, then brighter objects, then name. `MatchKind.fuzzy` results only appear when there
-    /// are no other matches.
+    /// Results are ordered by `MatchKind`; matches of the same kind are ordered by listed objects first,
+    /// then more prominent objects (`CelestialObject.prominence`), then brighter objects (objects without a
+    /// magnitude last), then name. `MatchKind.fuzzy` results only appear when there are no other matches.
     ///
     /// - Parameters:
     ///   - query: The text to look for. Only its first `maximumQueryLength` characters are used. A
@@ -55,11 +59,36 @@ extension Catalog {
     ///   - limit: The most results to return; a limit of zero or less returns none.
     public func search(_ query: String, limit: Int = 50) -> [CatalogSearchResult] {
         let key = SearchText.key(for: query, maximumScalars: SearchText.maximumQueryScalars)
-        return searchIndex.search(key.bytes, limit: limit).map { hit in
+        let bundled = searchIndex.search(key.bytes, limit: limit).map { hit in
             let object = objects[hit.objectIndex]
             let source = searchIndex.source(ofKey: hit.keyIndex)
             return CatalogSearchResult(object: object, matchedText: text(ofEntry: source.entry, in: object),
                                        kind: hit.kind)
         }
+        guard let smallIndex = smallBodyTable.searchIndex else { return bundled }
+        let own = smallIndex.search(key.bytes, limit: limit).map { hit in
+            let object = smallBodyTable.objects[hit.objectIndex]
+            let source = smallIndex.source(ofKey: hit.keyIndex)
+            return CatalogSearchResult(object: object, matchedText: text(ofEntry: source.entry, in: object),
+                                       kind: hit.kind)
+        }
+        guard !own.isEmpty else { return bundled }
+        return Self.merged(bundled, own, limit: limit)
+    }
+
+    /// The best `limit` of two result lists, each of them already the best of its own index: better kinds first, equal
+    /// kinds in the order of equally good matches (`CatalogOrdering.searchOrder`, which ends in the identifier and so
+    /// is total). A loose `.fuzzy` suggestion only counts when there is no other match in either list, as in a single
+    /// index.
+    private static func merged(_ first: [CatalogSearchResult], _ second: [CatalogSearchResult],
+                               limit: Int) -> [CatalogSearchResult] {
+        let all = (first + second).map { (result: $0, item: CatalogOrdering.item(for: $0.object)) }
+        let ordered = all.sorted { lhs, rhs in
+            if lhs.result.kind != rhs.result.kind { return lhs.result.kind < rhs.result.kind }
+            return CatalogOrdering.searchOrder(lhs.item, rhs.item)
+        }
+        let hasBetterThanFuzzy = ordered.contains { $0.result.kind != .fuzzy }
+        let kept = hasBetterThanFuzzy ? ordered.filter { $0.result.kind != .fuzzy } : ordered
+        return kept.prefix(limit).map(\.result)
     }
 }
