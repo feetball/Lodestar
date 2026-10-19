@@ -26,7 +26,8 @@ def main() -> None:
         del args[index:index + 2]
     folder = Path(args[0])
     flagged = 0
-    for path in sorted(folder.rglob("*-n-*.png")) + sorted(folder.rglob("*night*.png")):
+    # capture.sh names a picture <name>-<d|n>-<page>.png; n is night mode.
+    for path in sorted(folder.rglob("*-n-[0-9]*.png")):
         picture = np.asarray(Image.open(path).convert("RGB")).astype(int)
         body = picture[ignore_top:]
         leak = (body[:, :, 1] > THRESHOLD) | (body[:, :, 2] > THRESHOLD)
