@@ -13,12 +13,8 @@ struct SettingsNightSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Night mode")
                     .accessibilityHidden(true)
-                Picker("Night mode", selection: $store.settings.nightMode) {
-                    ForEach(NightModeSetting.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ThemedSegmentedPicker("Night mode", selection: $store.settings.nightMode,
+                                      options: NightModeSetting.allCases, label: \.title)
                 SettingsCaption(statusText(for: store.settings.nightMode))
             }
             SettingsSliderRow(title: "Red brightness", valueText: AppFormat.percent(store.settings.nightIntensity),

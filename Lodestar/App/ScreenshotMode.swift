@@ -10,7 +10,8 @@ import LodestarKit
 ///
 /// The visual review adds `screen=<name>` (a sub-screen or sheet, see `ReviewScreen`), `comets=0|1` (add the comets of
 /// `ReviewFixtures`; on by default with `screen=`), `online=1` (satellites and a cloud forecast in place of the downloads) and `review=1` (run the review driver, which pages the screen and
-/// reports its state, without a `screen=`). Unknown keys are ignored and an unknown screen name is no screen.
+/// reports its state, without a `screen=`). `nightchrome=<tokens>` switches on the
+/// ways of making the iOS 26 system chrome red at night (`NightChrome`). Unknown keys are ignored and an unknown screen name is no screen.
 struct ScreenshotMode {
     var tab: AppTab
     var date: Date
@@ -31,6 +32,9 @@ struct ScreenshotMode {
     var addsOnlineData: Bool
     /// Whether the review driver runs (it pages the screen and reports its state for the capture script).
     var runsReviewDriver: Bool
+    /// The ways of turning the iOS 26 system chrome red that are switched on (`nightchrome=ovl+g`, tokens joined by `+`,
+    /// see `NightChrome`). `["base"]` when the argument is missing, which changes nothing.
+    var chrome: Set<String>
 
     static let current: ScreenshotMode? = ScreenshotMode(arguments: ProcessInfo.processInfo.arguments)
 
@@ -59,6 +63,7 @@ struct ScreenshotMode {
         addsFixtureComets = values["comets"] == "1" || (values["screen"] != nil && values["comets"] != "0")
         addsOnlineData = values["online"] == "1" || (screen?.needsOnlineData ?? false)
         runsReviewDriver = values["review"] == "1" || values["screen"] != nil
+        chrome = Set((values["nightchrome"] ?? "base").lowercased().split(separator: "+").map(String.init))
     }
 }
 #endif

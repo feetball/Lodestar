@@ -33,10 +33,13 @@ struct EventsCalendarView: View {
         .screenBackground(palette)
         .navigationTitle("Events")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
+        .nightBackButton()
+        .trailingBarItems {
             ToolbarItem(placement: .topBarTrailing) {
                 HelpButton(topic: .events)
             }
+        } night: {
+            HelpButton(topic: .events)
         }
     }
 

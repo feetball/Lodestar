@@ -20,12 +20,8 @@ struct SettingsMountSection: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Heading source")
                     .accessibilityHidden(true)
-                Picker("Heading source", selection: $store.settings.headingSource) {
-                    ForEach(HeadingSource.allCases) { source in
-                        Text(source.title).tag(source)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ThemedSegmentedPicker("Heading source", selection: $store.settings.headingSource,
+                                      options: HeadingSource.allCases, label: \.title)
                 SettingsCaption(Self.explanation(of: store.settings.headingSource))
             }
             SettingsSliderRow(title: "Smoothing", valueText: Self.smoothingText(store.settings.smoothingTimeConstant),

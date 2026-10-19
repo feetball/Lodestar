@@ -41,7 +41,7 @@ struct TonightScreen: View {
         }
         // Some symbols draw themselves in colour by default; night mode allows red only.
         .symbolRenderingMode(.monochrome)
-        .toolbar {
+        .trailingBarItems {
             ToolbarItem(placement: .topBarTrailing) {
                 if choice != .tonight {
                     Button("Tonight") { choice = .tonight }
@@ -51,6 +51,12 @@ struct TonightScreen: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HelpButton(topic: .tonight)
             }
+        } night: {
+            if choice != .tonight {
+                Button("Tonight") { choice = .tonight }
+                    .accessibilityHint("Goes back to the night that is under way")
+            }
+            HelpButton(topic: .tonight)
         }
         .sheet(isPresented: $isShowingDateSheet) {
             dateSheet

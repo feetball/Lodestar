@@ -236,12 +236,8 @@ struct AimMosaicSheet: View {
                 Text("Camera held in")
                     .font(.subheadline)
                     .foregroundStyle(palette.secondaryText)
-                Picker("Camera orientation", selection: orientationBinding) {
-                    ForEach(MosaicOrientation.allCases, id: \.self) { orientation in
-                        Text(AimMosaicPlanner.name(of: orientation)).tag(orientation)
-                    }
-                }
-                .pickerStyle(.segmented)
+                ThemedSegmentedPicker("Camera orientation", selection: orientationBinding,
+                                      options: Array(MosaicOrientation.allCases)) { AimMosaicPlanner.name(of: $0) }
                 if let recommendation {
                     Text(recommendation)
                         .font(.footnote)
@@ -432,9 +428,7 @@ private struct AimMosaicSliderRow: View {
                     .foregroundStyle(palette.secondaryText)
             }
             .accessibilityHidden(true)
-            Slider(value: $value, in: range, step: step) {
-                Text(title)
-            }
+            ThemedSlider(title: title, value: $value, range: range, step: step)
             .tint(palette.accent)
             .accessibilityValue(valueText)
         }

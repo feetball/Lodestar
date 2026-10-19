@@ -47,6 +47,7 @@ struct RootView: View {
         .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
         .onChange(of: palette, initial: true) { _, newPalette in
             BarAppearance.apply(newPalette)
+            NightWindowFilter.setActive(NightChrome.isActive("win", night: newPalette.isNight))
         }
         .onChange(of: scenePhase, initial: true) { _, phase in
             app.handleScenePhase(phase)

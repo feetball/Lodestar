@@ -130,12 +130,8 @@ struct ToolsStarTrailSections: View {
         return SettingsSection(
             title: "Time for a Chosen Trail",
             footer: "How long stars at this declination need to draw a trail of the length you want.") {
-            Picker("Unit of the trail length", selection: $inputs.arcUnit) {
-                ForEach(ToolsTrailInputs.ArcUnit.allCases) { unit in
-                    Text(unit.title).tag(unit)
-                }
-            }
-            .pickerStyle(.segmented)
+            ThemedSegmentedPicker("Unit of the trail length", selection: $inputs.arcUnit,
+                                  options: ToolsTrailInputs.ArcUnit.allCases, label: \.title)
             switch inputs.arcUnit {
             case .degrees:
                 SettingsNumberField(title: "Trail length", unit: "\u{00B0}", value: $inputs.arcDegrees,
@@ -165,12 +161,8 @@ struct ToolsStarTrailSections: View {
             footer: "Many short exposures stacked in software draw the same trails as one long exposure, without its "
                 + "noise and sensor heat. Each frame is as long as the rule allows without trailing, rounded down to "
                 + "a setting you can dial.") {
-            Picker("Rule", selection: $inputs.rule) {
-                ForEach(ExposureRule.allCases) { option in
-                    Text(option.stackShortName).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
+            ThemedSegmentedPicker("Rule", selection: $inputs.rule, options: ExposureRule.allCases,
+                                  label: \.stackShortName)
             SettingsNumberField(title: "Frame length", unit: "s", optionalValue: $inputs.frameSeconds,
                                 range: 0.1...StarTrailPlanner.maximumExposureSeconds, fractionDigits: 1,
                                 placeholder: "Automatic")

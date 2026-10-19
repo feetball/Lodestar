@@ -1,0 +1,23 @@
+# name | modes (d day, n night) | launch arguments | options (pages=<n>, fixed=<seconds>)
+# The night chrome experiment (.github/workflows/review-chrome.yml): the screens that still show system chrome of iOS 26 in
+# night mode (the app draws its own tab bar and colours the placeholders and segment titles itself). The same list is run once
+# per variant; the variant comes in through EXTRA_ARGS (nightchrome=<tokens>). The places that leaked in the review of main
+# (pictures of 1206x2622) are named at each screen.
+#   tonight          toolbar capsules at the top right (x 1026-1157, y 186-317): "Tonight" and the help button. Taken by day
+#                    as well: the day picture must be the same for every variant except compat (day mode is untouched).
+#   objects          large title, search field and filter capsule, toolbar band (y 186-638)
+#   settings         large title, switches, segmented pickers (Night mode, Coordinates, Heading source), sliders with ticks,
+#                    disclosure chevrons, placeholders; three pages
+#   events-calendar  back button of a pushed screen (x 48-179, y 186-317), the help capsule, a switch, filter chips
+#   star-trails      back button, segmented pickers (Plan, Unit, Rule), slider rows; three pages
+#   mount-sheet      the Done capsule of a sheet (x 551-1135, y 1394-1551), the nudge speed picker, a switch; two pages
+#   site-editor      Cancel and Save capsules, text fields with placeholders
+#   mosaic           Done, the orientation picker, sliders with tick dots, over the Aim tab (camera preview); three pages
+tonight|dn|tab=tonight comets=1 online=1|pages=1
+objects|n|tab=objects comets=1|pages=1
+settings|n|tab=settings online=1|pages=3
+events-calendar|n|screen=events-calendar|pages=1
+star-trails|n|screen=star-trails|pages=3
+mount-sheet|n|screen=mount-sheet target=special.ncp|pages=2
+site-editor|n|screen=site-editor|pages=1
+mosaic|n|screen=mosaic target=dso.M31|pages=3

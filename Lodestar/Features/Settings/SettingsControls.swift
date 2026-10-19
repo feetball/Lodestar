@@ -78,9 +78,7 @@ struct SettingsSliderRow: View {
                     .foregroundStyle(palette.secondaryText)
             }
             .accessibilityHidden(true)
-            Slider(value: $value, in: range, step: step) {
-                Text(title)
-            }
+            ThemedSlider(title: title, value: $value, range: range, step: step)
             .accessibilityValue(valueText)
         }
     }

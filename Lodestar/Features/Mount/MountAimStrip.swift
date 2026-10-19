@@ -20,6 +20,7 @@ struct MountAimStrip: View {
             }
             .sheet(item: $confirmation) { confirmation in
                 MountConfirmationSheet(confirmation: confirmation)
+                    .themedRootForOverlayExperiment(app.palette, redFilter: app.settings.redFilterOverlay)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }

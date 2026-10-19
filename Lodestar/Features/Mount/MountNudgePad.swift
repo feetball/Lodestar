@@ -18,12 +18,8 @@ struct MountNudgeCard: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(palette.secondaryText)
                         .accessibilityHidden(true)
-                    Picker("Nudge speed", selection: $service.settings.nudgeRate) {
-                        ForEach(MountNudgeRate.allCases, id: \.self) { option in
-                            Text(Self.title(of: option)).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    ThemedSegmentedPicker("Nudge speed", selection: $service.settings.nudgeRate,
+                                          options: MountNudgeRate.allCases) { Self.title(of: $0) }
                     Text(Self.caption(of: rate))
                         .font(.footnote)
                         .foregroundStyle(palette.secondaryText)
