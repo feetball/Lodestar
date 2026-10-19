@@ -33,8 +33,8 @@ final class AimViewModel {
     private(set) var hudRotation = AimHUDRotation.upright
     /// The field of view along the screen's long side without a camera picture, in degrees.
     private(set) var virtualFieldOfView: Double
-    /// How far the camera picture is zoomed in: 1 is the camera's full field of view.
-    private(set) var cameraZoom: Double
+    /// The zoom of the camera picture asked for; the camera may support less (`cameraZoom`).
+    private var requestedCameraZoom: Double
     /// An object the alignment sheet asks to be guided to; it replaces the app's target while it is set.
     var alignmentTarget: CelestialObject?
 
@@ -52,8 +52,8 @@ final class AimViewModel {
         let range = AimProjectionFactory.virtualFieldOfViewRange
         virtualFieldOfView = range.contains(stored) ? stored : AimProjectionFactory.defaultVirtualFieldOfView
         let storedZoom = UserDefaults.standard.double(forKey: Self.cameraZoomKey)
-        cameraZoom = (1...CameraEngine.maximumZoom).contains(storedZoom) ? storedZoom : 1
-        app.camera.setZoom(cameraZoom)
+        requestedCameraZoom = (1...CameraEngine.maximumZoom).contains(storedZoom) ? storedZoom : 1
+        app.camera.setZoom(requestedCameraZoom)
     }
 
     // MARK: Derived state
@@ -180,6 +180,18 @@ final class AimViewModel {
 
     // MARK: Zoom
 
+    /// How far the camera picture is zoomed in, as the camera applies it: 1 is its full field of view.
+    var cameraZoom: Double { min(requestedCameraZoom, app.camera.maximumZoom) }
+
+    /// The camera zooms the zoom button steps through: the presets the camera supports, then its strongest zoom if
+    /// that lies between presets.
+    private var cameraZoomSteps: [Double] {
+        let limit = app.camera.maximumZoom
+        let presets = Self.cameraZoomPresets.filter { $0 <= limit + 0.05 }
+        guard let strongest = presets.last, strongest + 0.05 >= limit else { return presets + [limit] }
+        return presets
+    }
+
     /// Zooms by a pinch's `magnification`, counted from the zoom when the pinch began: the camera picture while it
     /// is behind the sky, else the virtual sky.
     func updatePinch(magnification: Double) {
@@ -217,7 +229,8 @@ final class AimViewModel {
     /// The preset the zoom button goes to next with the camera picture: the next stronger zoom, and from the
     /// strongest back to 1×.
     var nextCameraZoomPreset: Double {
-        Self.cameraZoomPresets.first { $0 > cameraZoom + 0.05 } ?? Self.cameraZoomPresets[0]
+        let steps = cameraZoomSteps
+        return steps.first { $0 > cameraZoom + 0.05 } ?? steps.first ?? 1
     }
 
     /// Zooms the camera picture, or the virtual sky without it, to the next preset.
@@ -236,9 +249,10 @@ final class AimViewModel {
         virtualFieldOfView = AstroMath.clamp(degrees, range.lowerBound, range.upperBound)
     }
 
+    /// Asks for a camera zoom within what the camera supports, so the shown, saved and applied zooms agree.
     private func setCameraZoom(_ factor: Double) {
-        cameraZoom = AstroMath.clamp(factor, 1, CameraEngine.maximumZoom)
-        app.camera.setZoom(cameraZoom)
+        requestedCameraZoom = AstroMath.clamp(factor, 1, app.camera.maximumZoom)
+        app.camera.setZoom(requestedCameraZoom)
     }
 
     // MARK: Controls

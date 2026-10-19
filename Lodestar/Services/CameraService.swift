@@ -62,8 +62,11 @@ final class CameraService {
     private(set) var authorization: CameraAuthorization = .notDetermined
     /// The newest frame (at most 30 per second), upright in portrait; `nil` while the camera is not delivering.
     private(set) var frame: CGImage?
-    /// The optics of `frame`, once the first frame has arrived.
+    /// The optics of `frame`, set together with it, once the first frame has arrived.
     private(set) var geometry: CameraGeometry?
+    /// The strongest zoom the camera supports, at most `CameraEngine.maximumZoom`; that maximum until the camera
+    /// has started once.
+    private(set) var maximumZoom = CameraEngine.maximumZoom
     /// Whether frames are flowing.
     private(set) var isRunning = false
     /// A message for the user when the camera is denied, unavailable, interrupted or failed.
@@ -111,8 +114,8 @@ final class CameraService {
         }
     }
 
-    /// Zooms the picture by `factor` (1 = the camera's full field of view, at most `CameraEngine.maximumZoom`). It
-    /// is kept while the camera is stopped and applied when it starts; `geometry` follows with the frames.
+    /// Zooms the picture by `factor` (1 = the camera's full field of view, at most `maximumZoom`). It is kept while
+    /// the camera is stopped and applied when it starts; `geometry` follows with the frames captured at that zoom.
     func setZoom(_ factor: Double) {
         engine.setZoom(factor)
     }
@@ -177,6 +180,7 @@ final class CameraService {
                 guard let self, !Task.isCancelled else { return }
                 self.automaticRestarts = 0
                 self.frame = next.image
+                if self.geometry != next.geometry { self.geometry = next.geometry }
             }
         }
         engine.start()
@@ -203,8 +207,8 @@ final class CameraService {
                 isRunning = true
                 errorDescription = nil
             }
-        case .geometry(let newGeometry):
-            geometry = newGeometry
+        case .zoomLimit(let limit):
+            if maximumZoom != limit { maximumZoom = limit }
         case .failed(.notRunning) where engineState == .interrupted:
             // The system interrupted the start (the camera is busy elsewhere); the session resumes by itself when
             // the interruption ends, which is reported separately.
