@@ -57,6 +57,19 @@ final class AimViewModel {
         configuration.wantsCameraPreview && app.camera.isRunning ? app.camera.geometry : nil
     }
 
+    /// The field of view along the screen's long side in degrees: the camera's while its picture is behind the sky,
+    /// else the virtual lens's.
+    var fieldOfView: Double {
+        cameraGeometry.map { max($0.portraitHorizontalFOV, $0.portraitVerticalFOV) } ?? virtualFieldOfView
+    }
+
+    /// The object under the reticle in `frame`, for looking around without a target.
+    func nearbyObject(in frame: AimFrame) -> AimLookAround.Nearby? {
+        guard let snapshot = skyContent?.snapshot else { return nil }
+        return AimLookAround.nearest(to: frame.pointing.boresightVector, in: snapshot,
+                                     within: AimLookAround.radius(fieldOfView: fieldOfView))
+    }
+
     /// What the sky snapshot depends on, or `nil` while it cannot be built (no location, catalog not loaded).
     func skyInputs(for configuration: AimConfiguration) -> AimSkyInputs? {
         guard let context = app.observerContext, app.catalog.loadState == .loaded else { return nil }

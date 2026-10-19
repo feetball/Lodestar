@@ -1,26 +1,28 @@
 import SwiftUI
 import LodestarKit
 
-/// The panel above the controls: the target and how to reach it, or the offer to choose one. It updates about ten
-/// times a second on its own timeline.
+/// The panel above the controls: the target and how to reach it, or, without a target, what lies under the reticle.
+/// It updates about ten times a second on its own timeline.
 struct AimReadout: View {
     let model: AimViewModel
     @Binding var sheet: AimSheet?
     let isActive: Bool
+    @Environment(AppModel.self) private var app
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
+            let frame = model.engine.frame()
             if let target = model.guidanceTarget {
-                let frame = model.engine.frame()
                 VStack(spacing: 8) {
                     AimTargetCard(object: target, horizontal: frame?.target?.horizontal,
-                                  belowHorizonNote: belowHorizonNote(for: target, frame: frame))
+                                  belowHorizonNote: belowHorizonNote(for: target, frame: frame),
+                                  onClear: model.alignmentTarget == nil ? { app.clearTarget() } : nil)
                     if let guidance = frame?.guidance {
                         AimMoveRow(summary: AimGuidanceSummary(guidance))
                     }
                 }
             } else {
-                AimNoTargetPrompt(model: model, sheet: $sheet)
+                AimLookAroundPanel(model: model, sheet: $sheet, frame: frame)
             }
         }
     }
@@ -42,6 +44,8 @@ private struct AimTargetCard: View {
     let object: CelestialObject
     let horizontal: HorizontalCoordinate?
     let belowHorizonNote: String?
+    /// Drops the target, to look around freely; `nil` hides the button.
+    let onClear: (() -> Void)?
     @Environment(\.palette) private var palette
 
     var body: some View {
@@ -68,6 +72,20 @@ private struct AimTargetCard: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(palette.secondaryText)
                 }
+                if let onClear {
+                    Button(action: onClear) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(palette.secondaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, -8)
+                    .padding(.trailing, -8)
+                    // Offered as an action of the combined card instead.
+                    .accessibilityHidden(true)
+                }
             }
             if let belowHorizonNote {
                 Label(belowHorizonNote, systemImage: "arrow.down.to.line")
@@ -82,6 +100,11 @@ private struct AimTargetCard: View {
         }
         .aimPanel(palette)
         .accessibilityElement(children: .combine)
+        .accessibilityActions {
+            if let onClear {
+                Button("Clear target", action: onClear)
+            }
+        }
     }
 
     private var subtitle: String {
@@ -142,34 +165,80 @@ private struct AimMovePill: View {
     }
 }
 
-/// Shown while there is no target: quick picks and a way to search.
-private struct AimNoTargetPrompt: View {
+/// Shown while there is no target, for exploring the sky by pointing the camera around: the object under the
+/// reticle, where the camera points, and ways to aim at the object or choose another target.
+private struct AimLookAroundPanel: View {
     let model: AimViewModel
     @Binding var sheet: AimSheet?
+    let frame: AimFrame?
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text("Choose what to aim at")
-                .font(.headline)
-                .foregroundStyle(palette.primaryText)
-            Text("Lodestar then shows how to turn the camera towards it.")
-                .font(.caption)
-                .foregroundStyle(palette.secondaryText)
-            AimFlowLayout {
-                ForEach(AimQuickPicks.picks(catalog: app.catalog, snapshot: model.skyContent?.snapshot, planetLimit: 2)) { pick in
-                    AimQuickPickButton(pick: pick) { app.select(target: pick.object) }
+        let nearby = frame.flatMap { model.nearbyObject(in: $0) }
+        let object = nearby.flatMap { app.catalog.object(id: $0.id) }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                if let object {
+                    ObjectIcon(category: object.category, size: 16)
+                } else {
+                    Image(systemName: "binoculars")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(palette.accent)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(nearby?.name ?? "Looking around")
+                        .font(.headline)
+                        .foregroundStyle(palette.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(subtitle(nearby: nearby, object: object))
+                        .font(.caption)
+                        .foregroundStyle(palette.secondaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 8)
+                if let boresight = frame?.pointing.boresight {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("Alt \(AppFormat.altitude(boresight.altitude))")
+                        Text("Az \(AppFormat.azimuth(boresight.azimuth))")
+                    }
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(palette.secondaryText)
+                    .accessibilityLabel("Pointing at altitude \(AppFormat.altitude(boresight.altitude)),"
+                                        + " azimuth \(AppFormat.azimuth(boresight.azimuth))")
                 }
             }
-            Button {
-                sheet = .targetPicker
-            } label: {
-                Label("Search all objects", systemImage: "magnifyingglass")
+            .accessibilityElement(children: .combine)
+            HStack(spacing: 8) {
+                if let object {
+                    Button {
+                        app.select(target: object)
+                    } label: {
+                        Label("Aim here", systemImage: "scope")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.lodestarPrimary)
+                    .accessibilityLabel("Aim at \(object.name)")
+                }
+                Button {
+                    sheet = .targetPicker
+                } label: {
+                    Label("Choose target", systemImage: "magnifyingglass")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.lodestarSecondary)
             }
-            .buttonStyle(.lodestarPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity)
-        .aimPanel(palette, padding: 12)
+        .aimPanel(palette)
+    }
+
+    private func subtitle(nearby: AimLookAround.Nearby?, object: CelestialObject?) -> String {
+        guard let nearby else { return "Point at a planet or bright star to name it" }
+        let distance = "\(AimFormat.angle(nearby.separation)) from center"
+        return [object?.category.displayName, distance].compactMap { $0 }.joined(separator: " \u{00B7} ")
     }
 }
