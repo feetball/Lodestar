@@ -10,6 +10,9 @@ struct SkyChartLayerOptions: Equatable {
     var starNames = true
     var altitudeGrid = true
     var cameraView = true
+    /// The camera's frame stays in the middle of the view and the chart moves under it, for planning a picture,
+    /// instead of following where the phone points. Only with `cameraView`.
+    var fixedCameraFrame = false
 }
 
 /// Builders for the simple shapes the chart draws.
@@ -73,6 +76,8 @@ struct SkyChartPaths: Sendable {
 struct SkyChartContent: Sendable, Equatable {
     let scene: SkyChartScene
     let paths: SkyChartPaths
+    /// The scene's instant and observer, for turning chart directions into sky coordinates.
+    let frame: SkyFrame
     /// Unique among the contents a model produces; contents are equal when their revisions are.
     let revision: Int
 

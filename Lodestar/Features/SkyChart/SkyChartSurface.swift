@@ -6,9 +6,20 @@ import LodestarKit
 ///
 /// With "rotate to camera heading" on, the whole chart is redrawn from the live camera heading up to
 /// 15 times a second; otherwise only the small camera layer is.
+///
+/// With the camera frame fixed in the middle, the frame stays put while the chart is dragged and zoomed under it, a
+/// panel under it tells where it is and how it is turned, and pressing and holding before a drag turns it.
 struct SkyChartSurface: View {
     /// How often the live layers are redrawn.
     private static let liveInterval = 1.0 / 15
+    /// How long a finger rests on the chart before dragging turns the fixed camera frame instead of moving the chart.
+    private static let rotationPressDuration = 0.35
+    /// Closer to the middle than this (points), the finger's angle around the frame is too unsteady to turn it by.
+    private static let rotationDeadZone: CGFloat = 24
+    /// Degrees the frame turns per point of sideways drag when the press began in the dead zone.
+    private static let rotationPerPoint = 0.5
+    /// A tap this soon (seconds) after a turn of the frame ended belongs to the turn and selects nothing.
+    private static let tapGraceAfterRotation = 0.4
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
@@ -17,29 +28,52 @@ struct SkyChartSurface: View {
     let layers: SkyChartLayerOptions
     let rotatesToHeading: Bool
     let timeZone: TimeZone
+    /// The position angle of the fixed camera frame, in degrees.
+    @Binding var framingAngle: Double
 
     @State private var headingHold = SkyChartHeadingHold()
     /// The magnification and translation already applied by the gesture in progress.
     @State private var appliedMagnification: CGFloat = 1
     @State private var appliedTranslation: CGSize = .zero
+    /// The frame's position angle when the turn in progress began; `nil` while the frame is not being turned.
+    @State private var rotationStartAngle: Double?
+    @State private var lastRotationEnd: Date?
+    /// Counts the turns begun, for the tap of the haptics that confirms one.
+    @State private var rotationCount = 0
+
+    /// Whether the camera's frame stays in the middle while the chart moves under it.
+    private var showsFixedFrame: Bool {
+        layers.cameraView && layers.fixedCameraFrame
+    }
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            chart(in: size)
-                .frame(width: size.width, height: size.height)
-                .contentShape(Rectangle())
-                .gesture(dragGesture(in: size))
-                .simultaneousGesture(magnifyGesture(in: size))
-                .onTapGesture { location in
-                    model.handleTap(at: location, in: viewport(in: size))
-                }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel(accessibilitySummary)
-                .accessibilityChildren { accessibilityBodies }
+            ZStack(alignment: .bottom) {
+                chart(in: size)
+                    .frame(width: size.width, height: size.height)
+                    .contentShape(Rectangle())
+                    .gesture(dragGesture(in: size))
+                    .simultaneousGesture(magnifyGesture(in: size))
+                    .highPriorityGesture(frameRotationGesture(in: size), including: showsFixedFrame ? .all : .subviews)
+                    .onTapGesture { location in
+                        if let end = lastRotationEnd, Date.now.timeIntervalSince(end) < Self.tapGraceAfterRotation {
+                            return
+                        }
+                        model.handleTap(at: location, in: viewport(in: size))
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(accessibilitySummary)
+                    .accessibilityChildren { accessibilityBodies }
+                // Beside the chart, not on it, so the chart's gestures leave the panel's buttons alone.
+                bottomPanel(in: size)
+            }
+            .onChange(of: showsFixedFrame, initial: true) { _, fixed in
+                model.setPanReachesHorizon(fixed, in: size)
+            }
         }
-        .overlay(alignment: .bottom) { callout }
         .animation(.easeOut(duration: 0.2), value: model.selection != nil)
+        .sensoryFeedback(.selection, trigger: rotationCount)
     }
 
     // MARK: Layers
@@ -57,6 +91,7 @@ struct SkyChartSurface: View {
                                                    rotation: headingHold.rotation(for: pose))
                 ZStack {
                     planisphere(viewport)
+                    fixedFrame(viewport)
                     liveOverlay(pose: pose, viewport: viewport)
                 }
             }
@@ -64,6 +99,7 @@ struct SkyChartSurface: View {
             let viewport = PlanisphereViewport(size: size, zoom: zoom, pan: pan)
             ZStack {
                 planisphere(viewport)
+                fixedFrame(viewport)
                 TimelineView(.animation(minimumInterval: Self.liveInterval, paused: !isMotionRunning)) { _ in
                     liveOverlay(pose: currentPose(), viewport: viewport)
                 }
@@ -77,11 +113,20 @@ struct SkyChartSurface: View {
             .equatable()
     }
 
+    /// The camera frame fixed in the middle, when it is shown.
+    @ViewBuilder
+    private func fixedFrame(_ viewport: PlanisphereViewport) -> some View {
+        if showsFixedFrame, let framing = makeFraming(in: viewport) {
+            SkyChartFramingCanvas(framing: framing, viewport: viewport, palette: palette)
+        }
+    }
+
     /// The camera crosshair and footprint, and the chips along the top edge.
     private func liveOverlay(pose: SkyChartCameraPose?, viewport: PlanisphereViewport) -> some View {
         ZStack {
             if layers.cameraView {
-                PlanisphereLiveCanvas(pose: pose, viewport: viewport, palette: palette)
+                PlanisphereLiveCanvas(pose: pose, viewport: viewport, palette: palette,
+                                      showsFootprint: !showsFixedFrame)
             }
             VStack {
                 HStack(alignment: .top, spacing: 6) {
@@ -108,8 +153,9 @@ struct SkyChartSurface: View {
         "\(Double(zoom).formatted(.number.precision(.fractionLength(1))))\u{00D7}"
     }
 
+    /// The callout of the selected object or, without a selection, the panel of the fixed camera frame.
     @ViewBuilder
-    private var callout: some View {
+    private func bottomPanel(in size: CGSize) -> some View {
         if let selection = model.selection {
             SkyChartCallout(selection: selection, isLive: app.clock.isLive,
                             onAim: { app.aim(at: selection.object) },
@@ -118,7 +164,37 @@ struct SkyChartSurface: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if showsFixedFrame {
+            Group {
+                if rotatesToHeading {
+                    // The chart turns with the heading, and with it the sky under the middle.
+                    TimelineView(.animation(minimumInterval: Self.liveInterval, paused: !isMotionRunning)) { _ in
+                        framingBar(framing: makeFraming(in: viewport(in: size)))
+                    }
+                } else {
+                    framingBar(framing: makeFraming(in: viewport(in: size)))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
+    }
+
+    private func framingBar(framing: SkyChartFraming?) -> some View {
+        SkyChartFramingBar(framing: framing, lens: app.lensSetup, coordinateStyle: app.settings.coordinateStyle,
+                           isLive: app.clock.isLive, positionAngle: $framingAngle) {
+            guard let framing else { return }
+            app.aim(at: CelestialObject.custom(name: "Planned frame", j2000: framing.equatorial))
+        }
+    }
+
+    // MARK: Fixed camera frame
+
+    /// The camera frame in the middle of `viewport`, with the lens of Settings; `nil` when the middle is off the sky.
+    private func makeFraming(in viewport: PlanisphereViewport) -> SkyChartFraming? {
+        SkyChartFraming(viewport: viewport, frame: content.frame, size: app.lensSetup.fieldOfView,
+                        positionAngle: framingAngle)
     }
 
     // MARK: Camera
@@ -144,7 +220,10 @@ struct SkyChartSurface: View {
         MagnifyGesture()
             .onChanged { value in
                 guard value.magnification > 0, appliedMagnification > 0 else { return }
-                let anchor = CGPoint(x: value.startAnchor.x * size.width, y: value.startAnchor.y * size.height)
+                // A fixed frame keeps the sky under it while zooming; otherwise the sky under the fingers stays put.
+                let anchor = showsFixedFrame
+                    ? CGPoint(x: size.width / 2, y: size.height / 2)
+                    : CGPoint(x: value.startAnchor.x * size.width, y: value.startAnchor.y * size.height)
                 model.zoom(by: value.magnification / appliedMagnification, around: anchor, in: size)
                 appliedMagnification = value.magnification
             }
@@ -164,6 +243,41 @@ struct SkyChartSurface: View {
             .onEnded { _ in
                 appliedTranslation = .zero
             }
+    }
+
+    /// Press and hold, then drag: turns the fixed camera frame with the finger around the middle of the view. A drag
+    /// without the pause moves the chart as usual, because the press fails as soon as the finger moves.
+    private func frameRotationGesture(in size: CGSize) -> some Gesture {
+        LongPressGesture(minimumDuration: Self.rotationPressDuration)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard case .second(true, let drag) = value else { return }
+                if rotationStartAngle == nil {
+                    rotationStartAngle = framingAngle
+                    rotationCount += 1
+                }
+                guard let drag, let start = rotationStartAngle else { return }
+                // Turning clockwise on the screen lowers the position angle, which grows from north through east.
+                framingAngle = SkyChartFraming.snapped(start - turn(of: drag, in: size))
+            }
+            .onEnded { _ in
+                rotationStartAngle = nil
+                lastRotationEnd = .now
+            }
+    }
+
+    /// How far a drag has turned the frame on the screen, in degrees clockwise: the change of the finger's angle around
+    /// the middle of the view or, for a press right at the middle, the drag's sideways distance.
+    private func turn(of drag: DragGesture.Value, in size: CGSize) -> Double {
+        let middle = CGPoint(x: size.width / 2, y: size.height / 2)
+        let start = drag.startLocation
+        let now = drag.location
+        guard hypot(start.x - middle.x, start.y - middle.y) >= Self.rotationDeadZone else {
+            return Double(now.x - start.x) * Self.rotationPerPoint
+        }
+        let before = atan2(Double(start.y - middle.y), Double(start.x - middle.x))
+        let after = atan2(Double(now.y - middle.y), Double(now.x - middle.x))
+        return AstroMath.degrees(after - before)
     }
 
     // MARK: Accessibility
@@ -191,6 +305,9 @@ struct SkyChartSurface: View {
         }
         if let mosaic = MosaicDisplay.current {
             parts.append(mosaicDescription(mosaic))
+        }
+        if showsFixedFrame {
+            parts.append("Your camera's frame is fixed in the middle of the chart; the panel below it says where it is.")
         }
         return parts.joined(separator: " ")
     }

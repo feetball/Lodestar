@@ -53,17 +53,18 @@ final class SkyChartModel {
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var lastBuildStart: ContinuousClock.Instant?
     @ObservationIgnored private var revision = 0
+    @ObservationIgnored private var panReachesHorizon = false
 
     private struct BuildRequest: Sendable {
         let catalog: Catalog
         let inputs: SkyChartInputs
 
-        func build() -> (scene: SkyChartScene, paths: SkyChartPaths) {
+        func build() -> (scene: SkyChartScene, paths: SkyChartPaths, frame: SkyFrame) {
             let snapshot = SkySnapshotBuilder.build(catalog: catalog, observer: inputs.observer.observer,
                                                     date: inputs.date, options: inputs.options, target: inputs.target,
                                                     mosaic: inputs.mosaic)
             let scene = SkyChartSceneBuilder.build(from: snapshot, horizon: inputs.observer.horizon)
-            return (scene, SkyChartPaths(scene: scene))
+            return (scene, SkyChartPaths(scene: scene), snapshot.frame)
         }
     }
 
@@ -94,13 +95,13 @@ final class SkyChartModel {
             pending = nil
             lastBuildStart = .now
             let built = await Task.detached(priority: .userInitiated) { request.build() }.value
-            apply(scene: built.scene, paths: built.paths)
+            apply(scene: built.scene, paths: built.paths, frame: built.frame)
         }
     }
 
-    private func apply(scene: SkyChartScene, paths: SkyChartPaths) {
+    private func apply(scene: SkyChartScene, paths: SkyChartPaths, frame: SkyFrame) {
         revision += 1
-        content = SkyChartContent(scene: scene, paths: paths, revision: revision)
+        content = SkyChartContent(scene: scene, paths: paths, frame: frame, revision: revision)
         if let current = selection {
             selection = Self.selection(for: current.object, in: scene)
         }
@@ -142,13 +143,20 @@ final class SkyChartModel {
         let newZoom = min(max(zoom * ratio, range.lowerBound), range.upperBound)
         let anchored = PlanisphereViewport.pan(pan, keeping: anchor, fixedIn: size, from: zoom, to: newZoom)
         zoom = newZoom
-        pan = PlanisphereViewport.clampedPan(anchored, zoom: newZoom, in: size)
+        pan = PlanisphereViewport.clampedPan(anchored, zoom: newZoom, in: size, reachesHorizon: panReachesHorizon)
     }
 
     /// Moves the chart by `translation` points.
     func pan(by translation: CGSize, in size: CGSize) {
         let moved = CGSize(width: pan.width + translation.width, height: pan.height + translation.height)
-        pan = PlanisphereViewport.clampedPan(moved, zoom: zoom, in: size)
+        pan = PlanisphereViewport.clampedPan(moved, zoom: zoom, in: size, reachesHorizon: panReachesHorizon)
+    }
+
+    /// Lets the middle of the view move out to the horizon, for a camera frame fixed there, or keeps it on the chart
+    /// as usual; the current pan is limited to match.
+    func setPanReachesHorizon(_ reaches: Bool, in size: CGSize) {
+        panReachesHorizon = reaches
+        pan = PlanisphereViewport.clampedPan(pan, zoom: zoom, in: size, reachesHorizon: reaches)
     }
 
     func resetViewport() {
