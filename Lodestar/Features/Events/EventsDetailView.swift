@@ -178,8 +178,9 @@ private struct EventsActionsCard: View {
             aim(at: subject)
         } label: {
             Label("Aim at \(subject.title)", systemImage: "scope")
-                .lineLimit(2)
+                .lineLimit(4)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(LodestarButtonStyle(kind: isPrimary ? .primary : .secondary))

@@ -148,9 +148,11 @@ struct ObjectDetailHeader: View {
         Button {
             app.aim(at: object)
         } label: {
+            // Comet designations are long; with large text the name wraps instead of being cut off.
             Label("Aim at \(SmallBodyText.displayName(object))", systemImage: "scope")
-                .lineLimit(2)
+                .lineLimit(4)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.lodestarPrimary)
