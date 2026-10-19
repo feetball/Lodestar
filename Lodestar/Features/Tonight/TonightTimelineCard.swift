@@ -173,17 +173,24 @@ private struct TonightTimelineCanvas: View {
         drawNowMarker(in: &context, axis: axis, bottom: barsBottom, size: size)
     }
 
-    /// Hairlines and labels at the whole hours.
+    /// Hairlines and labels at whole hours, as many as fit without the labels touching.
     private func drawHourLines(in context: inout GraphicsContext, axis: Axis, bottom: CGFloat, size: CGSize) {
+        let format = Date.FormatStyle(timeZone: timeZone).hour()
+        let labels = model.hourTicks.map { tick in
+            (tick, context.resolve(Text(tick.date.formatted(format))
+                .font(.system(size: labelSize).monospacedDigit())
+                .foregroundStyle(palette.secondaryText)))
+        }
+        let labelWidth = labels.map { $0.1.measure(in: size).width }.max() ?? 0
+        let pointsPerHour = axis.width / CGFloat(model.range.duration / 3600)
+        let spacing = TonightTimelineModel.labelSpacing(pointsPerHour: pointsPerHour, labelWidth: labelWidth,
+                                                        gap: labelSize * 0.8)
         var lines = Path()
-        for tick in model.hourTicks {
-            let x = axis.x(tick)
+        for (tick, label) in labels where tick.hour % spacing == 0 {
+            let x = axis.x(tick.date)
             lines.move(to: CGPoint(x: x, y: markerHeight))
             lines.addLine(to: CGPoint(x: x, y: bottom))
-            guard x + labelSize * 2 <= size.width else { continue }
-            let label = Text(tick.formatted(Date.FormatStyle(timeZone: timeZone).hour()))
-                .font(.system(size: labelSize).monospacedDigit())
-                .foregroundStyle(palette.secondaryText)
+            guard x + labelWidth / 2 <= size.width else { continue }
             context.draw(label, at: CGPoint(x: x, y: bottom + 4), anchor: .top)
         }
         context.stroke(lines, with: .color(palette.gridLine), lineWidth: 1)
