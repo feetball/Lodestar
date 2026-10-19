@@ -28,7 +28,12 @@ struct AimAccessibilitySummary: View {
         if let source = model.satelliteSource {
             return SatelliteAimText.spoken(source, frame: frame) + skyline
         }
-        guard let target = model.guidanceTarget else { return "No target. Use the Target button to choose one." + skyline }
+        guard let target = model.guidanceTarget else {
+            if let nearby = model.nearbyObject(in: frame) {
+                return "No target. Near \(nearby.name), \(AimFormat.spoken(nearby.separation)) from center." + skyline
+            }
+            return "No target. Use the Target button to choose one." + skyline
+        }
         guard let guidance = frame.guidance else { return "Locating \(target.name)." + skyline }
         let summary = AimGuidanceSummary(guidance)
         let note = summary.isBelowHorizon ? " Below the horizon." : ""

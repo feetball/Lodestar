@@ -141,13 +141,11 @@ private struct AimStage: View {
         .statusBarHidden(isActive)
     }
 
-    /// Pinching zooms the virtual sky; the camera picture has a fixed field of view.
+    /// Pinching zooms the camera picture, or the virtual sky without it.
     private var zoomGesture: some Gesture {
         MagnifyGesture()
             .onChanged { value in
-                if model.cameraGeometry == nil {
-                    model.updatePinch(magnification: Double(value.magnification))
-                }
+                model.updatePinch(magnification: Double(value.magnification))
             }
             .onEnded { _ in
                 model.endPinch()
