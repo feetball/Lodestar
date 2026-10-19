@@ -66,6 +66,7 @@ struct TonightSystemView: View {
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(TonightStyle.primaryText)
                         .lineLimit(2)
+                        .minimumScaleFactor(0.75)
                     Text("\(lines.moon.trailing ?? "") lit")
                         .font(.caption)
                         .foregroundStyle(TonightStyle.secondaryText)

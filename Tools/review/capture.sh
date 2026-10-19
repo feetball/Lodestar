@@ -18,7 +18,7 @@ OUT="$2"
 SHOTS="$3"
 ONLY="${4:-dn}"
 BUNDLE=net.kuecker.Lodestar
-COMMON="date=2026-10-19T05:00:00Z lat=36.0544 lon=-112.1401 elevation=2130 site=Grand_Canyon tz=America/Phoenix pointing=350,38"
+COMMON="date=2026-10-19T05:00:00Z lat=36.0544 lon=-112.1401 elevation=2130 site=Grand_Canyon tz=America/Phoenix pointing=350,38 review=1"
 
 mkdir -p "$OUT"
 FAILED=0

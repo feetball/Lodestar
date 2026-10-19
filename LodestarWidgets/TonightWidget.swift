@@ -24,6 +24,8 @@ struct TonightWidgetView: View {
 
     var body: some View {
         content
+            // The Home Screen layouts have a fixed size: beyond this the text only truncates ("Fir…", "Da… · n…").
+            .dynamicTypeSize(Self.isHomeScreen(family) ? .xSmall ... .xxxLarge : .xSmall ... .accessibility5)
             .widgetURL(TonightLink.url)
             .containerBackground(for: .widget) {
                 switch family {
@@ -33,6 +35,10 @@ struct TonightWidgetView: View {
                     Color.clear
                 }
             }
+    }
+
+    private static func isHomeScreen(_ family: WidgetFamily) -> Bool {
+        family == .systemSmall || family == .systemMedium
     }
 
     @ViewBuilder

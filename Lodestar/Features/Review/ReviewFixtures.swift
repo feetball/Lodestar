@@ -60,17 +60,16 @@ extension ReviewFixtures {
             let time = Date(timeIntervalSince1970: first + Double(hour) * 3_600)
             let solarHour = (time.timeIntervalSince1970 / 3_600 + longitude / 15).truncatingRemainder(dividingBy: 24)
             let local = solarHour < 0 ? solarHour + 24 : solarHour
-            let low: Double
-            let medium: Double
-            let high: Double
+            let layers: (low: Double, medium: Double, high: Double)
             switch local {
-            case 17..<21: (low, medium, high) = (60, 40, 30)
-            case 21..<23: (low, medium, high) = (20, 10, 10)
-            case 23..<24, 0..<3: (low, medium, high) = (0, 0, 5)
-            case 3..<5.5: (low, medium, high) = (0, 5, 60)
-            case 5.5..<8: (low, medium, high) = (10, 30, 80)
-            default: (low, medium, high) = (70, 60, 40)
+            case 17..<21: layers = (60, 40, 30)
+            case 21..<23: layers = (20, 10, 10)
+            case 23..<24, 0..<3: layers = (0, 0, 5)
+            case 3..<5.5: layers = (0, 5, 60)
+            case 5.5..<8: layers = (10, 30, 80)
+            default: layers = (70, 60, 40)
             }
+            let (low, medium, high) = layers
             let total = min(100, max(low, medium, high) + (low + medium + high) / 12)
             series.append([
                 "time": formatter.string(from: time),
