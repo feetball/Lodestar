@@ -72,22 +72,21 @@ struct AimControlsBar: View {
     }
 }
 
-/// Shows the field of view along the screen's long side and resets the zoom of the virtual sky. With the camera
-/// picture the field of view is the camera's and cannot be changed.
+/// Shows the field of view along the screen's long side and steps the zoom of the virtual sky through its presets.
+/// With the camera picture the field of view is the camera's and cannot be changed.
 private struct AimFieldOfViewButton: View {
     let model: AimViewModel
     let minHeight: CGFloat
 
     var body: some View {
-        let camera = model.cameraGeometry
-        let usesCamera = camera != nil
-        let fieldOfView = camera.map { max($0.portraitHorizontalFOV, $0.portraitVerticalFOV) } ?? model.virtualFieldOfView
-        let isDefault = abs(model.virtualFieldOfView - AimProjectionFactory.defaultVirtualFieldOfView) < 0.5
+        let usesCamera = model.cameraGeometry != nil
+        let fieldOfView = model.fieldOfView
+        let next = model.nextFieldOfViewPreset
         Button {
-            model.resetFieldOfView()
+            model.stepFieldOfView()
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: "arrow.counterclockwise")
+                Image(systemName: next < model.virtualFieldOfView ? "plus.magnifyingglass" : "minus.magnifyingglass")
                     .font(.system(size: 20, weight: .medium))
                 Text(AngleFormatter.formatDegrees(fieldOfView, decimals: 0))
                     .font(.caption2.weight(.semibold).monospacedDigit())
@@ -97,8 +96,9 @@ private struct AimFieldOfViewButton: View {
             .padding(.horizontal, 2)
         }
         .buttonStyle(AimControlButtonStyle(minHeight: minHeight))
-        .disabled(usesCamera || isDefault)
-        .accessibilityLabel("Reset zoom")
+        .disabled(usesCamera)
+        .accessibilityLabel("Zoom")
         .accessibilityValue("\(usesCamera ? "Camera field of view" : "Field of view") \(AimFormat.spoken(fieldOfView))")
+        .accessibilityHint(usesCamera ? "" : "Changes the field of view to \(AimFormat.spoken(next)).")
     }
 }

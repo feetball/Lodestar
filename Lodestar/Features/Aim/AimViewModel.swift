@@ -183,10 +183,16 @@ final class AimViewModel {
         UserDefaults.standard.set(virtualFieldOfView, forKey: Self.fieldOfViewKey)
     }
 
-    /// Returns the virtual sky to its default field of view.
-    func resetFieldOfView() {
-        setVirtualFieldOfView(AimProjectionFactory.defaultVirtualFieldOfView)
-        UserDefaults.standard.removeObject(forKey: Self.fieldOfViewKey)
+    /// The preset the zoom button goes to next: the next narrower one, and from the narrowest back to the widest.
+    var nextFieldOfViewPreset: Double {
+        let presets = AimProjectionFactory.virtualFieldOfViewPresets
+        return presets.first { $0 < virtualFieldOfView - 0.5 } ?? presets[0]
+    }
+
+    /// Zooms the virtual sky to the next preset.
+    func stepFieldOfView() {
+        setVirtualFieldOfView(nextFieldOfViewPreset)
+        UserDefaults.standard.set(virtualFieldOfView, forKey: Self.fieldOfViewKey)
     }
 
     private func setVirtualFieldOfView(_ degrees: Double) {

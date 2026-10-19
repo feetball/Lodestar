@@ -7,6 +7,8 @@ enum AimProjectionFactory {
     /// The range of the virtual lens, as the field of view along the screen's long side in degrees.
     static let virtualFieldOfViewRange: ClosedRange<Double> = 20...100
     static let defaultVirtualFieldOfView = 60.0
+    /// The fields of view the zoom button steps through, widest first.
+    static let virtualFieldOfViewPresets: [Double] = [100, 60, 40, 20]
 
     /// The projection for a viewport. With the optics of a running camera the focal length makes the overlay
     /// match the aspect-filled picture exactly; without one a virtual lens of `virtualFieldOfView` is used.
