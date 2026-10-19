@@ -18,6 +18,10 @@ final class AimViewModel {
     /// Where the zoom of the virtual sky is remembered, so it survives the screen being rebuilt (night mode starting
     /// at dusk rebuilds the tabs) and relaunches.
     private static let fieldOfViewKey = "lodestar.aim.virtualFieldOfView"
+    /// Where the zoom of the camera picture is remembered.
+    private static let cameraZoomKey = "lodestar.aim.cameraZoom"
+    /// The zooms the zoom button steps through while the camera picture is on, widest first.
+    static let cameraZoomPresets: [Double] = [1, 2, 4, 8]
 
     let app: AppModel
     let engine: AimFrameEngine
@@ -29,11 +33,14 @@ final class AimViewModel {
     private(set) var hudRotation = AimHUDRotation.upright
     /// The field of view along the screen's long side without a camera picture, in degrees.
     private(set) var virtualFieldOfView: Double
+    /// How far the camera picture is zoomed in: 1 is the camera's full field of view.
+    private(set) var cameraZoom: Double
     /// An object the alignment sheet asks to be guided to; it replaces the app's target while it is set.
     var alignmentTarget: CelestialObject?
 
     @ObservationIgnored private var hasHUDRotation = false
     @ObservationIgnored private var pinchStartFieldOfView: Double?
+    @ObservationIgnored private var pinchStartCameraZoom: Double?
     @ObservationIgnored private var wasOnTarget: Bool?
 
     init(app: AppModel) {
@@ -44,6 +51,9 @@ final class AimViewModel {
         let stored = UserDefaults.standard.double(forKey: Self.fieldOfViewKey)
         let range = AimProjectionFactory.virtualFieldOfViewRange
         virtualFieldOfView = range.contains(stored) ? stored : AimProjectionFactory.defaultVirtualFieldOfView
+        let storedZoom = UserDefaults.standard.double(forKey: Self.cameraZoomKey)
+        cameraZoom = (1...CameraEngine.maximumZoom).contains(storedZoom) ? storedZoom : 1
+        app.camera.setZoom(cameraZoom)
     }
 
     // MARK: Derived state
@@ -170,34 +180,65 @@ final class AimViewModel {
 
     // MARK: Zoom
 
-    /// Zooms the virtual sky by a pinch's `magnification`, counted from the field of view when the pinch began.
+    /// Zooms by a pinch's `magnification`, counted from the zoom when the pinch began: the camera picture while it
+    /// is behind the sky, else the virtual sky.
     func updatePinch(magnification: Double) {
         guard magnification.isFinite, magnification > 0 else { return }
-        let start = pinchStartFieldOfView ?? virtualFieldOfView
-        pinchStartFieldOfView = start
-        setVirtualFieldOfView(start / magnification)
+        if cameraGeometry != nil {
+            let start = pinchStartCameraZoom ?? cameraZoom
+            pinchStartCameraZoom = start
+            setCameraZoom(start * magnification)
+        } else {
+            let start = pinchStartFieldOfView ?? virtualFieldOfView
+            pinchStartFieldOfView = start
+            setVirtualFieldOfView(start / magnification)
+        }
     }
 
     func endPinch() {
         pinchStartFieldOfView = nil
+        pinchStartCameraZoom = nil
         UserDefaults.standard.set(virtualFieldOfView, forKey: Self.fieldOfViewKey)
+        UserDefaults.standard.set(cameraZoom, forKey: Self.cameraZoomKey)
     }
 
-    /// The preset the zoom button goes to next: the next narrower one, and from the narrowest back to the widest.
+    /// Whether the zoom button's next step zooms in (rather than back out to the widest preset).
+    var nextZoomStepZoomsIn: Bool {
+        cameraGeometry != nil ? nextCameraZoomPreset > cameraZoom : nextFieldOfViewPreset < virtualFieldOfView
+    }
+
+    /// The preset the zoom button goes to next with the virtual sky: the next narrower one, and from the narrowest
+    /// back to the widest.
     var nextFieldOfViewPreset: Double {
         let presets = AimProjectionFactory.virtualFieldOfViewPresets
         return presets.first { $0 < virtualFieldOfView - 0.5 } ?? presets[0]
     }
 
-    /// Zooms the virtual sky to the next preset.
-    func stepFieldOfView() {
-        setVirtualFieldOfView(nextFieldOfViewPreset)
-        UserDefaults.standard.set(virtualFieldOfView, forKey: Self.fieldOfViewKey)
+    /// The preset the zoom button goes to next with the camera picture: the next stronger zoom, and from the
+    /// strongest back to 1×.
+    var nextCameraZoomPreset: Double {
+        Self.cameraZoomPresets.first { $0 > cameraZoom + 0.05 } ?? Self.cameraZoomPresets[0]
+    }
+
+    /// Zooms the camera picture, or the virtual sky without it, to the next preset.
+    func stepZoom() {
+        if cameraGeometry != nil {
+            setCameraZoom(nextCameraZoomPreset)
+            UserDefaults.standard.set(cameraZoom, forKey: Self.cameraZoomKey)
+        } else {
+            setVirtualFieldOfView(nextFieldOfViewPreset)
+            UserDefaults.standard.set(virtualFieldOfView, forKey: Self.fieldOfViewKey)
+        }
     }
 
     private func setVirtualFieldOfView(_ degrees: Double) {
         let range = AimProjectionFactory.virtualFieldOfViewRange
         virtualFieldOfView = AstroMath.clamp(degrees, range.lowerBound, range.upperBound)
+    }
+
+    private func setCameraZoom(_ factor: Double) {
+        cameraZoom = AstroMath.clamp(factor, 1, CameraEngine.maximumZoom)
+        app.camera.setZoom(cameraZoom)
     }
 
     // MARK: Controls
