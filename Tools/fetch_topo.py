@@ -1,5 +1,7 @@
 """Fetches the topocentric Horizons rows of the comets tests (topo.json). Run with `python3 -I`, from the directory of fetch_refs.py."""
-import json
+import json, os, sys
+# `python3 -I` leaves the script's directory out of sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fetch_refs import horizons
 
 def topo(command, jds_ut, lon, lat, alt_km):
