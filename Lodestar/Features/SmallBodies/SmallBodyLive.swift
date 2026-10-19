@@ -39,7 +39,8 @@ struct SmallBodySummaryText: View {
 
     var body: some View {
         Text(summary)
-            .task(id: object.id) {
+            // The whole object, not its identifier: downloaded elements keep the identifier.
+            .task(id: object) {
                 await SmallBodyLive.keepCurrent(of: object, clock: app.clock) { live = $0 }
             }
     }

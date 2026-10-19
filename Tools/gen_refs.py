@@ -1,7 +1,8 @@
 """Fetches the Horizons elements and observer tables of the comets tests (refs.json and hz_*.txt); then run gen_ref_sources.py.
 Run with `python3 -I` from this directory."""
-import json, sys, re
-sys.path.insert(0, "/dev/shm/comets-tmp")
+import json, os, sys, re
+# `python3 -I` leaves the script's directory out of sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fetch_refs import horizons
 
 TARGETS = [
