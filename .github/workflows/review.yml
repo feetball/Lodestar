@@ -112,11 +112,14 @@ jobs:
           retention-days: 3
           compression-level: 0
 
-  # The iOS screens. Each entry boots its own Simulator and works through its list of shots.
+  # The iOS screens. Each entry boots its own Simulator and works through its list of shots. A list is kept to about 90
+  # pictures: a screen that never settles (the sheets over the Aim screen, a followed satellite) costs one to two minutes
+  # per picture, and a job that runs into its timeout loses the shots it has not taken yet. Each entry uploads its
+  # pictures as the artifact shots-<name>.
   capture:
     needs: build
     runs-on: macos-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
@@ -128,6 +131,10 @@ jobs:
           - name: iphone-2
             device: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
             shots: Tools/review/shots-iphone-2.txt
+            content_size: ""
+          - name: iphone-3
+            device: com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+            shots: Tools/review/shots-iphone-3.txt
             content_size: ""
           - name: ipad
             device: com.apple.CoreSimulator.SimDeviceType.iPad-Pro-11-inch-M5-12GB

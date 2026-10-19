@@ -10,7 +10,8 @@ import LodestarKit
 ///
 /// The visual review adds `screen=<name>` (a sub-screen or sheet, see `ReviewScreen`), `comets=0|1` (add the comets of
 /// `ReviewFixtures`; on by default with `screen=`), `online=1` (satellites and a cloud forecast in place of the downloads) and `review=1` (run the review driver, which pages the screen and
-/// reports its state, without a `screen=`). Unknown keys are ignored and an unknown screen name is no screen.
+/// reports its state, without a `screen=`). Unknown keys are ignored and an unknown screen name is no screen. Without
+/// `target=` the Aim screen has no target and looks around freely, at the `pointing=` it is given.
 struct ScreenshotMode {
     var tab: AppTab
     var date: Date

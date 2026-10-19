@@ -134,7 +134,8 @@ enum ReviewScreen: Hashable {
         }
     }
 
-    /// Whether `ReviewHost` builds the screen (the others are the real tab, with a sheet for the Aim tab).
+    /// Whether `ReviewHost` builds the screen (the others are the real tab, with a sheet for the Aim tab and, over
+    /// Settings, the explanation of Online Data: see `ReviewOnlineFirstTime`).
     var usesHost: Bool { (tab != .aim && self != .onlineFirstTime) || isWidgets }
 
     /// Whether the screen is pushed on the host's navigation stack.

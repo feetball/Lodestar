@@ -1,0 +1,14 @@
+# name | modes (d day, n night) | launch arguments | options (pages=<n>, fixed=<seconds>)
+# The simulated Sky-Watcher mount aligned on one and two stars, and the Aim screen's mount sheet in its states: the stars
+# are chosen by the app for the real time. The sheets do not settle in the Simulator (the capture script gives up on them
+# after 24 tries), so each picture of them takes about a minute and a half.
+mount-sw-aligned-1|dn|screen=mount-sw-aligned-1|pages=4
+mount-sw-aligned-2|n|screen=mount-sw-aligned-2|pages=4
+mount-sw-sheet|dn|screen=mount-sw-sheet|pages=4
+mount-sw-sheet-aligned|dn|screen=mount-sw-sheet-aligned|pages=4
+mount-sw-sync|dn|screen=mount-sw-sync|pages=2
+# Widgets (the widget views are compiled into the review build) and the sky at the same time.
+widgets|dn|screen=widgets|pages=4
+widgets-states|dn|screen=widgets-states|pages=6
+widgets-large-type|n|screen=widgets-large-type|pages=6
+widgets-red|n|screen=widgets-red|pages=4

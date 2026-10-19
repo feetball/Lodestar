@@ -2,6 +2,9 @@
 tonight|n|tab=tonight comets=1 online=1|pages=10
 objects|n|tab=objects comets=1|pages=3
 settings|n|tab=settings online=1|pages=8
+# Aim without a target (see shots-iphone-1.txt): the second names Saturn, which gives the panel its two-button row.
+aim-look|n|tab=aim|
+aim-look-named|n|tab=aim pointing=149,51|
 events-calendar|n|screen=events-calendar|pages=4
 event-meteorShower|n|screen=event-meteorShower|pages=5
 comets-list|n|screen=comets-list|pages=3
