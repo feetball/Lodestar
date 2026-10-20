@@ -285,10 +285,14 @@ struct SkyChartFramingBar: View {
                 HStack(spacing: 8) { buttons }
                 VStack(alignment: .leading, spacing: 8) { buttons }
             }
-            Text("Drag the sky under the frame. Hold, then drag, to turn it.")
-                .font(.caption)
-                .foregroundStyle(palette.tertiaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .center, spacing: 4) {
+                Text("Drag to move the frame over the sky. Twist two fingers, or hold and drag, to turn it.")
+                    .font(.caption)
+                    .foregroundStyle(palette.tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                HelpButton(topic: .planFraming)
+            }
         }
         .card(palette, padding: 12)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)

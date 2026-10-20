@@ -48,6 +48,9 @@ struct TonightScreen: View {
                         .accessibilityHint("Goes back to the night that is under way")
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                HelpButton(topic: .tonight)
+            }
         }
         .sheet(isPresented: $isShowingDateSheet) {
             dateSheet

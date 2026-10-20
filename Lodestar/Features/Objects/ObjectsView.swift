@@ -249,6 +249,7 @@ struct ObjectsView: View {
                                showsOnlyAboveHorizon: $showsOnlyAboveHorizon, hidesFaintObjects: $hidesFaintObjects,
                                showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized, hasLocation: app.observerContext != nil)
                 .disabled(isSearching)
+            HelpButton(topic: .objects)
         }
     }
 

@@ -33,6 +33,11 @@ struct EventsCalendarView: View {
         .screenBackground(palette)
         .navigationTitle("Events")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HelpButton(topic: .events)
+            }
+        }
     }
 
     // MARK: Content

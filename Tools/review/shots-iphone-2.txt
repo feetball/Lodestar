@@ -20,3 +20,9 @@ widgets|dn|screen=widgets|pages=4
 widgets-states|dn|screen=widgets-states|pages=6
 widgets-large-type|n|screen=widgets-large-type|pages=6
 widgets-red|n|screen=widgets-red|pages=4
+# Help: the list and the pages that carry the most layout (steps, bullets, tips, the glossary).
+help|dn|screen=help|pages=3
+help-aim-screen|dn|screen=help-aimScreen|pages=3
+help-plan-framing|dn|screen=help-planFraming|pages=3
+help-troubleshooting|n|screen=help-troubleshooting|pages=4
+help-glossary|n|screen=help-glossary|pages=4

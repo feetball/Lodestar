@@ -4,6 +4,9 @@ title: Lodestar support
 
 # Support
 
+The app has the same guides, and more, built in: **Settings ▸ Help** is a searchable list of pages for every
+screen, and the **?** buttons on Aim, Sky, Tonight, Events and Objects open the page that belongs to them.
+
 ## Getting started
 
 1. Mount your iPhone rigidly on the camera (a hot-shoe or tripod phone mount works) and choose that
