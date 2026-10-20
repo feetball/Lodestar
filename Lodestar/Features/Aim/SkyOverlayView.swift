@@ -12,28 +12,34 @@ struct SkyOverlayView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
-            // Over the camera picture the sky is drawn with the attitude the picture was captured at; the guidance
-            // elsewhere on the screen keeps using the newest.
-            let frame = model.engine.frame(capturedAt: model.cameraFrameTime)
-            let content = model.skyContent
-            let configuration = model.configuration
-            let camera = model.cameraGeometry
-            let virtualFieldOfView = model.virtualFieldOfView
-            let hudRotation = model.hudRotation
-            let mosaic = MosaicDisplay.current
-            let mountMarker = model.mountMarker()
-            // The target ring holds still for people who asked for less motion.
-            let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-            let palette = palette
-            Canvas { context, size in
-                guard let frame,
-                      var renderer = SkyOverlayRenderer(frame: frame, content: content, configuration: configuration,
-                                                        palette: palette, camera: camera,
-                                                        virtualFieldOfView: virtualFieldOfView,
-                                                        hudRotation: hudRotation, time: time, mosaic: mosaic,
-                                                        mountMarker: mountMarker, size: size) else { return }
-                renderer.draw(in: context)
+        GeometryReader { geometry in
+            // How far the bottom of the display lies above the screen's edge (the home indicator and the tab bar): the
+            // off-screen marker keeps above the cards that stand on it. Read here, in a view that ignores the safe area.
+            let bottomInset = geometry.safeAreaInsets.bottom
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
+                // Over the camera picture the sky is drawn with the attitude the picture was captured at; the guidance
+                // elsewhere on the screen keeps using the newest.
+                let frame = model.engine.frame(capturedAt: model.cameraFrameTime)
+                let content = model.skyContent
+                let configuration = model.configuration
+                let camera = model.cameraGeometry
+                let virtualFieldOfView = model.virtualFieldOfView
+                let hudRotation = model.hudRotation
+                let mosaic = MosaicDisplay.current
+                let mountMarker = model.mountMarker()
+                // The target ring holds still for people who asked for less motion.
+                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+                let palette = palette
+                Canvas { context, size in
+                    guard let frame,
+                          var renderer = SkyOverlayRenderer(frame: frame, content: content, configuration: configuration,
+                                                            palette: palette, camera: camera,
+                                                            virtualFieldOfView: virtualFieldOfView,
+                                                            hudRotation: hudRotation, time: time, mosaic: mosaic,
+                                                            mountMarker: mountMarker, bottomInset: bottomInset,
+                                                            size: size) else { return }
+                    renderer.draw(in: context)
+                }
             }
         }
         .allowsHitTesting(false)

@@ -90,6 +90,9 @@ extension SkyOverlayRenderer {
     /// Distances from the top and bottom edges, which leave room for the status chips and the control panel.
     private static let edgeTopInset: CGFloat = 96
     private static let edgeBottomInset: CGFloat = 240
+    /// How tall the cards and the controls of the display are, with a little room. They stand on the inset that holds the
+    /// display off the screen's bottom edge (the home indicator, the tab bar), so the marker keeps this far above it.
+    private static let displayHeight: CGFloat = 218
 
     /// Draws the ring on what the guidance leads to: the panel of a mosaic being shot, else the satellite, else the target.
     mutating func drawTarget(in context: GraphicsContext) {
@@ -125,8 +128,9 @@ extension SkyOverlayRenderer {
         let length = hypot(heading.dx, heading.dy)
         heading = length > 1e-6 ? CGVector(dx: heading.dx / length, dy: heading.dy / length) : CGVector(dx: 0, dy: -1)
 
+        let edgeBottomInset = max(Self.edgeBottomInset, bottomInset + Self.displayHeight)
         let bounds = CGRect(x: Self.edgeSideInset, y: Self.edgeTopInset, width: size.width - 2 * Self.edgeSideInset,
-                            height: size.height - Self.edgeTopInset - Self.edgeBottomInset)
+                            height: size.height - Self.edgeTopInset - edgeBottomInset)
         guard bounds.width > 0, bounds.height > 0 else { return }
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         var distance = CGFloat.infinity
