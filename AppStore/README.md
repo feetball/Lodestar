@@ -9,3 +9,5 @@ They are captured in the iOS Simulator by `Tools/capture_screenshots.sh`, which 
 screenshot mode (`Lodestar/App/ScreenshotMode.swift`): the Grand Canyon on a moonless July night, with a
 fixed camera pointing so the Aim screen shows real guidance. The app icon is not uploaded separately;
 App Store Connect takes it from the build.
+
+The listing has no What's New text: iOS ships these features as version 1.0. Write it when an update is submitted.

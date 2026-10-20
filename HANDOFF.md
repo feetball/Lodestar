@@ -3,6 +3,10 @@
 How to continue Lodestar 1.1 on another computer. This file is for Claude Code and for Daniel (repo owner
 `feetball`). The same file is in both repositories.
 
+**iOS version (2026-10-20):** the iOS app ships as **1.0**. App Store Connect has only version 1.0, in "Prepare for
+Submission", never released (checked through the API), so the features below go out as 1.0 on iOS. Android stays at
+1.1. Where this file says 1.1 for iOS, read 1.0.
+
 ## Start here (prompt for Claude on the new PC)
 
 > Clone `feetball/Lodestar-Android` (branch `main`) and `feetball/Lodestar` (branch `main`), read `HANDOFF.md` in
@@ -14,10 +18,10 @@ How to continue Lodestar 1.1 on another computer. This file is for Claude Code a
 |---|---|---|
 | Repo | `feetball/Lodestar` | `feetball/Lodestar-Android` (public) |
 | 1.1 code | **`main`** (features-1.1 and the review branch were merged on 2026-10-19) | **`main`** |
-| Version | 1.1 on all four targets (app, iOS widgets, watch app, watch widgets) | 1.1, versionCode 3 |
+| Version | 1.0 on all four targets (app, iOS widgets, watch app, watch widgets) | 1.1, versionCode 3 |
 | CI | `.github/workflows/ci.yml` on macOS runners. `main` is red since `5b1dc75` (see "What is left") | `ci.yml`, green |
 | Visual review | `review.yml` (`gh workflow run review.yml --ref <branch>`), shot lists in `Tools/review/` | `emulator.yml` with `-f set=review`, `tools/capture_review.sh` |
-| Store text | `AppStore/metadata-en-US.json` (1.1 description, What's New, promotional text) | `PlayStore/listing/en-US/` (`full_description.txt`, `release_notes.txt`) |
+| Store text | `AppStore/metadata-en-US.json` (description and promotional text; no What's New, because iOS ships these features as 1.0) | `PlayStore/listing/en-US/` (`full_description.txt`, `release_notes.txt`) |
 | Engine | `LodestarKit/` (Swift 6, Foundation only) | `lodestar-kit/` (pure Kotlin/JVM, a line-for-line twin) |
 
 The two engines are twins: same types, algorithms, constants and tests, in both languages. Any engine change goes into
@@ -92,9 +96,9 @@ A pixel scan checks that night mode is pure red (no green or blue).
    - The account is a personal developer account: production needs a closed test with **12+ testers for 14 days** first.
    - **Daniel, in Play Console, before the release:** Data safety → add *Approximate location*: collected, optional,
      app functionality, not shared, encrypted in transit. It is used only by the opt-in cloud forecast.
-4. **iOS release 1.1** (`main` is what Xcode Cloud builds and signs)
+4. **iOS release 1.0** (`main` is what Xcode Cloud builds and signs)
    - The bundle IDs `net.kuecker.Lodestar.Widgets`, `.watchkitapp` and `.watchkitapp.Widgets` are already registered.
-   - **Daniel, in App Store Connect:** create version 1.1 and paste the texts from `AppStore/metadata-en-US.json`;
+   - **Daniel, in App Store Connect:** use version 1.0 (it already exists, in "Prepare for Submission") and paste the texts from `AppStore/metadata-en-US.json`;
      App Privacy → Location → **Coarse Location**: not linked to you, no tracking, App Functionality (matches
      `PrivacyInfo.xcprivacy`); untick Apple Vision Pro availability (ITMS-90984) if not done yet; submit for review.
    - Store submissions are Daniel's call; Claude asks first.
