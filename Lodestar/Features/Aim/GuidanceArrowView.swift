@@ -12,9 +12,14 @@ struct GuidanceArrowView: View {
     /// The free space the display leaves between its chips and its cards (`AimFreeSpaceKey`); `nil` where it has none.
     var freeSpace: Anchor<CGRect>?
 
+    /// The ring grows with the screen but leaves room for the panels on a small one.
+    static func orbitRadius(forScreenHeight height: CGFloat) -> CGFloat {
+        min(100, max(70, height * 0.115))
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            let radius = AimArrowContent.orbitRadius(forScreenHeight: geometry.size.height)
+            let radius = Self.orbitRadius(forScreenHeight: geometry.size.height)
             // As distances below the reticle, which lies in the middle of this view.
             let freeRange = freeSpace.map { anchor -> (top: CGFloat, bottom: CGFloat) in
                 let rect = geometry[anchor]
@@ -39,11 +44,6 @@ private struct AimArrowContent: View {
     /// The free space of the display as distances below the reticle, `nil` where there is none.
     let freeRange: (top: CGFloat, bottom: CGFloat)?
     @Environment(\.palette) private var palette
-
-    /// The ring grows with the screen but leaves room for the panels on a small one.
-    static func orbitRadius(forScreenHeight height: CGFloat) -> CGFloat {
-        min(100, max(70, height * 0.115))
-    }
 
     var body: some View {
         ZStack {

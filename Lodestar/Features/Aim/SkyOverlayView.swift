@@ -14,7 +14,7 @@ struct SkyOverlayView: View {
     var body: some View {
         GeometryReader { geometry in
             // How far the bottom of the display lies above the screen's edge (the home indicator and the tab bar): the
-            // off-screen marker keeps above the cards that stand on it. Read here, in a view that ignores the safe area.
+            // off-screen marker keeps above the cards that stand on it. Read in a view that ignores the safe area.
             let bottomInset = geometry.safeAreaInsets.bottom
             TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
                 // Over the camera picture the sky is drawn with the attitude the picture was captured at; the guidance
