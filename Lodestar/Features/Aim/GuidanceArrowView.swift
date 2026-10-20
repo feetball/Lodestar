@@ -9,12 +9,20 @@ import LodestarKit
 struct GuidanceArrowView: View {
     let model: AimViewModel
     let isActive: Bool
+    /// The free space the display leaves between its chips and its cards (`AimFreeSpaceKey`); `nil` where it has none.
+    var freeSpace: Anchor<CGRect>?
 
     var body: some View {
         GeometryReader { geometry in
             let radius = AimArrowContent.orbitRadius(forScreenHeight: geometry.size.height)
+            // As distances below the reticle, which lies in the middle of this view.
+            let freeRange = freeSpace.map { anchor -> (top: CGFloat, bottom: CGFloat) in
+                let rect = geometry[anchor]
+                return (rect.minY - geometry.size.height / 2, rect.maxY - geometry.size.height / 2)
+            }
             TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { _ in
-                AimArrowContent(guidance: model.engine.frame()?.guidance, rotation: model.hudRotation, radius: radius)
+                AimArrowContent(guidance: model.engine.frame()?.guidance, rotation: model.hudRotation, radius: radius,
+                                freeRange: freeRange)
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
@@ -28,6 +36,8 @@ private struct AimArrowContent: View {
     let rotation: AimHUDRotation
     /// Distance in points from the reticle to the middle of the arrow's glyph; also the radius of the ring.
     let radius: CGFloat
+    /// The free space of the display as distances below the reticle, `nil` where there is none.
+    let freeRange: (top: CGFloat, bottom: CGFloat)?
     @Environment(\.palette) private var palette
 
     /// The ring grows with the screen but leaves room for the panels on a small one.
@@ -101,7 +111,19 @@ private struct AimArrowContent: View {
             .padding(.vertical, 1)
             .background(Capsule().fill(palette.background.opacity(0.7)))
             .rotationEffect(.degrees(rotation.degrees))
-            .offset(rotation.rotated(CGSize(width: 0, height: offset)))
+            .offset(rotation.rotated(CGSize(width: 0, height: clamped(offset, size: size))))
+    }
+
+    /// `offset`, moved in an upright display so that a text of `size` lies in the display's free space, above its
+    /// cards, instead of under one: a mount's card can reach up past the reticle. A free space too small for the text
+    /// leaves it where it was, as does a turned display, whose cards lie elsewhere.
+    private func clamped(_ offset: CGFloat, size: CGFloat) -> CGFloat {
+        guard rotation == .upright, let freeRange else { return offset }
+        let halfHeight = size * 0.7 + 2
+        let highest = freeRange.top + halfHeight + 4
+        let lowest = freeRange.bottom - halfHeight - 4
+        guard highest <= lowest else { return offset }
+        return min(max(offset, highest), lowest)
     }
 }
 

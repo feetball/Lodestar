@@ -141,10 +141,15 @@ private struct AimStage: View {
                 palette.background
                 CameraPreviewView(isWanted: model.configuration.wantsCameraPreview)
                 SkyOverlayView(model: model, isActive: isActive)
-                GuidanceArrowView(model: model, isActive: isActive)
             }
             .ignoresSafeArea()
             GuidanceHUD(model: model, sheet: $sheet, isActive: isActive)
+                // The arrow lies between the sky and the display, as before, and reads from the display where it
+                // leaves the sky free, so that the big number inside the ring is never under one of its cards.
+                .backgroundPreferenceValue(AimFreeSpaceKey.self) { freeSpace in
+                    GuidanceArrowView(model: model, isActive: isActive, freeSpace: freeSpace)
+                        .ignoresSafeArea()
+                }
             AimAccessibilitySummary(model: model, isActive: isActive)
         }
         .contentShape(Rectangle())

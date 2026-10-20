@@ -68,6 +68,8 @@ private struct AimHUDLayout: View {
     private var levelGaugeSlot: some View {
         Color.clear
             .frame(maxHeight: .infinity)
+            // Told to the arrow behind the display, whose big number must not lie under a card.
+            .anchorPreference(key: AimFreeSpaceKey.self, value: .bounds) { $0 }
             .overlay(alignment: .topTrailing) {
                 // Offered the size the space ended up with, so it fits exactly when there is room.
                 ViewThatFits(in: .vertical) {
@@ -92,5 +94,15 @@ private struct AimHUDLayout: View {
                 AimControlsBar(model: model, sheet: $sheet, axis: .vertical)
             }
         }
+    }
+}
+
+/// The free space of the tall layout, between the status chips and the cards, which the arrow behind the display reads
+/// to keep its big number clear of the cards. The wide layout has no such space and sets nothing.
+struct AimFreeSpaceKey: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = nextValue() ?? value
     }
 }
