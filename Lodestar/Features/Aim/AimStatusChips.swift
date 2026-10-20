@@ -9,6 +9,7 @@ struct AimStatusChips: View {
     @Binding var sheet: AimSheet?
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
+    @Environment(\.palette) private var palette
 
     /// Fractional deviation of the measured magnetic field from the expected one above which the compass is suspect.
     private static let interferenceThreshold = 0.25
@@ -31,6 +32,7 @@ struct AimStatusChips: View {
                     } label: {
                         // Padded to the minimum touch target.
                         StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
+                            .aimChipBacking(palette)
                             .padding(.vertical, 9)
                             .contentShape(Rectangle())
                     }
@@ -38,6 +40,7 @@ struct AimStatusChips: View {
                     .accessibilityHint("Opens the iOS settings to allow camera access. The virtual sky still works.")
                 } else {
                     StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
+                        .aimChipBacking(palette)
                 }
             }
             SatelliteStreakChip(model: model)
@@ -48,6 +51,8 @@ struct AimStatusChips: View {
                 .disabled(sheet != nil)
                 .accessibilityHidden(sheet != nil)
         }
+        // A chip wider than the row (the Starlink warning, with large text) shrinks its text to fit.
+        .minimumScaleFactor(0.7)
         .frame(maxWidth: .infinity)
     }
 

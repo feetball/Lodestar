@@ -129,6 +129,7 @@ final class SatelliteStreakMonitor {
 /// streak risk", that opens the list of crossings. Shown only while the Starlink feed is on and the pointing is known.
 struct SatelliteStreakChip: View {
     let model: AimViewModel
+    @Environment(\.palette) private var palette
 
     private static let symbol = "point.topleft.down.to.point.bottomright.curvepath"
 
@@ -139,6 +140,7 @@ struct SatelliteStreakChip: View {
             EmptyView()
         case .tooOld:
             StatusChip(systemImage: Self.symbol, text: SatelliteText.streakStaleChip)
+                .aimChipBacking(palette)
         case .ready(let result):
             let text = SatelliteText.streakChip(crossings: result.assessment.crossings.count,
                                                 exposureSeconds: result.exposureSeconds, risk: result.risk)
@@ -148,6 +150,7 @@ struct SatelliteStreakChip: View {
                 // Padded to the minimum touch target.
                 StatusChip(systemImage: Self.symbol, text: text,
                            tone: result.assessment.crossings.isEmpty ? .neutral : .warning)
+                    .aimChipBacking(palette)
                     .padding(.vertical, 9)
                     .contentShape(Rectangle())
             }

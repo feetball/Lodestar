@@ -9,6 +9,12 @@ extension View {
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(palette.surface.opacity(opacity)))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(palette.stroke, lineWidth: 0.5))
     }
+
+    /// An opaque capsule under a status chip of the Aim screen, below the chip's own translucent one, so the sky's
+    /// labels and boxes do not read through its words.
+    func aimChipBacking(_ palette: Palette) -> some View {
+        background(Capsule().fill(palette.surface))
+    }
 }
 
 /// A square-ish control for the bar at the bottom: a symbol over a caption, filled when its function is on.
