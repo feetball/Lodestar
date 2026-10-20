@@ -105,23 +105,23 @@ private struct AimScreen: View {
         case .targetPicker:
             AimTargetPickerSheet(model: model)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
         case .alignment:
             // The sheet stays small by default, so the sky behind it can still be seen and the tripod steered.
             AlignmentSheet(model: model)
                 .presentationDetents([.fraction(0.45), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.45)))
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
         case .mosaic:
             AimMosaicSheet(model: model)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
         case .mount:
             // Like the alignment sheet, it stays small by default so the sky behind it can still be seen.
             MountAimSheet(model: model)
                 .presentationDetents([.fraction(0.5), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.5)))
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
         case .help:
             HelpSheet(topic: .aimScreen)
         }

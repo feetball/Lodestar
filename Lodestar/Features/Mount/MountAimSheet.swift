@@ -77,7 +77,8 @@ private struct MountControlPanel: View {
         .sheet(item: $confirmation) { confirmation in
             MountConfirmationSheet(confirmation: confirmation)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
+                .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
         }
         #if DEBUG
         // The visual review opens the sync confirmation once the target is chosen (`screen=mount-sw-sync`).

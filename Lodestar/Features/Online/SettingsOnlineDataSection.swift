@@ -52,7 +52,7 @@ private struct OnlineFeedRows: View {
         .sheet(isPresented: $asksFirst) {
             OnlineFirstTimeSheet(feed: feed)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
                 .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
         }
         if status.isEnabled {
