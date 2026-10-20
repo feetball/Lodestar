@@ -44,6 +44,10 @@ public final class SkyWatcherDriver: MountDriver {
     private static let nudgeGraceSeconds = 2.0
     private static let nudgeLeadSeconds = 0.5
     private static let nudgeUpdateSeconds = 0.5
+    /// A nudge ends when its path comes within this many seconds of an altitude limit: the poll that sees the limit is up to half a
+    /// second late, and the mount needs about a second to come to a halt after the stop command.
+    private static let nudgeLimitLookaheadSeconds = 1.0
+    private static let nudgeLimitStepSeconds = 0.25
     private static let trackingLeadExtraSeconds = 0.5
     private static let trackingRateSlack = 1.5
     private static let limitSlackDegrees = 0.25
@@ -812,6 +816,21 @@ public final class SkyWatcherDriver: MountDriver {
         try setAxisRate(.axis2, rate2)
     }
 
+    /// Throws the altitude limit that the path of the nudge reaches within `nudgeLimitLookaheadSeconds`. Looking at the place the anchor
+    /// has when the servo step runs is not enough: a fast nudge crosses the narrow zone above an overhead limit (and the mount, a second
+    /// of braking later, is far inside it) between two polls, and near the zenith the anchor then comes out on the other side.
+    private func checkNudgeAltitudes(_ reading: Reading) throws {
+        let limits = configuration.limits
+        var elapsed = 0.0
+        while elapsed <= SkyWatcherDriver.nudgeLimitLookaheadSeconds {
+            let at = reading.time.addingTimeInterval(elapsed)
+            let altitude = SkyWatcherSky.altitude(nudgeAnchor(at), localSiderealTime: lst(at), latitude: location.latitude)
+            if altitude < limits.minimumAltitudeDegrees { throw MountError.mountHorizonLimit }
+            if resolvedMode == .altAzimuth && altitude > limits.maximumAltitudeDegrees { throw MountError.mountOverheadLimit }
+            elapsed += SkyWatcherDriver.nudgeLimitStepSeconds
+        }
+    }
+
     private func endNudge() throws {
         nudge = nil
         // The axes still turn at the nudge speed. They are stopped before the position is read, so that what tracking starts from is
@@ -947,6 +966,7 @@ public final class SkyWatcherDriver: MountDriver {
         if let last = lastServo, now.timeIntervalSince(last) < SkyWatcherDriver.nudgeUpdateSeconds { return }
         let reading = try readAxes()
         do {
+            try checkNudgeAltitudes(reading)
             try servoStep(reading, lead: SkyWatcherDriver.nudgeLeadSeconds) { at in self.nudgeAnchor(at) }
             lastServo = clock.now()
         } catch let limit as MountError {

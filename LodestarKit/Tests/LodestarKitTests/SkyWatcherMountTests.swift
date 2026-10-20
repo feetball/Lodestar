@@ -871,7 +871,9 @@ final class SkyWatcherMountTests: XCTestCase {
         }
         try rig.controller.stopNudge()
         let altitude = realAltitude(rig)
-        XCTAssertTrue((85.0 ... 88.6).contains(altitude), "\(altitude)")
+        // It went up from 78° and ended before the limit: a fast nudge is stopped about a second early, because the mount needs
+        // that long to come to a halt (near the zenith a fraction of a degree of the axis is several degrees of the sky).
+        XCTAssertTrue((80.0 ... 88.0).contains(altitude), "\(altitude)")
         XCTAssertNil(rig.driver.trackingStopReason)
         // The mount tracks at the place where the nudge ended.
         let place = rig.trueJ2000()
