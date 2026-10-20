@@ -81,7 +81,9 @@ extension AlignmentError {
         case .nonFiniteInput:
             return "The sensors gave an unusable reading. Hold the phone still for a moment and sync again."
         case .boresightTooHigh(let altitude):
-            return "The camera points almost straight up (\(AngleFormatter.formatDegrees(altitude, decimals: 0))). Alignment needs an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}: choose a lower one."
+            // A negative altitude is a camera pointing at the nadir.
+            let direction = altitude < 0 ? "down" : "up"
+            return "The camera points almost straight \(direction) (\(AngleFormatter.formatDegrees(altitude, decimals: 0))). Alignment needs an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}: choose a lower one."
         case .targetTooHigh(let altitude):
             return "\(name) is too high in the sky (\(AngleFormatter.formatDegrees(altitude, decimals: 0))) for a reliable alignment. Choose an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}."
         case .implausibleCorrection(let degrees):

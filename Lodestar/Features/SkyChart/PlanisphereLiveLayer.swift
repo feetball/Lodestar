@@ -22,18 +22,18 @@ struct SkyChartCameraPose {
     }
 }
 
-/// Remembers the last well-defined camera heading. Close to the zenith the azimuth of the optical
+/// Remembers the last well-defined camera heading. Close to the zenith or the nadir the azimuth of the optical
 /// axis is meaningless and jumps about, so a chart that follows the heading keeps its rotation there.
 @MainActor
 final class SkyChartHeadingHold {
-    /// Above this altitude (degrees) the azimuth is too unreliable to follow.
+    /// Beyond this altitude (degrees), above or below the horizon, the azimuth is too unreliable to follow.
     private static let followLimit = 85.0
 
     private var rotation = 0.0
 
     /// The chart rotation in radians that puts the camera's azimuth at the top of the chart.
     func rotation(for pose: SkyChartCameraPose?) -> Double {
-        if let pose, pose.horizontal.altitude < Self.followLimit {
+        if let pose, abs(pose.horizontal.altitude) < Self.followLimit {
             rotation = AstroMath.radians(pose.horizontal.azimuth)
         }
         return rotation

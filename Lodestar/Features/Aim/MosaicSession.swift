@@ -52,7 +52,12 @@ final class MosaicSession {
     /// "Panel 3 of 12", or "All 12 panels shot" once complete.
     var progressText: String {
         guard plan != nil else { return "" }
-        return isComplete ? "All \(panelCount) panels shot" : "Panel \(step + 1) of \(panelCount)"
+        return isComplete ? Self.allShotText(panelCount: panelCount) : "Panel \(step + 1) of \(panelCount)"
+    }
+
+    /// "All 12 panels shot", or "The panel is shot" for a mosaic of one panel.
+    nonisolated static func allShotText(panelCount: Int) -> String {
+        panelCount == 1 ? "The panel is shot" : "All \(panelCount) panels shot"
     }
 
     /// Where the current panel sits in the grid: "Row 2 of 3, column 1".
