@@ -46,7 +46,7 @@ struct OnlineRefresher: Sendable {
                                     lastModified: cached?.lastModified, allowsExpensiveNetwork: !resource.requiresUnmetered)
         switch await downloader.fetch(request) {
         case .failed(let failure, let status, let retryAfter):
-            if failure.sentNothing {
+            if failure.neverSent(statusCode: status) {
                 // Nothing reached the provider, so the request interval is not used up.
                 store.setLastAttempt(resource, previousAttempt)
                 store.setLastAttemptFailed(resource, previousFailed)

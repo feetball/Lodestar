@@ -64,7 +64,15 @@ struct OnlineCache: Sendable {
     func write(_ name: String, bytes: Data, meta: OnlineCacheMeta) throws {
         guard var url = fileURL(name) else { throw CocoaError(.fileWriteInvalidFileName) }
         try prepareDirectory()
-        let header = try JSONEncoder().encode(meta)
+        var header = try JSONEncoder().encode(meta)
+        if header.count > Self.maximumHeader {
+            // A reader refuses a longer header, so the data would be lost at the next launch: write it without the validators.
+            var trimmed = meta
+            trimmed.etag = nil
+            trimmed.lastModified = nil
+            header = try JSONEncoder().encode(trimmed)
+            guard header.count <= Self.maximumHeader else { throw CocoaError(.fileWriteUnknown) }
+        }
         var file = Data(Self.magic)
         var length = UInt32(header.count).bigEndian
         withUnsafeBytes(of: &length) { file.append(contentsOf: $0) }

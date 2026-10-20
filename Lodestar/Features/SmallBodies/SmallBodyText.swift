@@ -18,6 +18,11 @@ enum SmallBodyText {
 
     static let targetsNote = "Comets and asteroids come first when they are bright and high enough tonight."
 
+    /// What replaces "no comet is bright" while the Comets feed is off: then there is no comet data to be bright.
+    static let cometsOffTitle = "Comets Are Off"
+    static let cometsOffMessage = "Comets are switched off, so Lodestar has no comet data. Switch on Comets in Settings "
+        + "\u{25B8} Online Data to see which comets are bright."
+
     static let footnote = "Magnitudes are estimates, good to a magnitude or two. "
         + "Only bodies at least 25\u{00B0} from the Sun are listed."
 
