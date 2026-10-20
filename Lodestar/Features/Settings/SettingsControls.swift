@@ -61,6 +61,7 @@ struct SettingsToggleRow: View {
 /// A slider with its title and current value on one line. VoiceOver reads the value text.
 struct SettingsSliderRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     /// The value as the user should read it, e.g. "0.12 s".
     let valueText: String
@@ -70,14 +71,25 @@ struct SettingsSliderRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                Spacer(minLength: 12)
-                Text(valueText)
-                    .monospacedDigit()
-                    .foregroundStyle(palette.secondaryText)
+            if dynamicTypeSize.isAccessibilitySize {
+                // The title and the value each get the whole width instead of squeezing one another.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(valueText)
+                        .monospacedDigit()
+                        .foregroundStyle(palette.secondaryText)
+                }
+                .accessibilityHidden(true)
+            } else {
+                HStack {
+                    Text(title)
+                    Spacer(minLength: 12)
+                    Text(valueText)
+                        .monospacedDigit()
+                        .foregroundStyle(palette.secondaryText)
+                }
+                .accessibilityHidden(true)
             }
-            .accessibilityHidden(true)
             Slider(value: $value, in: range, step: step) {
                 Text(title)
             }
@@ -97,6 +109,7 @@ struct SettingsMenuOption<Value: Hashable>: Identifiable {
 /// shows it in a light grey, which does not belong in a night palette.
 struct SettingsMenuPicker<Value: Hashable>: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     @Binding var selection: Value
     let options: [SettingsMenuOption<Value>]
@@ -113,17 +126,34 @@ struct SettingsMenuPicker<Value: Hashable>: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                Text(title)
-                    .foregroundStyle(palette.primaryText)
-                Spacer(minLength: 8)
-                Text(selectedTitle)
-                    .foregroundStyle(palette.accent)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.footnote)
-                    .foregroundStyle(palette.accent)
+            if dynamicTypeSize.isAccessibilitySize {
+                // The chosen value goes under the title, so neither is squeezed into a narrow column.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .foregroundStyle(palette.primaryText)
+                    HStack(spacing: 8) {
+                        Text(selectedTitle)
+                            .foregroundStyle(palette.accent)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.footnote)
+                            .foregroundStyle(palette.accent)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            } else {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .foregroundStyle(palette.primaryText)
+                    Spacer(minLength: 8)
+                    Text(selectedTitle)
+                        .foregroundStyle(palette.accent)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.footnote)
+                        .foregroundStyle(palette.accent)
+                }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
         }
         .accessibilityLabel(title)
         .accessibilityValue(selectedTitle)
@@ -134,6 +164,7 @@ struct SettingsMenuPicker<Value: Hashable>: View {
 /// editing ends. The decimal mark may be "." or ",".
 struct SettingsNumberField: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let title: String
     private let prefix: String
     private let unit: String
@@ -181,24 +212,20 @@ struct SettingsNumberField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .accessibilityHidden(true)
-                Spacer(minLength: 8)
-                if !prefix.isEmpty {
-                    Text(prefix)
-                        .foregroundStyle(palette.secondaryText)
+            if dynamicTypeSize.isAccessibilitySize {
+                // The label gets the whole width, with the field under it, so a word of it is never broken.
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .accessibilityHidden(true)
+                    valueGroup
                 }
-                TextField(title, text: $text, prompt: Text(placeholder).foregroundStyle(palette.tertiaryText))
-                    .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
-                    .submitLabel(.done)
-                    .multilineTextAlignment(.trailing)
-                    .focused($isFocused)
-                    .foregroundStyle(isInvalid ? palette.critical : palette.primaryText)
-                    .frame(maxWidth: 120)
-                if !unit.isEmpty {
-                    Text(unit)
-                        .foregroundStyle(palette.secondaryText)
+            } else {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .accessibilityHidden(true)
+                        .layoutPriority(1)
+                    Spacer(minLength: 8)
+                    valueGroup
                 }
             }
             if isInvalid {
@@ -215,6 +242,28 @@ struct SettingsNumberField: View {
         }
         .onChange(of: value) { _, newValue in
             if !isFocused { text = SettingsNumberText.text(for: newValue, fractionDigits: fractionDigits) }
+        }
+    }
+
+    /// The prefix, the field and the unit.
+    private var valueGroup: some View {
+        let isStacked = dynamicTypeSize.isAccessibilitySize
+        return HStack(spacing: 8) {
+            if !prefix.isEmpty {
+                Text(prefix)
+                    .foregroundStyle(palette.secondaryText)
+            }
+            TextField(title, text: $text, prompt: Text(placeholder).foregroundStyle(palette.tertiaryText))
+                .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
+                .submitLabel(.done)
+                .multilineTextAlignment(.trailing)
+                .focused($isFocused)
+                .foregroundStyle(isInvalid ? palette.critical : palette.primaryText)
+                .frame(maxWidth: isStacked ? CGFloat.infinity : 120)
+            if !unit.isEmpty {
+                Text(unit)
+                    .foregroundStyle(palette.secondaryText)
+            }
         }
     }
 
