@@ -244,7 +244,9 @@ private struct MountAddressSection: View {
                 Text("Address")
                     .accessibilityHidden(true)
                 Spacer(minLength: 8)
-                TextField("Address", text: hostBinding, prompt: Text(option.defaultHost.isEmpty ? "192.168.1.20" : option.defaultHost))
+                TextField("Address", text: hostBinding,
+                          prompt: Text(option.defaultHost.isEmpty ? "192.168.1.20" : option.defaultHost)
+                              .foregroundStyle(palette.tertiaryText))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
@@ -256,7 +258,8 @@ private struct MountAddressSection: View {
                 Text("Port")
                     .accessibilityHidden(true)
                 Spacer(minLength: 8)
-                TextField("Port", text: portBinding, prompt: Text(String(option.defaultPort)))
+                TextField("Port", text: portBinding,
+                          prompt: Text(String(option.defaultPort)).foregroundStyle(palette.tertiaryText))
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(palette.primaryText)
