@@ -194,12 +194,16 @@ private final class OnlineNetProtocol: URLProtocol {
             return
         }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        // A connection that breaks right after the answer: URLSession reports the failure before it has handed the answer to the
+        // delegate unless the protocol gives it a moment (the first CI run saw 'network' where 'interrupted' was meant).
+        if reply.errorAfterBody != nil { Thread.sleep(forTimeInterval: 0.2) }
         for chunk in reply.chunks {
             if isStopped { return }
             client?.urlProtocol(self, didLoad: chunk)
         }
         if isStopped { return }
         if let error = reply.errorAfterBody {
+            Thread.sleep(forTimeInterval: 0.2)
             client?.urlProtocol(self, didFailWithError: error)
         } else {
             client?.urlProtocolDidFinishLoading(self)
