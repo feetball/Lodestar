@@ -38,10 +38,13 @@ struct TonightWidgetView: View {
     }
 
     /// The medium widget's tiles are about 133 pt wide, so its text stops growing earlier than the small one's: at xLarge
-    /// the bold value is still larger than its label and fits without shrinking far.
+    /// the bold value is still larger than its label and fits without shrinking far. The small one is about 126 pt high
+    /// inside its margins: at xxLarge the Moon phase on two lines, its "lit" line, the label and the dark window on two
+    /// lines still fit (the window shrinks a little); at xxxLarge they need about 140 pt, so the window would be cut to
+    /// one line again ("7:13 PM – 5:13…").
     private static func dynamicTypeRange(for family: WidgetFamily) -> ClosedRange<DynamicTypeSize> {
         switch family {
-        case .systemSmall: return .xSmall ... .xxxLarge
+        case .systemSmall: return .xSmall ... .xxLarge
         case .systemMedium: return .xSmall ... .xLarge
         default: return .xSmall ... .accessibility5
         }
