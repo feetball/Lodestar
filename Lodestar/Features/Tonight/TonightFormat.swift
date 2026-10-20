@@ -5,9 +5,21 @@ import LodestarKit
 enum TonightFormat {
     // MARK: Time
 
-    /// A window of time in the observer's time zone, such as "21:40 – 04:12".
+    /// `text` with its spaces made non-breaking, so a line never breaks inside it ("10:54 PM", "mag 3.6").
+    static func solid(_ text: String) -> String {
+        text.replacingOccurrences(of: " ", with: "\u{00A0}")
+    }
+
+    /// `segments` joined with a dot that stays with the segment before it, so a wrapped line never starts with a dot.
+    static func dotted(_ segments: [String]) -> String {
+        segments.joined(separator: "\u{00A0}\u{00B7} ")
+    }
+
+    /// A window of time in the observer's time zone, such as "21:40 – 04:12". A time never splits from its "PM", and
+    /// the dash stays with the time after it, so a line can break only before the dash.
     static func window(_ interval: DateInterval, in timeZone: TimeZone) -> String {
-        "\(AppFormat.time(interval.start, in: timeZone)) \u{2013} \(AppFormat.time(interval.end, in: timeZone))"
+        "\(solid(AppFormat.time(interval.start, in: timeZone))) \u{2013}\u{00A0}"
+            + solid(AppFormat.time(interval.end, in: timeZone))
     }
 
     /// Every window of a list, separated by commas; the placeholder for an empty list.
@@ -29,7 +41,7 @@ enum TonightFormat {
         let minutes = Int((hours * 60).rounded())
         guard minutes >= 60 else { return "\(minutes)m" }
         let remainder = minutes % 60
-        return "\(minutes / 60)h \(remainder < 10 ? "0" : "")\(remainder)m"
+        return "\(minutes / 60)h\u{00A0}\(remainder < 10 ? "0" : "")\(remainder)m"
     }
 
     /// How far a night is from tonight: "Tonight", "Tomorrow night", "3 nights ago".
@@ -98,11 +110,11 @@ enum TonightFormat {
             parts.append(constellation)
         }
         if let magnitude = object.magnitude {
-            parts.append(AppFormat.magnitude(magnitude))
+            parts.append(solid(AppFormat.magnitude(magnitude)))
         }
         if let size = object.angularSize {
-            parts.append(size.description)
+            parts.append(solid(size.description))
         }
-        return parts.joined(separator: " \u{00B7} ")
+        return dotted(parts)
     }
 }

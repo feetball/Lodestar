@@ -121,15 +121,16 @@ private struct TonightTargetRow: View {
     /// The name, with the first catalog designation when it differs: "Andromeda Galaxy · M 31".
     private var title: String {
         let name = SmallBodyText.displayName(object)
-        return TonightFormat.designation(of: object).map { "\(name) \u{00B7} \($0)" } ?? name
+        return TonightFormat.designation(of: object).map { "\(name)\u{00A0}\u{00B7} \($0)" } ?? name
     }
 
     /// "Best 23:40 facing SE · 7h 12m above 20°".
     private var timing: String {
         let minimum = Int(TonightCalculator.minimumTargetAltitude)
-        return "Best \(AppFormat.time(target.peakTime, in: timeZone)) "
-            + TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude)
-            + " \u{00B7} \(TonightFormat.duration(hours: target.hoursAboveMinimum)) above \(minimum)\u{00B0}"
+        let best = TonightFormat.solid("Best \(AppFormat.time(target.peakTime, in: timeZone))") + " "
+            + TonightFormat.solid(TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
+        let above = "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
+        return TonightFormat.dotted([best, above])
     }
 
     private var spokenSummary: String {
