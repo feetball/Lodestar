@@ -161,8 +161,9 @@ extension SkyOverlayRenderer {
         layer.stroke(arrow, with: .color(.black.opacity(0.5)), lineWidth: 1)
 
         let separation = AimFormat.angle(boresight.angle(to: direction))
-        // On a backing, so a star or a line behind the number does not read as part of it.
-        let style = AimLabelStyle(size: 14, weight: .bold, color: color, backing: palette.background.opacity(0.72))
+        // On an opaque backing, so a star or a line behind the number does not read as part of it: through a translucent
+        // one a star on the decimal point still showed, dimmed, as a colon.
+        let style = AimLabelStyle(size: 14, weight: .bold, color: color, backing: palette.background)
         let labelCenter = edgeLabelCenter(for: separation, tip: tip, heading: heading)
         labels.add(separation, at: labelCenter, style: style, priority: 3)
     }
