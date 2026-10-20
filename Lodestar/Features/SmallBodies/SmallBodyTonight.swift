@@ -25,6 +25,14 @@ enum SmallBodyTonightPlanner {
     /// The candidates looked at: the brightest ones at the night's reference time.
     private static let candidateLimit = 30
 
+    /// What the card says when it has no comet: that none is bright, or, while the Comets feed is off (`cometsAreOn`
+    /// false), that comets are off, since then there is no comet data to be bright.
+    static func emptyCardMessage(cometsAreOn: Bool) -> String {
+        guard cometsAreOn else { return SmallBodyText.cometsOffMessage }
+        return "No comet is brighter than magnitude \(Int(cardMagnitudeLimit)) tonight. "
+            + "That is normal; bright comets are rare."
+    }
+
     /// The comets for the card (bright at the night's reference time) and the comets and asteroids worth a place among
     /// the Best Targets: at most `targetMagnitudeLimit`, 25° or more from the Sun, and at least
     /// `TonightCalculator.minimumTargetAltitude` high for `minimumHours` in the dark (over the skyline, if there is

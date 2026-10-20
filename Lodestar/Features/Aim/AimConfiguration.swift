@@ -20,24 +20,6 @@ struct AimConfiguration: Equatable {
     var wantsCameraPreview: Bool
     var isNight: Bool
 
-    @MainActor
-    init(app: AppModel) {
-        let settings = app.settings
-        let mount = app.mountProfile
-        self.mount = mount
-        alignment = app.alignment
-        lensFrame = app.lensSetup.fieldOfView
-        showConstellationLines = settings.showConstellationLines
-        showConstellationNames = settings.showConstellationNames
-        showDeepSkyObjects = settings.showDeepSkyObjects
-        showMilkyWay = settings.showMilkyWay
-        deepSkyProminence = settings.deepSkyProminence
-        starMagnitudeLimit = settings.starMagnitudeLimit
-        isNight = app.isNightModeActive
-        wantsCameraPreview = settings.cameraPreviewEnabled && (!isNight || settings.cameraPreviewAtNight)
-            && Self.phoneCameraFollowsLens(mount)
-    }
-
     /// Whether the phone's back camera looks along the lens. It does not when the phone lies on top of the camera:
     /// its picture then shows the ground, and the sky is drawn as seen from the lens instead.
     static func phoneCameraFollowsLens(_ mount: MountProfile) -> Bool {

@@ -63,6 +63,10 @@ enum OnlineFailure: Sendable, Equatable {
 
     /// Whether the request never reached the provider, so it does not count against the request interval.
     var sentNothing: Bool { self == .offline || self == .waitingForUnmetered || self == .insecure }
+
+    /// `sentNothing`, given the HTTP status the failure came with, if any. A redirect to an address that is not HTTPS
+    /// fails as `.insecure` too, but only after the provider answered with a 3xx: that request was made.
+    func neverSent(statusCode: Int?) -> Bool { sentNothing && statusCode == nil }
 }
 
 /// The outcome of `OnlineDownloader.fetch`.
@@ -86,6 +90,8 @@ struct OnlineDownloader: Sendable {
     var idleTimeout: TimeInterval = 30
     /// Seconds for the whole request.
     var totalTimeout: TimeInterval = 120
+    /// `URLProtocol` classes that answer the request instead of the network (tests only; `nil` in the app).
+    var protocolClasses: [AnyClass]?
 
     init(userAgent: String = OnlineUserAgent.current) {
         self.userAgent = userAgent
@@ -104,6 +110,7 @@ struct OnlineDownloader: Sendable {
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.tlsMinimumSupportedProtocolVersion = .TLSv12
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
 
         var urlRequest = URLRequest(url: request.url)
         urlRequest.httpMethod = "GET"
@@ -175,7 +182,7 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
         let count = redirects
         lock.unlock()
         guard request.url?.scheme?.lowercased() == "https" else {
-            setAbort(.insecure)
+            setAbort(.insecure, status: response.statusCode)
             completionHandler(nil)
             task.cancel()
             return

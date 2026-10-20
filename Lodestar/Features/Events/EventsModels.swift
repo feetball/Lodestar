@@ -4,9 +4,10 @@ import LodestarKit
 /// What one run of the events calculator is asked for: where the observer is, in which time zone the days are
 /// counted and from which local day the next twelve months run.
 struct EventsKey: Sendable, Equatable {
-    /// How far the observer may move before the events are worked out again, in kilometres. Their visibility and the
-    /// local circumstances of an eclipse change slowly with the place.
-    static let placeToleranceKilometers = 100.0
+    /// How far the observer may move before the events are worked out again, in kilometres: only a movement of the size
+    /// of GPS jitter. The local circumstances of an eclipse (magnitude, contact times, an occultation) are worked out for
+    /// one place and a totality path is only a few hundred kilometres wide, so they do not hold for a place far away.
+    static let placeToleranceKilometers = 10.0
     /// How far ahead the calendar looks, in days.
     static let spanDays = 366
 

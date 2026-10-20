@@ -147,9 +147,11 @@ struct SmallBodyListView: View {
     private var content: some View {
         if let entries {
             if entries.isEmpty {
-                EmptyStateView(title: "Nothing Bright", systemImage: "sparkle",
-                               message: SmallBodyBrightLists.emptyMessage(period: period, limit: limit.value,
-                                                                          kind: kind))
+                let cometsAreOn = app.online.isEnabled(.comets)
+                EmptyStateView(title: SmallBodyBrightLists.emptyTitle(kind: kind, cometsAreOn: cometsAreOn),
+                               systemImage: "sparkle",
+                               message: SmallBodyBrightLists.emptyMessage(period: period, limit: limit.value, kind: kind,
+                                                                          cometsAreOn: cometsAreOn))
             } else {
                 list(of: entries)
             }

@@ -1,0 +1,1 @@
+../../../Lodestar/Features/Objects/ObjectDetailModels.swift

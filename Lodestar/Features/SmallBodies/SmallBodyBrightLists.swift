@@ -128,10 +128,22 @@ enum SmallBodyBrightLists {
             }
     }
 
-    /// "No comet is brighter than magnitude 10 right now. That is normal; bright comets are rare."
-    static func emptyMessage(period: SmallBodyListPeriod, limit: Double, kind: SmallBodyListKind) -> String {
+    /// "No comet is brighter than magnitude 10 right now. That is normal; bright comets are rare." While the Comets
+    /// feed is off (`cometsAreOn` false) there are no comets to be bright: a list of comets says they are off, and a
+    /// list of both says so after the asteroids.
+    static func emptyMessage(period: SmallBodyListPeriod, limit: Double, kind: SmallBodyListKind,
+                             cometsAreOn: Bool = true) -> String {
+        if kind == .comets && !cometsAreOn { return SmallBodyText.cometsOffMessage }
         let timing = period == .now ? "right now" : "in the next \(monthDays) days"
-        let first = "No \(kind.noun) is brighter than magnitude \(Int(limit)) \(timing)."
-        return kind == .asteroids ? first : "\(first) That is normal; bright comets are rare."
+        let noun = kind == .both && !cometsAreOn ? SmallBodyListKind.asteroids.noun : kind.noun
+        let first = "No \(noun) is brighter than magnitude \(Int(limit)) \(timing)."
+        if kind == .asteroids { return first }
+        if !cometsAreOn { return "\(first) \(SmallBodyText.cometsOffMessage)" }
+        return "\(first) That is normal; bright comets are rare."
+    }
+
+    /// "Nothing Bright", or "Comets Are Off" for a list of comets while the Comets feed is off.
+    static func emptyTitle(kind: SmallBodyListKind, cometsAreOn: Bool = true) -> String {
+        kind == .comets && !cometsAreOn ? SmallBodyText.cometsOffTitle : "Nothing Bright"
     }
 }
