@@ -6,6 +6,9 @@ import LodestarKit
 struct ObjectRow: View {
     @Environment(\.palette) private var palette
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    /// The widest the trailing column (the position, or "Below horizon" over the rising time) grows before its text
+    /// wraps, so the names keep the rest of the row.
+    @ScaledMetric(relativeTo: .footnote) private var statusWidth: CGFloat = 112
 
     let object: CelestialObject
     /// Where the object is now; `nil` while positions are not known.
@@ -28,6 +31,7 @@ struct ObjectRow: View {
                 names
                 Spacer(minLength: 8)
                 skyPosition
+                    .layoutPriority(1)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -36,60 +40,106 @@ struct ObjectRow: View {
                                                         in: timeZone, showsProminence: showsProminence))
     }
 
+    /// At the largest text sizes nothing is cut: every line wraps instead.
+    private var linesWrap: Bool {
+        dynamicTypeSize.isAccessibilitySize
+    }
+
     private var names: some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(SmallBodyText.displayName(object))
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(palette.primaryText)
-                    .lineLimit(2)
-                if let designation = ObjectsFormat.extraDesignation(of: object) {
-                    Text(designation)
-                        .font(.subheadline)
-                        .foregroundStyle(palette.tertiaryText)
-                        .lineLimit(1)
-                }
-                if isFavorite {
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundStyle(palette.accent)
-                }
-            }
+            nameLine
             Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude, position: position))
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-                // The kind, magnitude, elongation and warnings of a comet or an asteroid take two lines.
-                .lineLimit(object.smallBody == nil ? 1 : 2)
+                // The kind, magnitude, elongation and warnings of a comet or an asteroid take up to three lines.
+                .lineLimit(linesWrap ? nil : (object.smallBody == nil ? 1 : 3))
             if let line = ObjectsFormat.catalogueLine(of: object, showsProminence: showsProminence) {
                 Text(line)
                     .font(.caption)
                     .foregroundStyle(palette.tertiaryText)
-                    .lineLimit(1)
+                    .lineLimit(linesWrap ? nil : 1)
             }
         }
+    }
+
+    /// The name with its first other designation and the favorite star. They share a line when they fit; otherwise the
+    /// designation (which tells similar comets apart) and the star go under the name, so the name is not split at a
+    /// hyphen and the designation is not cut.
+    private var nameLine: some View {
+        let designation = ObjectsFormat.extraDesignation(of: object)
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                nameText
+                if let designation {
+                    designationText(designation)
+                }
+                if isFavorite {
+                    favoriteStar
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                nameText
+                if designation != nil || isFavorite {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let designation {
+                            designationText(designation)
+                        }
+                        if isFavorite {
+                            favoriteStar
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var nameText: some View {
+        Text(SmallBodyText.displayName(object))
+            .font(.body.weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+            .lineLimit(linesWrap ? nil : 2)
+    }
+
+    private func designationText(_ designation: String) -> some View {
+        Text(designation)
+            .font(.subheadline)
+            .foregroundStyle(palette.tertiaryText)
+            .lineLimit(linesWrap ? nil : 1)
+    }
+
+    private var favoriteStar: some View {
+        Image(systemName: "star.fill")
+            .font(.caption)
+            .foregroundStyle(palette.accent)
     }
 
     @ViewBuilder
     private var skyPosition: some View {
         if let position {
-            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
+            VStack(alignment: linesWrap ? .leading : .trailing, spacing: 2) {
                 if position.isAboveHorizon {
                     Text(ObjectsFormat.altitudeAndDirection(of: position))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(palette.accent)
+                        .lineLimit(linesWrap ? nil : 1)
                 } else {
                     Text(ObjectsFormat.hiddenText(for: position))
                         .font(.subheadline)
                         .foregroundStyle(palette.tertiaryText)
+                        .lineLimit(linesWrap ? nil : 2)
                     if let rising = ObjectsFormat.risingText(for: position, in: timeZone) {
+                        // "Rises tomorrow 7:27 AM" takes two lines here rather than being cut.
                         Text(rising)
                             .font(.footnote)
                             .foregroundStyle(palette.secondaryText)
+                            .lineLimit(linesWrap ? nil : 2)
                     }
                 }
             }
             .monospacedDigit()
-            .lineLimit(1)
+            .multilineTextAlignment(linesWrap ? .leading : .trailing)
+            .frame(maxWidth: linesWrap ? nil : statusWidth, alignment: .trailing)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
