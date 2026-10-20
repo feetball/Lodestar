@@ -206,7 +206,8 @@ final class AimSkySnapshotTests: XCTestCase {
     func testTheDefaultSnapshotHoldsTheProminentDeepSkyObjectsAndTheGalacticCentre() throws {
         let items = try baseline().deepSky
         let ids = Set(items.map { $0.id })
-        XCTAssertEqual(ids.count, items.count, "an object appears once")
+        let repeated = Dictionary(grouping: items, by: { $0.id }).filter { $0.value.count > 1 }.keys.sorted()
+        XCTAssertEqual(ids.count, items.count, "an object appears once; listed twice: \(repeated)")
         XCTAssertTrue(ids.contains("dso.M31"))
         XCTAssertTrue(ids.contains("special.galacticCenter"))
         XCTAssertFalse(ids.contains("special.ncp"), "the poles are not fixed places")
@@ -226,7 +227,8 @@ final class AimSkySnapshotTests: XCTestCase {
         XCTAssertLessThan(prominent.count, everything.count)
         let catalog = try loadedCatalog()
         XCTAssertGreaterThan(everything.count, catalog.deepSkyObjects(upTo: .obscure).count)
-        XCTAssertEqual(Set(everything.map { $0.id }).count, everything.count)
+        let repeated = Dictionary(grouping: everything, by: { $0.id }).filter { $0.value.count > 1 }.keys.sorted()
+        XCTAssertEqual(Set(everything.map { $0.id }).count, everything.count, "listed twice: \(repeated)")
     }
 
     func testTheMajorAxisIsGivenInDegreesWhenTheCatalogKnowsIt() throws {
