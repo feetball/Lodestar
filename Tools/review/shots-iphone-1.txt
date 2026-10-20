@@ -4,6 +4,9 @@ tonight|dn|tab=tonight comets=1 online=1|pages=8
 objects|dn|tab=objects comets=1|pages=4
 settings|dn|tab=settings online=1|pages=8
 aim-comet|dn|tab=aim target=comet.161P comets=1|
+# The sky chart, which the review of 1.1 never captured: with the comets and asteroids, and with a target.
+sky|dn|tab=sky comets=1|
+sky-target|dn|tab=sky target=special.galacticCenter|
 # Events
 events-calendar|dn|screen=events-calendar|pages=4
 event-meteorShower|dn|screen=event-meteorShower|pages=4

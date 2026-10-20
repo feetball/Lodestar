@@ -23,8 +23,6 @@ final class WatchTonightModel {
     @ObservationIgnored private var link: WatchPhoneLink?
     @ObservationIgnored private var phonePlace = TonightPlaceStore.load(.phone)
     @ObservationIgnored private var isRefreshing = false
-    /// Set when the iPhone's place arrives during a refresh, which then works it out again with the new place.
-    @ObservationIgnored private var isPlaceStale = false
 
     /// Starts listening to the iPhone and asks for location access if the user has not been asked.
     func start() {
@@ -42,20 +40,19 @@ final class WatchTonightModel {
     }
 
     /// Works out the entries again for the current place and asks the complications to work theirs out again too
-    /// (for the watch's own location, which they always use).
+    /// (for the watch's own location, which they always use). A place the iPhone sends meanwhile makes it start over,
+    /// so that it never shows what was worked out for the place before.
     func refresh() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        var phone: TonightPlace?
+        var computed: (entries: [TonightEntry], source: TonightPlaceStore.Source)?
         repeat {
-            isPlaceStale = false
-            await refreshOnce()
-        } while isPlaceStale
-    }
-
-    private func refreshOnce() async {
-        let (place, source, now) = await placeAndDate()
-        guard let place else {
+            phone = phonePlace
+            computed = await entriesForCurrentPlace()
+        } while phonePlace != phone
+        guard let computed else {
             entries = []
             placeSource = nil
             locationIssue = locator.locationIssue
@@ -63,13 +60,21 @@ final class WatchTonightModel {
             isLoading = false
             return
         }
-        entries = await Task.detached(priority: .userInitiated) {
-            TonightBuilder.entries(for: place, from: now)
-        }.value
-        placeSource = source
+        entries = computed.entries
+        placeSource = computed.source
         needsLocation = false
         isLoading = false
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// The entries for the current place and where that place came from, or `nil` without a place.
+    private func entriesForCurrentPlace() async -> (entries: [TonightEntry], source: TonightPlaceStore.Source)? {
+        let (place, source, now) = await placeAndDate()
+        guard let place else { return nil }
+        let built = await Task.detached(priority: .userInitiated) {
+            TonightBuilder.entries(for: place, from: now)
+        }.value
+        return (built, source)
     }
 
     /// The place to work for, where it came from, and the moment to start from. (The visual review of the Simulator
@@ -86,11 +91,7 @@ final class WatchTonightModel {
         guard place != phonePlace else { return }
         phonePlace = place
         TonightPlaceStore.save(place, as: .phone)
-        if isRefreshing {
-            // A refresh that is already under way may have chosen the place before this one arrived.
-            isPlaceStale = true
-        } else {
-            await refresh()
-        }
+        // A refresh already under way sees the new place and starts over.
+        await refresh()
     }
 }

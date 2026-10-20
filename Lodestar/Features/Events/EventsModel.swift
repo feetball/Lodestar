@@ -13,6 +13,7 @@ final class EventsModel {
     /// The events, in time order, or `nil` until the first run has finished (and while another place is worked out).
     private(set) var entries: [EventsEntry]?
 
+    /// The key `entries` were worked out for; `nil` while there are none.
     @ObservationIgnored private var loadedKey: EventsKey?
     @ObservationIgnored private var pendingKey: EventsKey?
     @ObservationIgnored private var task: Task<Void, Never>?
@@ -21,11 +22,17 @@ final class EventsModel {
     /// result that still fits makes it return at once.
     func refresh(context: ObserverContext, now: Date) {
         let key = EventsKey(context: context, now: now)
-        if let loadedKey, loadedKey.covers(key) { return }
+        if let loadedKey, loadedKey.covers(key) {
+            // The stored events fit again: a run for another key would replace them with events that do not.
+            task?.cancel()
+            pendingKey = nil
+            return
+        }
         if let pendingKey, pendingKey.covers(key) { return }
         // Events of another place would show the wrong visibility; another day is only a little out of date.
         if let loadedKey, !loadedKey.isNear(key) || loadedKey.timeZone.identifier != key.timeZone.identifier {
             entries = nil
+            self.loadedKey = nil
         }
         pendingKey = key
         task?.cancel()
