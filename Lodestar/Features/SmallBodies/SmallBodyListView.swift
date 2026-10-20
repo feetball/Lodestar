@@ -86,6 +86,7 @@ struct SmallBodyListView: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var period = SmallBodyListPeriod.now
     @State private var limit = SmallBodyMagnitudeLimit.default
@@ -103,17 +104,31 @@ struct SmallBodyListView: View {
                          kind: kind)
     }
 
+    /// At accessibility sizes the filters would take up to two fifths of the screen, so they scroll with the rows.
+    /// While there are no rows (loading, or nothing bright) they stay on top, where they are the only way to change the
+    /// filter.
+    private var scrollsHeader: Bool {
+        dynamicTypeSize.isAccessibilitySize && entries?.isEmpty == false
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SmallBodyChoiceChips(options: SmallBodyListPeriod.allCases, selection: $period) { $0.title }
+            SmallBodyChoiceChips(options: SmallBodyListKind.allCases, selection: $kind) { $0.title }
+            SmallBodyChoiceChips(options: SmallBodyMagnitudeLimit.allCases, selection: $limit) { $0.title }
+            Text(limit.caption)
+                .font(.footnote)
+                .foregroundStyle(palette.secondaryText)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                SmallBodyChoiceChips(options: SmallBodyListPeriod.allCases, selection: $period) { $0.title }
-                SmallBodyChoiceChips(options: SmallBodyListKind.allCases, selection: $kind) { $0.title }
-                SmallBodyChoiceChips(options: SmallBodyMagnitudeLimit.allCases, selection: $limit) { $0.title }
-                Text(limit.caption)
-                    .font(.footnote)
-                    .foregroundStyle(palette.secondaryText)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 4)
+            if !scrollsHeader {
+                header
             }
             content
         }
@@ -148,24 +163,29 @@ struct SmallBodyListView: View {
     private func list(of entries: [SmallBodyListEntry]) -> some View {
         let timeZone = app.observerContext?.timeZone ?? .autoupdatingCurrent
         return ScrollView {
-            LazyVStack(spacing: 8) {
-                ForEach(entries) { entry in
-                    NavigationLink(value: entry.object) {
-                        SmallBodyListRow(entry: entry, showsPeakDate: period == .thisMonth, timeZone: timeZone)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(palette.surface))
-                    }
-                    .buttonStyle(.plain)
+            VStack(spacing: 0) {
+                if scrollsHeader {
+                    header
                 }
-                Text(SmallBodyText.footnote)
-                    .font(.footnote)
-                    .foregroundStyle(palette.tertiaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 4)
+                LazyVStack(spacing: 8) {
+                    ForEach(entries) { entry in
+                        NavigationLink(value: entry.object) {
+                            SmallBodyListRow(entry: entry, showsPeakDate: period == .thisMonth, timeZone: timeZone)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(palette.surface))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Text(SmallBodyText.footnote)
+                        .font(.footnote)
+                        .foregroundStyle(palette.tertiaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
+                }
+                .padding(16)
             }
-            .padding(16)
         }
     }
 
@@ -185,38 +205,105 @@ struct SmallBodyListView: View {
     }
 }
 
-/// A row of exclusive choices as capsules, scrolling sideways when they do not fit.
+/// A row of exclusive choices as capsules, scrolling sideways when they do not fit; at accessibility sizes the
+/// capsules wrap onto further lines instead, so every choice and the selected one can be seen.
 private struct SmallBodyChoiceChips<Option: Hashable & Identifiable>: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let options: [Option]
     @Binding var selection: Option
     let title: (Option) -> String
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(options) { option in
-                    let isSelected = option == selection
-                    Button {
-                        selection = option
-                    } label: {
-                        Text(title(option))
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .foregroundStyle(isSelected ? palette.onAccent : palette.secondaryText)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 7)
-                            .background(Capsule().fill(isSelected ? palette.accent : palette.surface))
-                            .overlay(Capsule().strokeBorder(isSelected ? palette.accent : palette.stroke, lineWidth: 0.75))
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                }
+        if dynamicTypeSize.isAccessibilitySize {
+            SmallBodyChipFlow(spacing: 8) {
+                chips
             }
             .padding(.horizontal, 16)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    chips
+                }
+                .padding(.horizontal, 16)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var chips: some View {
+        ForEach(options) { option in
+            let isSelected = option == selection
+            Button {
+                selection = option
+            } label: {
+                Text(title(option))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .foregroundStyle(isSelected ? palette.onAccent : palette.secondaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(isSelected ? palette.accent : palette.surface))
+                    .overlay(Capsule().strokeBorder(isSelected ? palette.accent : palette.stroke, lineWidth: 0.75))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+        }
+    }
+}
+
+/// Lays its children out left to right, starting a new line when the next one does not fit.
+private struct SmallBodyChipFlow: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let lineIndices = breakIntoLines(sizes, maxWidth: proposal.width ?? .infinity)
+        let height = lineIndices.map { line in line.map { sizes[$0].height }.max() ?? 0 }.reduce(0, +)
+            + spacing * CGFloat(max(lineIndices.count - 1, 0))
+        let width = lineIndices.map { lineWidth($0, sizes: sizes) }.max() ?? 0
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var y = bounds.minY
+        for line in breakIntoLines(sizes, maxWidth: bounds.width) {
+            var x = bounds.minX
+            let lineHeight = line.map { sizes[$0].height }.max() ?? 0
+            for index in line {
+                subviews[index].place(at: CGPoint(x: x, y: y), anchor: .topLeading,
+                                      proposal: ProposedViewSize(sizes[index]))
+                x += sizes[index].width + spacing
+            }
+            y += lineHeight + spacing
+        }
+    }
+
+    /// The indices of the children on each line.
+    private func breakIntoLines(_ sizes: [CGSize], maxWidth: CGFloat) -> [[Int]] {
+        var lines: [[Int]] = []
+        var current: [Int] = []
+        var currentWidth: CGFloat = 0
+        for (index, size) in sizes.enumerated() {
+            let widthWithChild = current.isEmpty ? size.width : currentWidth + spacing + size.width
+            if !current.isEmpty && widthWithChild > maxWidth {
+                lines.append(current)
+                current = [index]
+                currentWidth = size.width
+            } else {
+                current.append(index)
+                currentWidth = widthWithChild
+            }
+        }
+        if !current.isEmpty { lines.append(current) }
+        return lines
+    }
+
+    private func lineWidth(_ line: [Int], sizes: [CGSize]) -> CGFloat {
+        line.map { sizes[$0].width }.reduce(0, +) + spacing * CGFloat(max(line.count - 1, 0))
     }
 }
