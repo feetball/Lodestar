@@ -35,6 +35,8 @@ struct SkyChartSelection: Equatable {
 @MainActor
 @Observable
 final class SkyChartModel {
+    /// Where the camera frame's place is remembered, so it survives a relaunch.
+    private static let framingCenterKey = "lodestar.skyChart.cameraFrameCenter"
     /// The instants scenes are built for are multiples of this many seconds.
     static let timeBucket: TimeInterval = 30
     /// The shortest time between the starts of two scene builds.
@@ -45,6 +47,9 @@ final class SkyChartModel {
     private(set) var selection: SkyChartSelection?
     private(set) var zoom: CGFloat = 1
     private(set) var pan: CGSize = .zero
+    /// The J2000 position of the camera frame fixed in the middle of the chart. Kept on the sky, not on the chart, so
+    /// the frame stays on the same stars as time passes; the chart is panned to put it in the middle.
+    private(set) var framingCenter: EquatorialCoordinate?
     /// The object whose detail screen is pushed on the navigation stack.
     var detailObject: CelestialObject?
 
@@ -58,13 +63,17 @@ final class SkyChartModel {
         let catalog: Catalog
         let inputs: SkyChartInputs
 
-        func build() -> (scene: SkyChartScene, paths: SkyChartPaths) {
+        func build() -> (scene: SkyChartScene, paths: SkyChartPaths, frame: SkyFrame) {
             let snapshot = SkySnapshotBuilder.build(catalog: catalog, observer: inputs.observer.observer,
                                                     date: inputs.date, options: inputs.options, target: inputs.target,
                                                     mosaic: inputs.mosaic)
             let scene = SkyChartSceneBuilder.build(from: snapshot, horizon: inputs.observer.horizon)
-            return (scene, SkyChartPaths(scene: scene))
+            return (scene, SkyChartPaths(scene: scene), snapshot.frame)
         }
+    }
+
+    init() {
+        framingCenter = SkyChartFraming.decode(UserDefaults.standard.string(forKey: Self.framingCenterKey) ?? "")
     }
 
     /// Rounds `date` down to a multiple of `timeBucket`.
@@ -94,13 +103,13 @@ final class SkyChartModel {
             pending = nil
             lastBuildStart = .now
             let built = await Task.detached(priority: .userInitiated) { request.build() }.value
-            apply(scene: built.scene, paths: built.paths)
+            apply(scene: built.scene, paths: built.paths, frame: built.frame)
         }
     }
 
-    private func apply(scene: SkyChartScene, paths: SkyChartPaths) {
+    private func apply(scene: SkyChartScene, paths: SkyChartPaths, frame: SkyFrame) {
         revision += 1
-        content = SkyChartContent(scene: scene, paths: paths, revision: revision)
+        content = SkyChartContent(scene: scene, paths: paths, frame: frame, revision: revision)
         if let current = selection {
             selection = Self.selection(for: current.object, in: scene)
         }
@@ -149,6 +158,29 @@ final class SkyChartModel {
     func pan(by translation: CGSize, in size: CGSize) {
         let moved = CGSize(width: pan.width + translation.width, height: pan.height + translation.height)
         pan = PlanisphereViewport.clampedPan(moved, zoom: zoom, in: size)
+    }
+
+    /// Puts the chart at `pan`, limited to what the zoom allows.
+    func setPan(_ pan: CGSize, in size: CGSize) {
+        self.pan = PlanisphereViewport.clampedPan(pan, zoom: zoom, in: size)
+    }
+
+    // MARK: Camera frame
+
+    /// Where the camera frame fixed in the middle of the chart is on the sky; `nil` until it is first placed.
+    func setFramingCenter(_ center: EquatorialCoordinate) {
+        framingCenter = center
+    }
+
+    /// Remembers the frame's place for the next launch. Called when a drag ends, not at every step of it.
+    func saveFramingCenter() {
+        UserDefaults.standard.set(SkyChartFraming.encode(framingCenter), forKey: Self.framingCenterKey)
+    }
+
+    /// Takes the camera frame off the sky; it is placed again when it is next fixed in the middle.
+    func clearFramingCenter() {
+        framingCenter = nil
+        saveFramingCenter()
     }
 
     func resetViewport() {

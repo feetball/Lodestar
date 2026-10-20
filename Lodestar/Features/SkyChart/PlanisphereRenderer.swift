@@ -142,9 +142,12 @@ struct PlanisphereRenderer {
         let showsObscure = viewport.zoom >= Self.obscureMinimumZoom
         for object in scene.deepSky where showsObscure || object.prominence < 4 {
             let center = viewport.screen(object.point)
-            guard bounds.contains(center) else { continue }
             let extent = (object.extent ?? 0) * Double(viewport.pointsPerRadian(at: object.point))
-            let size = CGFloat(min(max(extent, 5), 48))
+            // Zoomed in, large objects are drawn at their true size (as far as the screen allows), so they can be
+            // framed against the camera's frame.
+            let size = CGFloat(min(max(extent, 5), 48 * max(1, Double(viewport.zoom) / 2)))
+            // A large marker whose middle is off the screen can still reach onto it.
+            guard bounds.insetBy(dx: -size / 2, dy: -size / 2).contains(center) else { continue }
             switch object.group {
             case .galaxies:
                 let outline = CGSize(width: size, height: size * 0.6)

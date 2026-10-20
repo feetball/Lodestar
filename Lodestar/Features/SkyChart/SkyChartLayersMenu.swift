@@ -5,7 +5,7 @@ import LodestarKit
 ///
 /// It is drawn by the app, not by the system, so it stays red in night mode. The first four layers
 /// are the "Sky Display" preferences of the Settings screen, shared with the Aim screen; the rest
-/// belong to the chart alone.
+/// belong to the chart alone. "Frame in the middle" refines "Camera view" and works only with it.
 struct SkyChartLayersMenu: View {
     /// The range of the "faintest star" setting the menu offers, in magnitudes.
     private static let starLimitRange: ClosedRange<Double> = 3...6.5
@@ -16,6 +16,8 @@ struct SkyChartLayersMenu: View {
     @Binding var showsStarNames: Bool
     @Binding var showsAltitudeGrid: Bool
     @Binding var showsCameraView: Bool
+    /// Whether the camera's frame stays in the middle for planning a picture, instead of following the phone.
+    @Binding var fixesCameraFrame: Bool
     let onDismiss: () -> Void
 
     var body: some View {
@@ -27,6 +29,9 @@ struct SkyChartLayersMenu: View {
             SkyChartLayerRow(title: "Star names", isOn: $showsStarNames)
             SkyChartLayerRow(title: "Altitude grid", isOn: $showsAltitudeGrid)
             SkyChartLayerRow(title: "Camera view", isOn: $showsCameraView)
+            SkyChartLayerRow(title: "Frame in the middle", isOn: $fixesCameraFrame, indent: 30)
+                .disabled(!showsCameraView)
+                .accessibilityHint("Keeps your camera's frame in the middle, to plan a picture by moving the sky under it.")
             starLimitRow
         }
         .frame(width: 270)
@@ -77,11 +82,14 @@ struct SkyChartLayersMenu: View {
     }
 }
 
-/// One layer of the menu: a title and a check mark.
+/// One layer of the menu: a title and a check mark. A row that depends on the one above it is indented, and dimmed
+/// while it is disabled.
 private struct SkyChartLayerRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.isEnabled) private var isEnabled
     let title: String
     @Binding var isOn: Bool
+    var indent: CGFloat = 0
 
     var body: some View {
         Button {
@@ -90,11 +98,12 @@ private struct SkyChartLayerRow: View {
             HStack(spacing: 10) {
                 Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isOn ? palette.accent : palette.tertiaryText)
+                    .foregroundStyle(isOn && isEnabled ? palette.accent : palette.tertiaryText)
                 Text(title)
-                    .foregroundStyle(palette.primaryText)
+                    .foregroundStyle(isEnabled ? palette.primaryText : palette.tertiaryText)
                 Spacer(minLength: 0)
             }
+            .padding(.leading, indent)
             .frame(minHeight: 40)
             .contentShape(Rectangle())
         }

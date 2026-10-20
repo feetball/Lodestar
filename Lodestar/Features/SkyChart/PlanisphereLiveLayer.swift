@@ -47,13 +47,15 @@ struct PlanisphereLiveCanvas: View {
     let pose: SkyChartCameraPose?
     let viewport: PlanisphereViewport
     let palette: Palette
+    /// Off while the camera frame is fixed in the middle of the chart: the crosshair alone shows where the phone points.
+    var showsFootprint = true
 
     var body: some View {
         Canvas { context, _ in
             guard let pose else { return }
             var sky = context
             sky.clip(to: Path(ellipseIn: viewport.discRect))
-            drawFootprint(of: pose, in: &sky)
+            if showsFootprint { drawFootprint(of: pose, in: &sky) }
             if pose.boresight.z >= 0 {
                 drawCrosshair(at: viewport.screen(PlanisphereProjection.chartPoint(pose.boresight)), in: &sky)
             } else {

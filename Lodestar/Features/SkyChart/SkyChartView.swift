@@ -5,7 +5,8 @@ import LodestarKit
 ///
 /// The chart is a planisphere: the zenith is at the centre, north at the top and east to the left,
 /// as when lying down and looking up. It shows the stars, constellations, Milky Way, Sun, Moon,
-/// planets and deep-sky objects, the aiming target, and where the camera on the tripod points.
+/// planets and deep-sky objects, the aiming target, and where the camera on the tripod points, or, with
+/// the camera frame fixed in the middle, a frame to plan a picture with by moving the sky under it.
 /// Pinch and drag zoom and pan; a tap selects an object and opens its card.
 struct SkyChartView: View {
     @Environment(AppModel.self) private var app
@@ -17,6 +18,9 @@ struct SkyChartView: View {
     @AppStorage("skyChart.showsStarNames") private var showsStarNames = true
     @AppStorage("skyChart.showsAltitudeGrid") private var showsAltitudeGrid = true
     @AppStorage("skyChart.showsCameraView") private var showsCameraView = true
+    @AppStorage("skyChart.fixesCameraFrame") private var fixesCameraFrame = false
+    /// The position angle of the fixed camera frame, in degrees.
+    @AppStorage("skyChart.cameraFrameAngle") private var cameraFrameAngle = 0.0
 
     var body: some View {
         @Bindable var model = model
@@ -61,7 +65,8 @@ struct SkyChartView: View {
     private func chartArea(for observer: ObserverContext) -> some View {
         if let content = model.content {
             SkyChartSurface(model: model, content: content, layers: layerOptions,
-                            rotatesToHeading: rotatesToHeading, timeZone: observer.timeZone)
+                            rotatesToHeading: rotatesToHeading, timeZone: observer.timeZone,
+                            framingAngle: $cameraFrameAngle)
         } else if case .failed(let message) = app.catalog.loadState {
             EmptyStateView(title: "Sky Catalog Unavailable", systemImage: "exclamationmark.triangle", message: message)
         } else {
@@ -85,6 +90,7 @@ struct SkyChartView: View {
                     .accessibilityHidden(true)
                 SkyChartLayersMenu(store: app.settingsStore, showsStarNames: $showsStarNames,
                                    showsAltitudeGrid: $showsAltitudeGrid, showsCameraView: $showsCameraView,
+                                   fixesCameraFrame: $fixesCameraFrame,
                                    onDismiss: { isShowingLayers = false })
                     .padding(.top, 6)
                     .padding(.trailing, 12)
@@ -137,7 +143,8 @@ struct SkyChartView: View {
                                     deepSkyObjects: settings.showDeepSkyObjects,
                                     starNames: showsStarNames,
                                     altitudeGrid: showsAltitudeGrid,
-                                    cameraView: showsCameraView)
+                                    cameraView: showsCameraView,
+                                    fixedCameraFrame: fixesCameraFrame)
     }
 
     /// What the scene depends on. The chart's instant is rounded, so the 1 Hz clock does not rebuild it every second.

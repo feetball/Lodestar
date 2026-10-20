@@ -35,6 +35,14 @@ enum PlanisphereProjection {
         return CGPoint(x: -direction.x / horizontal * retractionRadius, y: -direction.y / horizontal * retractionRadius)
     }
 
+    /// The East–North–Up unit vector of a chart point: the inverse of `chartPoint(_:)`.
+    static func direction(ofChartPoint point: CGPoint) -> Vector3 {
+        let x = Double(point.x), y = Double(point.y)
+        let squared = x * x + y * y
+        let scale = 2 / (1 + squared)
+        return Vector3(-x * scale, -y * scale, (1 - squared) / (1 + squared))
+    }
+
     /// The chart radius of a circle of constant altitude (degrees); 1 for the horizon.
     static func radius(ofAltitude altitude: Double) -> Double {
         AstroMath.tanDeg((90 - altitude) / 2)
@@ -200,7 +208,9 @@ private struct PlanisphereHorizonClipper {
 struct PlanisphereViewport: Equatable, Sendable {
     /// Space kept free around the horizon circle at zoom 1, for the cardinal letters.
     static let rimMargin: CGFloat = 26
-    static let zoomRange: ClosedRange<CGFloat> = 1...6
+    /// At the strongest zoom a phone screen spans about 17° of sky near the zenith (less towards the horizon, where the
+    /// projection stretches), enough to frame a short telephoto lens.
+    static let zoomRange: ClosedRange<CGFloat> = 1...15
 
     let size: CGSize
     let zoom: CGFloat
@@ -240,6 +250,18 @@ struct PlanisphereViewport: Equatable, Sendable {
     func screen(_ point: CGPoint) -> CGPoint {
         CGPoint(x: center.x + radius * (point.x * cosine - point.y * sine),
                 y: center.y + radius * (point.x * sine + point.y * cosine))
+    }
+
+    /// The chart point at a screen position: the inverse of `screen(_:)`.
+    func chartPoint(atScreen position: CGPoint) -> CGPoint {
+        let dx = (position.x - center.x) / radius
+        let dy = (position.y - center.y) / radius
+        return CGPoint(x: dx * cosine + dy * sine, y: dy * cosine - dx * sine)
+    }
+
+    /// The middle of the view, where a camera frame fixed on the screen sits.
+    var middle: CGPoint {
+        CGPoint(x: size.width / 2, y: size.height / 2)
     }
 
     /// Screen points per radian of sky at a chart point (the stereographic scale grows towards the horizon).
