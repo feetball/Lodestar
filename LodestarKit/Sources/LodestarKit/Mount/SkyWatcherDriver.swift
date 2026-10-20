@@ -775,6 +775,7 @@ public final class SkyWatcherDriver: MountDriver {
             return nil
         } catch let error as MountError {
             if error.isCommunicationFailure { throw error }
+            print("DBG applyTracking stops tracking: \(error) axis1=\(reading.axis1) axis2=\(reading.axis2)")
             stopTracking(error)
             return error
         }
@@ -799,7 +800,10 @@ public final class SkyWatcherDriver: MountDriver {
         // Beyond the azimuth limit of an alt-azimuth mount `choose` answers with the same direction from another turn, a jump of
         // nearly a full turn. Tracking would be stopped by the rate check below, but a nudge is only clamped to the rate limit and
         // would unwind the cable at full speed: both end here as at any other limit.
-        if resolvedMode == .altAzimuth && abs(wanted.axis1 - reading.axis1) > 180.0 { throw MountError.outsideMountLimits }
+        if resolvedMode == .altAzimuth && abs(wanted.axis1 - reading.axis1) > 180.0 {
+            print("DBG servoStep azimuth jump wanted=\(wanted.axis1) reading=\(reading.axis1) motion=\(motion)")
+            throw MountError.outsideMountLimits
+        }
         let limit = configuration.limits.maximumAxisRateDegreesPerSecond
         var rate1 = (wanted.axis1 - reading.axis1) / lead
         var rate2 = (wanted.axis2 - reading.axis2) / lead
@@ -942,6 +946,7 @@ public final class SkyWatcherDriver: MountDriver {
             lastServo = clock.now()
         } catch let limit as MountError {
             if limit.isCommunicationFailure { throw limit }
+            print("DBG serviceNudge limit=\(limit) reading.axis1=\(reading.axis1) axis2=\(reading.axis2)")
             // The nudge has reached a limit of the mount: end it here and go on tracking from where the mount is.
             try endNudge()
         }

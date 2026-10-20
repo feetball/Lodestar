@@ -1,0 +1,49 @@
+# Temporary: runs on pushes to debug-* branches only. Never merge this file.
+name: Debug
+
+on:
+  push:
+    branches: ['debug-*']
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+          swift --version
+      - name: The failing test, with logging
+        run: |
+          swift test --package-path LodestarKit --filter 'SkyWatcherMountTests/testANudgeIntoTheOverheadLimitEndsAndTrackingContinues' 2>&1 | grep -E "DBG|error:|Executed|warning: unre" || true
+
+  coverage:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+      - name: Test LodestarKit with coverage
+        run: swift test --package-path LodestarKit --enable-code-coverage --skip CometsOrbitTests/testSolverIsFast 2>&1 | grep -E "error:|Executed [0-9]+ tests, with [0-9]+ failures" | tail -8 || true
+      - name: Coverage report
+        run: |
+          JSON="$(swift test --package-path LodestarKit --show-codecov-path)"
+          echo "codecov json: $JSON"
+          python3 Tools/coverage_report.py "$JSON" LodestarKit/Sources/ | tee coverage-kit.md
+          cat coverage-kit.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Test the widgets' shared code with coverage
+        run: |
+          swift test --package-path WidgetTests --enable-code-coverage 2>&1 | grep -E "error:|Executed [0-9]+ tests, with [0-9]+ failures" | tail -4 || true
+          JSON="$(swift test --package-path WidgetTests --show-codecov-path)"
+          python3 Tools/coverage_report.py "$JSON" WidgetShared/ | tee coverage-widgets.md
+          python3 Tools/coverage_report.py "$JSON" TonightCore/ | tee -a coverage-widgets.md
+          cat coverage-widgets.md >> "$GITHUB_STEP_SUMMARY"
