@@ -70,6 +70,7 @@ struct TonightTargetsCard: View {
 /// One target: what it is, how high it gets in the dark and when.
 private struct TonightTargetRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let target: TonightTarget
     let timeZone: TimeZone
@@ -121,15 +122,18 @@ private struct TonightTargetRow: View {
     /// The name, with the first catalog designation when it differs: "Andromeda Galaxy · M 31".
     private var title: String {
         let name = SmallBodyText.displayName(object)
-        return TonightFormat.designation(of: object).map { "\(name) \u{00B7} \($0)" } ?? name
+        return TonightFormat.designation(of: object).map { "\(name)\u{00A0}\u{00B7} \($0)" } ?? name
     }
 
     /// "Best 23:40 facing SE · 7h 12m above 20°".
     private var timing: String {
         let minimum = Int(TonightCalculator.minimumTargetAltitude)
-        return "Best \(AppFormat.time(target.peakTime, in: timeZone)) "
-            + TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude)
-            + " \u{00B7} \(TonightFormat.duration(hours: target.hoursAboveMinimum)) above \(minimum)\u{00B0}"
+        let best = TonightFormat.solid("Best \(AppFormat.time(target.peakTime, in: timeZone))") + " "
+            + TonightFormat.solid(TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
+        let above = "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
+        // A wrapped line breaks after the dot, not between "8h 14m" and a lone "above 20°". At accessibility sizes the
+        // text column is too narrow for the whole phrase in one piece, so it may break at its spaces there.
+        return TonightFormat.dotted([best, dynamicTypeSize.isAccessibilitySize ? above : TonightFormat.solid(above)])
     }
 
     private var spokenSummary: String {

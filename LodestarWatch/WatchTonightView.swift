@@ -141,7 +141,7 @@ struct WatchTonightView: View {
             HStack(spacing: 4) {
                 icon()
                 labelText(item, lines: 1)
-                badgeText(item)
+                badgeText(item, separated: true)
                 trailingText(item)
             }
             VStack(alignment: .leading, spacing: 0) {
@@ -150,7 +150,7 @@ struct WatchTonightView: View {
                     labelText(item, lines: 2)
                     trailingText(item)
                 }
-                badgeText(item)
+                badgeText(item, separated: false)
             }
         }
     }
@@ -163,9 +163,10 @@ struct WatchTonightView: View {
     }
 
     @ViewBuilder
-    private func badgeText(_ item: TonightItem) -> some View {
+    private func badgeText(_ item: TonightItem, separated: Bool) -> some View {
         if let badge = item.badge {
-            Text("\u{00B7} \(badge)")
+            // On a line of its own the badge has nothing to be separated from.
+            Text(separated ? "\u{00B7} \(badge)" : badge)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(TonightStyle.accent)
                 .lineLimit(1)

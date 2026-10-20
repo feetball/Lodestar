@@ -72,8 +72,10 @@ enum AppFormat {
     /// Apparent magnitude, e.g. "mag 3.4" or "mag −1.5".
     static func magnitude(_ value: Double?) -> String {
         guard let value, value.isFinite else { return missing }
-        let text = abs(value).formatted(.number.precision(.fractionLength(1)))
-        return "mag \(value < 0 ? "\u{2212}" : "")\(text)"
+        // The sign follows the rounded value, so -0.04 reads "mag 0.0", not "mag −0.0".
+        let shown = (abs(value) * 10).rounded() / 10
+        let text = shown.formatted(.number.precision(.fractionLength(1)))
+        return "mag \(value < 0 && shown > 0 ? "\u{2212}" : "")\(text)"
     }
 
     /// A percentage with no decimals, e.g. "64%".

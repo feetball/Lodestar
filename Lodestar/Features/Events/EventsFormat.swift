@@ -57,9 +57,13 @@ enum EventsFormat {
         }
     }
 
-    /// A viewing window, such as "22:10 \u{2013} 04:50".
+    /// A viewing window, such as "22:10 \u{2013} 04:50". A time never splits from its "PM", and the dash stays with the
+    /// time before it, so a line can break only after the dash and the next line starts with the second time (a
+    /// non-breaking space after a dash would start that line with a blank).
     static func window(_ interval: DateInterval, in timeZone: TimeZone) -> String {
-        "\(AppFormat.time(interval.start, in: timeZone)) \u{2013} \(AppFormat.time(interval.end, in: timeZone))"
+        let start = AppFormat.time(interval.start, in: timeZone).replacingOccurrences(of: " ", with: "\u{00A0}")
+        let end = AppFormat.time(interval.end, in: timeZone).replacingOccurrences(of: " ", with: "\u{00A0}")
+        return "\(start)\u{00A0}\u{2013} \(end)"
     }
 
     /// A window as a spoken phrase, such as "10:10 PM to 4:50 AM".

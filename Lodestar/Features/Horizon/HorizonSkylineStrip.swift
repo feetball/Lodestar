@@ -9,7 +9,8 @@ struct HorizonSkylineStrip: View {
     private static let labels: [(azimuth: Double, text: String)] = [
         (0, "N"), (90, "E"), (180, "S"), (270, "W"), (360, "N"),
     ]
-    private static let labelBand: CGFloat = 16
+    /// The room under the plot for the direction labels, which grow with the text size.
+    @ScaledMetric(relativeTo: .caption2) private var labelBand: CGFloat = 16
     /// The stretches still to sweep are listed once this much of the circle is recorded.
     static let showGapsFrom = 0.5
 
@@ -20,7 +21,7 @@ struct HorizonSkylineStrip: View {
         Canvas { context, size in
             draw(in: &context, size: size)
         }
-        .frame(height: 96)
+        .frame(height: 80 + labelBand)
         .accessibilityElement()
         .accessibilityLabel("Skyline recorded so far")
         .accessibilityValue(summary)
@@ -45,7 +46,7 @@ struct HorizonSkylineStrip: View {
     }
 
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        let plot = CGRect(x: 0, y: 0, width: size.width, height: max(size.height - Self.labelBand, 1))
+        let plot = CGRect(x: 0, y: 0, width: size.width, height: max(size.height - labelBand, 1))
         let range = altitudeRange
         let altitudes = reading.skyline.altitudes
         let isGap = gapMask()

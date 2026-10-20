@@ -70,6 +70,9 @@ struct HorizonRecordView: View {
         .onAppear {
             app.keepsMotionRunning = true
             app.keepsScreenAwake = true
+            // The camera is shared with the Aim screen, which may have left it zoomed in; the recorder wants the whole
+            // field of view. The Aim screen sets its own zoom again when its tab is shown.
+            app.camera.setZoom(1)
         }
         .onChange(of: isCameraWanted, initial: true) { _, wanted in
             app.keepsCameraRunning = wanted
@@ -100,12 +103,16 @@ struct HorizonRecordView: View {
     // MARK: Top
 
     /// Cancel, the title and Done; under them the feedback, the instruction and, if needed, the camera access offer.
-    /// It scrolls when it would take more than `maxHeight`.
+    /// What is under the bar scrolls when the panel would take more than `maxHeight`; the bar stays in place.
     private func topPanel(_ reading: HorizonReading, maxHeight: CGFloat) -> some View {
-        ViewThatFits(in: .vertical) {
-            topContent(reading)
-            ScrollView {
-                topContent(reading)
+        VStack(alignment: .leading, spacing: 6) {
+            topBar(reading)
+            ViewThatFits(in: .vertical) {
+                topMessages(reading)
+                ScrollView {
+                    topMessages(reading)
+                }
+                .scrollIndicators(.visible)
             }
         }
         .frame(maxHeight: maxHeight, alignment: .top)
@@ -117,16 +124,13 @@ struct HorizonRecordView: View {
         }
     }
 
-    private func topContent(_ reading: HorizonReading) -> some View {
+    private func topMessages(_ reading: HorizonReading) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            topBar(reading)
-            VStack(alignment: .leading, spacing: 6) {
-                messages(reading)
-                cameraAccess
-            }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 10)
+            messages(reading)
+            cameraAccess
         }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

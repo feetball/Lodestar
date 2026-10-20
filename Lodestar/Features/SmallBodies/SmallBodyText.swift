@@ -115,7 +115,12 @@ enum SmallBodyText {
                     .replacingOccurrences(of: "\u{00B0}", with: " degrees")
             }.joined(separator: ", ")
         }
-        return parts.joined(separator: " \u{00B7} ")
+        // When the line wraps, the dot stays with the text before it (a line never starts with one), "mag ≈ 7.4"
+        // stays in one piece, and so does "from the Sun" (not "166° from" / "the Sun").
+        return parts.map {
+            $0.replacingOccurrences(of: "mag \u{2248} ", with: "mag\u{00A0}\u{2248}\u{00A0}")
+                .replacingOccurrences(of: " from the Sun", with: " from\u{00A0}the\u{00A0}Sun")
+        }.joined(separator: "\u{00A0}\u{00B7} ")
     }
 
     /// The one line under a name in the picker, Tonight and the lists: kind, estimate and elongation.

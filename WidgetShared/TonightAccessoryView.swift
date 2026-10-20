@@ -66,6 +66,8 @@ struct TonightAccessoryView: View {
             thirdLine(lines)
         }
         .font(.caption)
+        // The rectangle has a fixed size: three lines larger than this only get cut off at the top and bottom.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(lines.spoken(includingCore: !Self.showsEvent, includingEvent: Self.showsEvent))
@@ -144,6 +146,7 @@ struct TonightAccessoryView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
+            .dynamicTypeSize(...DynamicTypeSize.xLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
