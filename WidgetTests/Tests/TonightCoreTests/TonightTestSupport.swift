@@ -28,12 +28,11 @@ enum TonightTestSupport {
                                                                 hour: hour, minute: minute)))
     }
 
-    /// The night an entry describes.
+    /// The night an entry describes. An entry without one fails the test: every place here has a night.
     static func night(_ entry: TonightEntry, file: StaticString = #filePath, line: UInt = #line) throws -> TonightNight {
-        guard case .night(let night) = entry.content else {
-            throw XCTSkip("the entry has no night", file: file, line: line)
-        }
-        return night
+        var night: TonightNight?
+        if case .night(let content) = entry.content { night = content }
+        return try XCTUnwrap(night, "the entry has no night", file: file, line: line)
     }
 
     /// The summary of the night that starts on the local date of `instant`.

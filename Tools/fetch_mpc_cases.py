@@ -1,5 +1,7 @@
 """Fetches the Horizons rows (2026-10-18 and 2026-11-17, geocentric) that the MPC-line tests compare with (mpc_cases.json)."""
-import json, re
+import json, os, re, sys
+# `python3 -I` leaves the script's directory out of sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fetch_refs import horizons
 
 def observer(command, jds_ut):

@@ -258,8 +258,7 @@ private struct MountAddressSection: View {
                 Text("Port")
                     .accessibilityHidden(true)
                 Spacer(minLength: 8)
-                TextField("Port", text: portBinding,
-                          prompt: Text(String(option.defaultPort)).foregroundStyle(palette.tertiaryText))
+                TextField("Port", text: portBinding, prompt: Text(String(option.defaultPort)).foregroundStyle(palette.tertiaryText))
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(palette.primaryText)
