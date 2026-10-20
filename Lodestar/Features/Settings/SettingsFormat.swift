@@ -10,14 +10,14 @@ enum SettingsFormat {
 
     /// Whole metres above sea level, e.g. "1650 m".
     static func elevation(_ metres: Double) -> String {
-        "\(metres.formatted(.number.precision(.fractionLength(0)).grouping(.never))) m"
+        "\(metres.formatted(.number.precision(.fractionLength(0)).grouping(.never)))\u{00A0}m"
     }
 
     /// A position error radius, e.g. "±35 m" or "±2.4 km".
     static func accuracy(metres: Double) -> String {
         guard metres.isFinite, metres >= 0 else { return AppFormat.missing }
-        if metres < 1000 { return "\u{00B1}\(Int(metres.rounded())) m" }
-        return "\u{00B1}\((metres / 1000).formatted(.number.precision(.fractionLength(1)))) km"
+        if metres < 1000 { return "\u{00B1}\(Int(metres.rounded()))\u{00A0}m" }
+        return "\u{00B1}\((metres / 1000).formatted(.number.precision(.fractionLength(1))))\u{00A0}km"
     }
 
     /// The offset from UTC, e.g. "UTC−6" or "UTC+5:30".
