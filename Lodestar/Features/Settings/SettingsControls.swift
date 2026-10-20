@@ -257,17 +257,21 @@ struct SettingsNumberField: View {
                 numberField
                     .frame(maxWidth: isStacked ? CGFloat.infinity : 120)
             } else {
-                // After a prefix ("f/") the field is only as wide as its text, so the prefix sits against the number
-                // instead of at the far end of the empty part of the field.
-                Text(text.isEmpty ? placeholder : text)
-                    .lineLimit(1)
-                    .opacity(0)
-                    .accessibilityHidden(true)
-                    .padding(.horizontal, 2)
-                    .frame(minWidth: 44, maxWidth: isStacked ? 240 : 120)
-                    .overlay(alignment: .trailing) {
-                        numberField
-                    }
+                // After a prefix ("f/") the field is only as wide as its text (but at least 44 pt, to be tapped), so
+                // the prefix sits against the number instead of at the far end of the empty part of the field. A
+                // flexible frame would grow to its maximum, so the minimum width comes from a clear 44 pt spacer.
+                ZStack(alignment: .trailing) {
+                    Color.clear
+                        .frame(width: 44, height: 1)
+                    Text(text.isEmpty ? placeholder : text)
+                        .lineLimit(1)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+                        .padding(.horizontal, 2)
+                }
+                .overlay(alignment: .trailing) {
+                    numberField
+                }
             }
             if !unit.isEmpty {
                 Text(unit)
