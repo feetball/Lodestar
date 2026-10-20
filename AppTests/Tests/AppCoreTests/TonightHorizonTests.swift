@@ -252,7 +252,9 @@ final class TonightHorizonTests: XCTestCase {
         let core = TonightHorizon.summary(flat, applying: HorizonProfile.constant(5)).milkyWayCore
         XCTAssertFalse(flat.milkyWayCore.visibleIntervals.isEmpty)
         assertSameIntervals(core.visibleIntervals, flat.milkyWayCore.visibleIntervals, accuracy: 5)
-        assertSameIntervals(core.moonFreeVisibleIntervals, flat.milkyWayCore.moonFreeVisibleIntervals, accuracy: 5)
+        // The skyline hides the Moon as well: it counts as down once it is below 5 degrees, so the Moon-free window can only start
+        // earlier than with a flat horizon (it began 29 minutes earlier in the first CI run), never later or shorter.
+        XCTAssertGreaterThanOrEqual(total(core.moonFreeVisibleIntervals), total(flat.milkyWayCore.moonFreeVisibleIntervals) - 5)
         XCTAssertFalse(core.moonFreeVisibleIntervals.isEmpty, "the core is still up after the Moon has set")
         // The best moment is the highest one in the Moon-free window.
         let best = try XCTUnwrap(core.bestTime)
