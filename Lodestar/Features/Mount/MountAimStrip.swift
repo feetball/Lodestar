@@ -45,10 +45,10 @@ struct MountAimStrip: View {
         HStack(spacing: 10) {
             ProgressView()
                 .tint(palette.accent)
+            // The mount's name wraps with large text instead of being cut off.
             Text("Connecting to \(service.displayName)\u{2026}")
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 6)
             Button("Cancel") { service.cancelConnect() }
                 .buttonStyle(.lodestarSecondary)
@@ -138,29 +138,56 @@ struct MountAimStrip: View {
         }
     }
 
+    /// The name and where the mount points: on one line while both fit in full, else the name (wrapped if need be) with
+    /// the position under it, so neither is cut off.
     private func header(_ status: MountStatus) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(palette.positive)
-                .frame(width: 9, height: 9)
-                .accessibilityHidden(true)
-            Text(service.displayName)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(palette.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: 6)
-            if let position = status.position {
-                Text(MountStatusText.pointing(position, style: app.settings.coordinateStyle))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(palette.secondaryText)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                headerDot
+                headerName
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 6)
+                headerPosition(status, oneLine: true)
             }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    headerDot
+                    headerName
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                headerPosition(status, oneLine: false)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(service.displayName), connected")
         .accessibilityValue(status.position.map { "Points at \(MountStatusText.spokenPointing($0))" } ?? "No position yet")
+    }
+
+    private var headerDot: some View {
+        Circle()
+            .fill(palette.positive)
+            .frame(width: 9, height: 9)
+            .accessibilityHidden(true)
+    }
+
+    private var headerName: some View {
+        Text(service.displayName)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+    }
+
+    /// Where the mount points, on one line or, under the name, on up to two; nothing until it reports a position.
+    @ViewBuilder
+    private func headerPosition(_ status: MountStatus, oneLine: Bool) -> some View {
+        if let position = status.position {
+            Text(MountStatusText.pointing(position, style: app.settings.coordinateStyle))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(palette.secondaryText)
+                .lineLimit(oneLine ? 1 : 2)
+                .fixedSize(horizontal: oneLine, vertical: !oneLine)
+        }
     }
 
     /// The distance to the target, the phase of the slew and its progress.
