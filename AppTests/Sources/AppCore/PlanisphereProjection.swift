@@ -1,1 +1,0 @@
-../../../Lodestar/Features/SkyChart/PlanisphereProjection.swift
