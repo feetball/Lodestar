@@ -7,6 +7,8 @@ struct TonightSystemView: View {
     let entry: TonightEntry
     let isMedium: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     /// The four things a widget shows.
     private enum Slot {
         case dark, moon, core, event
@@ -67,6 +69,9 @@ struct TonightSystemView: View {
                         .foregroundStyle(TonightStyle.primaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.75)
+                        // The phase keeps both its lines ("First" / "Quarter"); the lines under it give way.
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
                     Text("\(lines.moon.trailing ?? "") lit")
                         .font(.caption)
                         .foregroundStyle(TonightStyle.secondaryText)
@@ -81,7 +86,8 @@ struct TonightSystemView: View {
                 .widgetAccentable()
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-            if let detail = lines.dark.detail {
+            // Larger text leaves no height for this line; the full text is in the spoken label.
+            if dynamicTypeSize <= .large, let detail = lines.dark.detail {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(TonightStyle.secondaryText)
@@ -115,7 +121,7 @@ struct TonightSystemView: View {
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(slot == .dark ? TonightStyle.accent : TonightStyle.primaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.85)
             if let detail = item.detail {
                 Text(detail)
                     .font(.caption2)
