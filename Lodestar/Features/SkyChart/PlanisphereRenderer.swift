@@ -22,6 +22,11 @@ struct PlanisphereRenderer {
     static let altitudeCircles: [Double] = [30, 60]
     /// The most text labels placed in one frame.
     private static let labelLimit = 90
+    /// The most labels tried in one frame, placed or not. Every label tried is turned into text and measured, and
+    /// thrown away again when a more important one is in its way, so a dense sky needs a limit.
+    private static let labelAttemptLimit = 160
+    /// The size a label is measured against: wider than any name, so that a name never wraps.
+    private static let labelProposal = CGSize(width: 400, height: 60)
 
     let content: SkyChartContent
     let viewport: PlanisphereViewport
@@ -44,12 +49,20 @@ struct PlanisphereRenderer {
         CGRect(origin: .zero, size: viewport.size).insetBy(dx: -12, dy: -12)
     }
 
-    static func altitudeLabelID(_ altitude: Double) -> String {
-        "altitude.\(Int(altitude))"
+    /// `string` as text of `font` and `color`, ready to be measured and drawn.
+    private func resolvedText(_ string: String, font: Font, color: Color, kerning: CGFloat = 0,
+                              in context: GraphicsContext) -> GraphicsContext.ResolvedText {
+        var text = context.resolve(Text(verbatim: string).font(font).kerning(kerning))
+        text.shading = .color(color)
+        return text
     }
 
-    /// The id of the canvas symbol that names the mosaic panel being shot.
-    static let mosaicLabelID = "mosaic.panel"
+    /// The name of a label in its style: constellation names in capitals and set wide, the others as the style says.
+    private func resolvedText(of label: SkyChartLabel, in context: GraphicsContext) -> GraphicsContext.ResolvedText {
+        let string = label.style == .constellation ? label.text.uppercased() : label.text
+        return resolvedText(string, font: label.style.font, color: label.style.color(in: palette),
+                            kerning: label.style.kerning, in: context)
+    }
 
     /// Draws the whole chart. The compass letters and ticks go first, then the sky inside the horizon
     /// circle (on a copy of the context that is clipped to it), then the horizon ring and the labels.
@@ -216,12 +229,13 @@ struct PlanisphereRenderer {
     /// Names the current panel, "Panel 3 of 12", at its centre.
     private func drawMosaicLabel(_ context: inout GraphicsContext) {
         guard let mosaic, mosaic.step < mosaic.count,
-              let center = scene.mosaic.first(where: { $0.shootingPosition == mosaic.step })?.center,
-              let symbol = context.resolveSymbol(id: Self.mosaicLabelID) else { return }
+              let center = scene.mosaic.first(where: { $0.shootingPosition == mosaic.step })?.center else { return }
         let point = viewport.screen(center)
         guard visibleBounds.contains(point), hypot(point.x - viewport.center.x, point.y - viewport.center.y) < viewport.radius
         else { return }
-        context.draw(symbol, at: point, anchor: .center)
+        let text = resolvedText("Panel \(mosaic.step + 1) of \(mosaic.count)", font: .system(size: 11.5, weight: .bold),
+                                color: palette.guidance, in: context)
+        context.draw(text, at: point, anchor: .center)
     }
 
     // MARK: Solar system
@@ -316,9 +330,11 @@ struct PlanisphereRenderer {
         var occupied: [CGRect] = []
         for cardinal in PlanisphereCardinal.all {
             let center = viewport.rimPoint(azimuth: cardinal.azimuth, outside: cardinal.isPrincipal ? 17 : 15)
-            guard visibleBounds.contains(center), let symbol = context.resolveSymbol(id: cardinal.id) else { continue }
-            context.draw(symbol, at: center, anchor: .center)
-            occupied.append(PlanisphereBounds.rect(around: center, size: symbol.size))
+            guard visibleBounds.contains(center) else { continue }
+            let text = resolvedText(cardinal.title, font: .system(size: cardinal.isPrincipal ? 16 : 11, weight: .bold),
+                                    color: cardinal.title == "N" ? palette.accent : palette.primaryText, in: context)
+            context.draw(text, at: center, anchor: .center)
+            occupied.append(PlanisphereBounds.rect(around: center, size: text.measure(in: Self.labelProposal)))
         }
         return occupied
     }
@@ -330,9 +346,10 @@ struct PlanisphereRenderer {
         for altitude in Self.altitudeCircles {
             let radius = CGFloat(PlanisphereProjection.radius(ofAltitude: altitude))
             let center = viewport.screen(CGPoint(x: direction.x * radius, y: direction.y * radius))
-            let id = Self.altitudeLabelID(altitude)
-            guard visibleBounds.contains(center), let symbol = context.resolveSymbol(id: id) else { continue }
-            context.draw(symbol, at: center, anchor: .center)
+            guard visibleBounds.contains(center) else { continue }
+            let text = resolvedText("\(Int(altitude))\u{00B0}", font: .system(size: 9), color: palette.tertiaryText,
+                                    in: context)
+            context.draw(text, at: center, anchor: .center)
         }
     }
 
@@ -342,14 +359,17 @@ struct PlanisphereRenderer {
     private func drawLabels(_ context: inout GraphicsContext, occupied initial: [CGRect]) {
         var occupied = initial
         var placed = 0
+        var attempts = 0
         let screen = CGRect(origin: .zero, size: viewport.size).insetBy(dx: 2, dy: 2)
         let center = viewport.center
         let limit = viewport.radius
         for label in scene.labels where label.minimumZoom <= viewport.zoom && isEnabled(label.style) {
             let anchor = viewport.screen(label.point)
-            guard visibleBounds.contains(anchor), hypot(anchor.x - center.x, anchor.y - center.y) < limit,
-                  let symbol = context.resolveSymbol(id: label.id) else { continue }
-            let size = symbol.size
+            guard visibleBounds.contains(anchor), hypot(anchor.x - center.x, anchor.y - center.y) < limit else { continue }
+            attempts += 1
+            if attempts > Self.labelAttemptLimit { break }
+            let text = resolvedText(of: label, in: context)
+            let size = text.measure(in: Self.labelProposal)
             let free = candidateOrigins(for: label, around: anchor, size: size).first { origin in
                 let rect = CGRect(origin: origin, size: size)
                 let padded = rect.insetBy(dx: -3, dy: -1.5)
@@ -357,7 +377,7 @@ struct PlanisphereRenderer {
             }
             guard let origin = free else { continue }
             occupied.append(CGRect(origin: origin, size: size))
-            context.draw(symbol, at: origin, anchor: .topLeading)
+            context.draw(text, at: origin, anchor: .topLeading)
             placed += 1
             if placed >= Self.labelLimit { break }
         }
