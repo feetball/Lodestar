@@ -118,11 +118,9 @@ private struct TonightPlanetRow: View {
 
     /// "Up 20:15 – 05:40 · highest 62°".
     private var timing: String {
-        var text = "Up " + TonightFormat.windows(planet.visibleIntervals, in: timeZone)
-        if let altitude = planet.maxAltitudeDuringDarkness {
-            text += " \u{00B7} highest " + AngleFormatter.formatDegrees(altitude, decimals: 0)
-        }
-        return text
+        let up = "Up " + TonightFormat.windows(planet.visibleIntervals, in: timeZone)
+        guard let altitude = planet.maxAltitudeDuringDarkness else { return up }
+        return TonightFormat.dotted([up, "highest " + AngleFormatter.formatDegrees(altitude, decimals: 0)])
     }
 
     private var spokenSummary: String {

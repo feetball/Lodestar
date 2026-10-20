@@ -16,9 +16,10 @@ enum TonightFormat {
     }
 
     /// A window of time in the observer's time zone, such as "21:40 – 04:12". A time never splits from its "PM", and
-    /// the dash stays with the time after it, so a line can break only before the dash.
+    /// the dash stays with the time before it, so a line can break only after the dash and the next line starts with
+    /// the second time (a non-breaking space after a dash would start that line with a blank).
     static func window(_ interval: DateInterval, in timeZone: TimeZone) -> String {
-        "\(solid(AppFormat.time(interval.start, in: timeZone))) \u{2013}\u{00A0}"
+        "\(solid(AppFormat.time(interval.start, in: timeZone)))\u{00A0}\u{2013} "
             + solid(AppFormat.time(interval.end, in: timeZone))
     }
 
