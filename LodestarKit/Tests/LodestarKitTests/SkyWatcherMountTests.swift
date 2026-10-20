@@ -865,12 +865,14 @@ final class SkyWatcherMountTests: XCTestCase {
         let scheat = EquatorialCoordinate(rightAscensionHours: 23.0629, declination: 28.0828)
         XCTAssertTrue(try goto(rig, scheat) < 0.1)
         try rig.controller.nudge(.north, rate: .slew, durationSeconds: 30.0)
-        for _ in 0 ..< 60 {
+        for step in 0 ..< 60 {
             rig.clock.advance(seconds: 0.5)
             rig.controller.poll()
+            print("DBG step=\(step) alt=\(realAltitude(rig)) ax1=\(rig.simulator.axis1Degrees) ax2=\(rig.simulator.axis2Degrees) moving=\(rig.simulator.isMoving) stop=\(String(describing: rig.driver.trackingStopReason))")
         }
         try rig.controller.stopNudge()
         let altitude = realAltitude(rig)
+        print("DBG final alt=\(altitude) stop=\(String(describing: rig.driver.trackingStopReason))")
         XCTAssertTrue((85.0 ... 88.6).contains(altitude), "\(altitude)")
         XCTAssertNil(rig.driver.trackingStopReason)
         // The mount tracks at the place where the nudge ended.
