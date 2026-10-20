@@ -53,7 +53,7 @@ struct MountAimStrip: View {
             Button("Cancel") { service.cancelConnect() }
                 .buttonStyle(.lodestarSecondary)
         }
-        .aimPanel(palette, padding: 8)
+        .aimPanel(palette, padding: 8, opacity: 1)
         .accessibilityElement(children: .contain)
     }
 
@@ -78,7 +78,7 @@ struct MountAimStrip: View {
                     .buttonStyle(.lodestarSecondary)
             }
         }
-        .aimPanel(palette, padding: 10)
+        .aimPanel(palette, padding: 10, opacity: 1)
         .accessibilityElement(children: .contain)
     }
 
@@ -99,7 +99,8 @@ struct MountAimStrip: View {
             messageLine
             actions(target: target)
         }
-        .aimPanel(palette, padding: 8)
+        // Opaque: the ring and the labels of the sky must not read through the card's words.
+        .aimPanel(palette, padding: 8, opacity: 1)
         .accessibilityElement(children: .contain)
     }
 
