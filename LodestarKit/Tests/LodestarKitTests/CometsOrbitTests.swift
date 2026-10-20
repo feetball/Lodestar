@@ -349,6 +349,37 @@ final class CometsOrbitTests: XCTestCase {
         XCTAssertNotNil(orbit.periodDays)
     }
 
+    func testFarHyperbolasConvergeToTheClassicalSolution() throws {
+        // Barker's parabola, the start of the iteration, is far too high when (e - 1) / q is large (for q = 0.01 and
+        // e = 10 it puts sqrt(-z) at 240 where the root is at 15), and plain Newton steps then only lower it by about 1.
+        // That used to run out of iterations with r around 1e58 AU. The reference solves e sinh H - H = M by bisection.
+        let cases: [(q: Double, e: Double, days: Double)] = [
+            (0.01, 10.0, 50_000.0), (0.01, 10.0, -50_000.0), (0.01, 5.0, 20_000.0),
+            (1e-5, 100.0, 50_000.0), (0.01, 100.0, -50_000.0)
+        ]
+        for c in cases {
+            let a = c.q / (c.e - 1)
+            let meanAnomaly = OrbitPropagator.gaussianGravitationalConstant * abs(c.days) / (a * a.squareRoot())
+            var low = 0.0
+            var high = 100.0
+            for _ in 0..<200 {
+                let middle = 0.5 * (low + high)
+                if c.e * sinh(middle) - middle > meanAnomaly { high = middle } else { low = middle }
+            }
+            let anomaly = 0.5 * (low + high)
+            let r = a * (c.e * cosh(anomaly) - 1)
+            let x = a * (c.e - cosh(anomaly))
+            let y = (c.days < 0 ? -1.0 : 1.0) * a * (c.e * c.e - 1).squareRoot() * sinh(anomaly)
+            let position = try XCTUnwrap(OrbitPropagator.perifocal(q: c.q, e: c.e, days: c.days), "q = \(c.q), e = \(c.e), dt = \(c.days)")
+            XCTAssertEqual(position.r, r, accuracy: 1e-9 * r, "distance q = \(c.q), e = \(c.e), dt = \(c.days)")
+            XCTAssertEqual(position.x, x, accuracy: 1e-9 * r, "x q = \(c.q), e = \(c.e), dt = \(c.days)")
+            XCTAssertEqual(position.y, y, accuracy: 1e-9 * r, "y q = \(c.q), e = \(c.e), dt = \(c.days)")
+        }
+        let orbit = try elements(q: 0.01, e: 10.0, t: 2_460_000.0)
+        let distance = try XCTUnwrap(OrbitPropagator.heliocentricDistance(of: orbit, at: 2_460_000.0 + 50_000.0))
+        XCTAssertTrue(distance > 25_000.0 && distance < 26_000.0, "distance \(distance) AU")
+    }
+
     func testInvalidInputsToTheSolverGiveNothing() {
         // The semi-major axis overflows, so the period is not a number.
         XCTAssertNil(OrbitPropagator.perifocal(q: 1e300, e: 1.0 - 1e-16, days: 1.0))

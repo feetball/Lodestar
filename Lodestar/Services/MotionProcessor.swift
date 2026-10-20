@@ -128,6 +128,11 @@ struct MotionProcessor: Sendable {
     /// Smoothing time constants below this many seconds mean "no smoothing".
     static let minimumSmoothing = 0.01
     static let defaultSmoothing = 0.12
+    /// How far back published samples are kept for `sample(at:)`, in seconds: longer than a camera frame takes to
+    /// reach the screen.
+    static let historyDuration = 0.5
+    /// A time further than this many seconds from every kept sample has no sample (a stalled sensor).
+    static let historyReach = 0.1
 
     // MARK: Configuration
 
@@ -164,6 +169,8 @@ struct MotionProcessor: Sendable {
     // MARK: Results
 
     private(set) var latest: MotionSample?
+    /// The samples published in the last `historyDuration` seconds, oldest first.
+    private var history: [MotionSample] = []
     private(set) var sampleCount = 0
     private(set) var frameEpoch = 0
     private var compassQuality: CompassQuality = .unavailable
@@ -246,9 +253,13 @@ struct MotionProcessor: Sendable {
                 if running != .arbitrary { phase = .inactive; storedCompassSample = nil }
                 return nil
             }
-            // Leaving the gyro frame: its heading and the compass heading differ by the accumulated drift.
+            // Leaving the gyro frame: its heading and the compass heading differ by the accumulated drift. The heading
+            // is dropped with it, so a later transfer starts clean (and a declination step does not move a new one by
+            // the declination it already contains).
             frameEpoch += 1
             phase = .inactive
+            gyroAzimuth = nil
+            gyroAzimuthLacksDeclination = false
             return begin(compass)
         }
     }
@@ -306,6 +317,7 @@ struct MotionProcessor: Sendable {
         resetTransfer()
         resetFilters()
         latest = nil
+        history = []
         sampleCount = 0
         compassQuality = .unavailable
         magneticDisturbance = nil
@@ -465,6 +477,8 @@ struct MotionProcessor: Sendable {
                var azimuth = ReferenceFrames.referenceAzimuth(ofArbitraryFrameAttitude: input.matrix,
                                                               knownFrameAttitude: stored.matrix,
                                                               knownFrameAzimuth: stored.azimuth) {
+                // Set for this transfer alone: an earlier one may have left it set.
+                gyroAzimuthLacksDeclination = false
                 if stored.lacksDeclination {
                     if let declination {
                         azimuth = AstroMath.normalizeSignedDegrees(azimuth + declination)
@@ -505,9 +519,31 @@ struct MotionProcessor: Sendable {
         }
         let smoothed = smoothingTimeConstant >= Self.minimumSmoothing ? smoother.update(with: raw) : raw
         let usesField = stream != .arbitrary && input.fieldMicrotesla.isFinite && input.fieldMicrotesla > 0
-        latest = MotionSample(attitude: smoothed, rawAttitude: raw, gravity: input.gravity,
-                              angularSpeed: input.angularSpeed,
-                              magneticFieldMicrotesla: usesField ? input.fieldMicrotesla : nil,
-                              compassQuality: compassQuality, timestamp: input.timestamp)
+        let sample = MotionSample(attitude: smoothed, rawAttitude: raw, gravity: input.gravity,
+                                  angularSpeed: input.angularSpeed,
+                                  magneticFieldMicrotesla: usesField ? input.fieldMicrotesla : nil,
+                                  compassQuality: compassQuality, timestamp: input.timestamp)
+        latest = sample
+        history.append(sample)
+        // The sample just added is never older than the cut-off, so there is always an index to keep from.
+        let cutoff = sample.timestamp - Self.historyDuration
+        if let firstKept = history.firstIndex(where: { $0.timestamp >= cutoff }), firstKept > 0 {
+            history.removeFirst(firstKept)
+        }
+    }
+
+    /// The published sample whose time is nearest `time` (seconds since boot, the clock of `MotionSample.timestamp`),
+    /// for matching the attitude to a camera frame captured then; `nil` when none is kept within `historyReach` of it.
+    func sample(at time: TimeInterval) -> MotionSample? {
+        var nearest: MotionSample?
+        var nearestGap = Self.historyReach
+        for sample in history {
+            let gap = abs(sample.timestamp - time)
+            if gap <= nearestGap {
+                nearest = sample
+                nearestGap = gap
+            }
+        }
+        return nearest
     }
 }

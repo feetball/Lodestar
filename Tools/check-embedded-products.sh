@@ -38,4 +38,38 @@ echo "complications: $(plist "$complications" CFBundleIdentifier) $(plist "$comp
 [ "$(plist "$watch" CFBundleIdentifier)" = "net.kuecker.Lodestar.watchkitapp" ] || { echo "error: wrong watch app bundle id" >&2; exit 1; }
 [ "$(plist "$complications" CFBundleIdentifier)" = "net.kuecker.Lodestar.watchkitapp.Widgets" ] || { echo "error: wrong complications bundle id" >&2; exit 1; }
 [ "$(plist "$widgets" NSWidgetWantsLocation)" = "true" ] || { echo "error: widget extension lacks NSWidgetWantsLocation" >&2; exit 1; }
+[ "$(plist "$complications" NSWidgetWantsLocation)" = "true" ] || { echo "error: complications lack NSWidgetWantsLocation" >&2; exit 1; }
+[ "$(plist "$watch" WKCompanionAppBundleIdentifier)" = "$(plist "$app" CFBundleIdentifier)" ] || { echo "error: the watch app's companion id is not the app's bundle id" >&2; exit 1; }
+
+# App Store Connect rejects an app whose embedded watch app or extensions have another version or build number than
+# the app (project.yml keeps all four targets equal), and the bundles need their privacy manifests and location texts.
+app_short="$(plist "$app" CFBundleShortVersionString)"
+app_build="$(plist "$app" CFBundleVersion)"
+if [ "$app_short" = "(not set)" ] || [ "$app_build" = "(not set)" ]; then
+  echo "error: the app has no version or build number" >&2
+  exit 1
+fi
+failed=0
+for bundle in "$widgets" "$watch" "$complications"; do
+  name="${bundle#"$app"/}"
+  short="$(plist "$bundle" CFBundleShortVersionString)"
+  build="$(plist "$bundle" CFBundleVersion)"
+  if [ "$short" != "$app_short" ]; then
+    echo "error: $name has version $short, the app has $app_short" >&2
+    failed=1
+  fi
+  if [ "$build" != "$app_build" ]; then
+    echo "error: $name has build $build, the app has $app_build" >&2
+    failed=1
+  fi
+  if [ ! -f "$bundle/PrivacyInfo.xcprivacy" ]; then
+    echo "error: $name has no privacy manifest" >&2
+    failed=1
+  fi
+  if [ "$(plist "$bundle" NSLocationWhenInUseUsageDescription)" = "(not set)" ]; then
+    echo "error: $name has no location usage description" >&2
+    failed=1
+  fi
+done
+[ "$failed" -eq 0 ] || exit 1
 echo "ok"

@@ -7,7 +7,7 @@ enum TonightPlaceStore {
     enum Source: String {
         /// The device's own location, as measured by Core Location.
         case device
-        /// The observer the iPhone app sent to the watch.
+        /// The observer the iPhone app sent to the watch. Only the watch app sees it; the complications use `device`.
         case phone
     }
 

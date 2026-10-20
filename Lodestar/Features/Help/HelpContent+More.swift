@@ -83,7 +83,7 @@ extension HelpContent {
                 "**Sensor problem**. Close Lodestar and open it again. Aiming needs a real iPhone, because the Simulator has no motion sensors.",
                 "**Part of the screen is not red at night**. Lodestar cannot tint the rest of iOS. Set up **Color Filters**, as explained in **Night mode**.",
                 "**The last update failed.** Lodestar keeps the data you already have. Wait, then tap **Update now** in **Settings** \u{25B8} **Online Data**.",
-                "**Still stuck?** Read the support page at https://feetball.github.io/Lodestar/support.html, or report the problem on the issue tracker at https://github.com/feetball/Lodestar/issues.",
+                "**Still stuck?** Read the [support page](https://feetball.github.io/Lodestar/support.html), or report the problem on the [issue tracker](https://github.com/feetball/Lodestar/issues).",
             ]),
         ],
         related: [.alignment, .compassAndGyro, .mounting])

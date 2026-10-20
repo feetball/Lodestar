@@ -142,6 +142,22 @@ final class AimFrameEngine {
                         satellite: isSatellite ? satelliteFix : nil)
     }
 
+    /// The frame for the sky drawn over a camera picture captured at `time` (seconds on the sensors' clock, see
+    /// `CameraService.frameCapturedAt`). The picture reaches the screen about a tenth of a second after it was captured, so
+    /// the sky has to be drawn with the attitude of that moment, or it runs ahead of the stars in the picture while the
+    /// phone turns. Only the attitude and what follows from it directly (the pointing) are taken from the past; the
+    /// guidance stays as of the newest sample. This is `frame()` without a time, and when no sample is kept for it.
+    func frame(capturedAt time: TimeInterval?) -> AimFrame? {
+        guard let newest = frame() else { return nil }
+        guard let time, let sample = motion.sample(at: time), sample.timestamp != newest.sample.timestamp else {
+            return newest
+        }
+        let pointing = PointingSolution.solve(attitude: sample.attitude, mount: configuration.mount,
+                                              alignment: configuration.alignment)
+        return AimFrame(sample: sample, pointing: pointing, guidance: newest.guidance, target: newest.target,
+                        mosaic: newest.mosaic, satellite: newest.satellite)
+    }
+
     /// How far the camera has to turn clockwise to take the roll `aim` asks for, folded into ±90°.
     ///
     /// A panel is the same rectangle turned half a circle, so the smaller turn of the two is reported. A camera held in

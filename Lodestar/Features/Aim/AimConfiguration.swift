@@ -77,9 +77,10 @@ struct AimSkyInputs: Equatable, Sendable {
     var mosaic: MosaicPlan?
 }
 
-/// The sheets the Aim screen presents.
+/// The sheets the Aim screen presents. The help page is one of them, and not a sheet of its own button, because the
+/// display it opens from is rebuilt whenever it turns and would close the page.
 enum AimSheet: String, Identifiable {
-    case targetPicker, alignment, mosaic, mount
+    case targetPicker, alignment, mosaic, mount, help
 
     var id: String { rawValue }
 }

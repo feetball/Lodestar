@@ -24,11 +24,23 @@ enum MountChannel: Sendable {
         }
     }
 
-    /// Ends whatever exchange is waiting right now, so a Stop or a Cancel does not sit out a timeout.
+    /// Ends whatever exchange is waiting right now, so a Stop or a Cancel does not sit out a timeout. The job that was
+    /// running then fails at its next call to the link as well (see `beginJob`).
     func interrupt() {
         switch self {
         case .stream(let transport): transport.interrupt()
         case .http(let transport): transport.interrupt()
+        case .simulated: break
+        }
+    }
+
+    /// Called first thing by every job on the mount worker. An `interrupt()` since then ends this job for good: the engine
+    /// retries a timed-out exchange, so cutting short one wait would not stop a job that goes on to send the next command.
+    /// A job that starts after the interruption (the Stop itself) is not affected.
+    func beginJob() {
+        switch self {
+        case .stream(let transport): transport.beginJob()
+        case .http(let transport): transport.beginJob()
         case .simulated: break
         }
     }
@@ -64,6 +76,8 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
     /// The most unread input kept; older bytes are dropped.
     private static let maximumBuffered = 65_536
     private static let sendTimeoutSeconds = 3.0
+    /// How often a waiting `send` looks whether the job was interrupted.
+    private static let sendSliceSeconds = 0.1
 
     let kind: Kind
     private let connection: NWConnection
@@ -72,6 +86,8 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
     private var linkState = LinkState.preparing
     private var buffer: [UInt8] = []
     private var interruptions = 0
+    /// The value of `interruptions` when the job on the worker began; a higher count means the job was interrupted.
+    private var jobBaseline = 0
     private var waitingDetail: String?
     private var hasStarted = false
 
@@ -111,7 +127,6 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
         condition.lock()
         let isFirstOpen = !hasStarted
         hasStarted = true
-        let startInterruptions = interruptions
         condition.unlock()
 
         if isFirstOpen {
@@ -135,7 +150,7 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
             case .preparing:
                 break
             }
-            if interruptions != startInterruptions {
+            if interruptions != jobBaseline {
                 throw MountError.transport(detail: "connecting was cancelled")
             }
             if !condition.wait(until: deadline) {
@@ -145,11 +160,19 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
         }
     }
 
-    /// Wakes up whatever is waiting in `open` or `receive` right now. Later calls are not affected.
+    /// Wakes up whatever is waiting in `open`, `send` or `receive` right now, and makes the calls the same job makes
+    /// afterwards fail. A job that starts later (`beginJob`) is not affected.
     func interrupt() {
         condition.lock()
         interruptions += 1
         condition.broadcast()
+        condition.unlock()
+    }
+
+    /// Starts a job on the mount worker: an interruption from before it began does not count against it.
+    func beginJob() {
+        condition.lock()
+        jobBaseline = interruptions
         condition.unlock()
     }
 
@@ -168,13 +191,16 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
     func send(_ bytes: [UInt8]) throws {
         condition.lock()
         let state = linkState
+        let wasInterrupted = interruptions != jobBaseline
         condition.unlock()
+        // Not a timeout: the Sky-Watcher link sends again after a timeout, which would undo the interruption.
+        if wasInterrupted { throw MountError.transport(detail: "the command was stopped") }
         try requireReady(state)
         let outcome = MountSendOutcome()
         connection.send(content: Data(bytes), completion: .contentProcessed { error in
             outcome.finish(error)
         })
-        guard outcome.wait(timeoutSeconds: Self.sendTimeoutSeconds) else {
+        guard try waitForSend(outcome) else {
             throw MountError.timeout(operation: "sending a command")
         }
         if let error = outcome.error {
@@ -182,15 +208,29 @@ final class MountSocketTransport: MountTransport, @unchecked Sendable {
         }
     }
 
+    /// Waits until the send is reported, in short slices so that an interruption ends the wait too.
+    ///
+    /// - Returns: `false` if it was not reported within `sendTimeoutSeconds`.
+    private func waitForSend(_ outcome: MountSendOutcome) throws -> Bool {
+        let deadline = Date(timeIntervalSinceNow: Self.sendTimeoutSeconds)
+        while true {
+            if outcome.wait(timeoutSeconds: Self.sendSliceSeconds) { return true }
+            condition.lock()
+            let wasInterrupted = interruptions != jobBaseline
+            condition.unlock()
+            if wasInterrupted { throw MountError.transport(detail: "the command was stopped") }
+            if Date() >= deadline { return false }
+        }
+    }
+
     func receive(maxCount: Int, timeoutSeconds: Double) throws -> [UInt8] {
         let deadline = Date(timeIntervalSinceNow: max(timeoutSeconds, 0))
         condition.lock()
         defer { condition.unlock() }
-        let startInterruptions = interruptions
         while buffer.isEmpty {
             try requireReady(linkState)
-            if interruptions != startInterruptions {
-                throw MountError.timeout(operation: "stopped waiting")
+            if interruptions != jobBaseline {
+                throw MountError.transport(detail: "the command was stopped")
             }
             if !condition.wait(until: deadline) {
                 throw MountError.timeout(operation: "waiting for a reply")
@@ -343,6 +383,9 @@ final class MountHTTPTransport: AlpacaTransport, @unchecked Sendable {
     private let lock = NSLock()
     private var currentTask: URLSessionDataTask?
     private var isClosed = false
+    private var interruptions = 0
+    /// The value of `interruptions` when the job on the worker began; a higher count means the job was interrupted.
+    private var jobBaseline = 0
 
     init(endpoint: AlpacaEndpoint) {
         let configuration = URLSessionConfiguration.ephemeral
@@ -379,6 +422,11 @@ final class MountHTTPTransport: AlpacaTransport, @unchecked Sendable {
             lock.unlock()
             throw MountError.transport(detail: "the connection was closed")
         }
+        // A job that was interrupted between two requests sends no more.
+        guard interruptions == jobBaseline else {
+            lock.unlock()
+            throw MountError.transport(detail: "the command was stopped")
+        }
         let task = session.dataTask(with: urlRequest) { data, response, error in
             outcome.finish(data: data, response: response, error: error)
         }
@@ -409,12 +457,21 @@ final class MountHTTPTransport: AlpacaTransport, @unchecked Sendable {
         return AlpacaHTTPResponse(statusCode: http.statusCode, body: String(decoding: data, as: UTF8.self))
     }
 
-    /// Cancels the request that is running right now.
+    /// Cancels the request that is running right now, and makes the requests the same job sends afterwards fail. A job
+    /// that starts later (`beginJob`) is not affected.
     func interrupt() {
         lock.lock()
+        interruptions += 1
         let task = currentTask
         lock.unlock()
         task?.cancel()
+    }
+
+    /// Starts a job on the mount worker: an interruption from before it began does not count against it.
+    func beginJob() {
+        lock.lock()
+        jobBaseline = interruptions
+        lock.unlock()
     }
 
     func close() {

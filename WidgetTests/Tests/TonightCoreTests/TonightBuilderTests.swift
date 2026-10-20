@@ -43,6 +43,19 @@ final class TonightBuilderTests: XCTestCase {
         }
     }
 
+    func testAChangeJustAfterNowStillGetsAnEntryAMinuteLater() throws {
+        let summary = TonightTestSupport.summary(startingOn: try afternoon(), in: boulder)
+        let dusk = try XCTUnwrap(summary.astronomicalDarknessIntervals.first).start
+        // The darkness starts half a minute after the timeline does, which is too close for an entry of its own.
+        let start = dusk.addingTimeInterval(-30)
+        let entries = TonightBuilder.entries(for: boulder, from: start)
+        XCTAssertEqual(entries.first?.date, start)
+        let second = try XCTUnwrap(entries.dropFirst().first)
+        XCTAssertEqual(second.date.timeIntervalSince(start), TonightBuilder.minimumSpacing, accuracy: 1e-6)
+        XCTAssertEqual(TonightLines(night: try TonightTestSupport.night(second), now: second.date).dark.badge, "now")
+        XCTAssertNil(TonightLines(night: try TonightTestSupport.night(try XCTUnwrap(entries.first)), now: start).dark.badge)
+    }
+
     func testTheCurrentEntryIsTheLastOneNotAfterTheMoment() throws {
         let start = try afternoon()
         let entries = TonightBuilder.entries(for: boulder, from: start)
@@ -264,6 +277,24 @@ final class TonightBuilderTests: XCTestCase {
         XCTAssertNotNil(later)
         XCTAssertNotEqual(later?.title, first.title)
         XCTAssertGreaterThan(try XCTUnwrap(later).date, first.date)
+        // The moment itself counts as having happened, so the entry the timeline has there already moves on.
+        let atTheMoment = try TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: first.date)).event
+        XCTAssertNotEqual(atTheMoment?.title, first.title)
+        let justBefore = try TonightTestSupport.night(
+            TonightBuilder.entry(for: boulder, at: first.date.addingTimeInterval(-1))).event
+        XCTAssertEqual(justBefore?.title, first.title)
+    }
+
+    func testTheTimelineMovesOnFromAnEventAtTheMomentItHappens() throws {
+        let first = try XCTUnwrap(
+            TonightTestSupport.night(TonightBuilder.entry(for: boulder, at: try afternoon())).event)
+        // A timeline that reaches the event (the day's timeline from the afternoon does not).
+        let entries = TonightBuilder.entries(for: boulder, from: first.date.addingTimeInterval(-6 * 3_600))
+        let before = try XCTUnwrap(entries.last { $0.date < first.date })
+        XCTAssertEqual(try TonightTestSupport.night(before).event?.title, first.title)
+        let atTheEvent = try XCTUnwrap(entries.first { $0.date >= first.date })
+        XCTAssertLessThan(atTheEvent.date.timeIntervalSince(first.date), TonightBuilder.minimumSpacing)
+        XCTAssertNotEqual(try TonightTestSupport.night(atTheEvent).event?.title, first.title)
     }
 
     func testTheMoonsConjunctionsAreOnlyListedWhenItCoversTheOtherBody() throws {

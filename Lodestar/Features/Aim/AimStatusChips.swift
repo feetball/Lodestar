@@ -5,6 +5,8 @@ import LodestarKit
 /// The row of status chips at the top: sensors, compass, alignment, location and camera.
 struct AimStatusChips: View {
     let model: AimViewModel
+    /// The screen's sheet, where the help page is presented from: this view is rebuilt when the display turns.
+    @Binding var sheet: AimSheet?
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
 
@@ -39,7 +41,12 @@ struct AimStatusChips: View {
                 }
             }
             SatelliteStreakChip(model: model)
-            HelpButton(topic: .aimScreen, appearance: .chip)
+            // The alignment and mount sheets leave the display usable, and the screen shows one sheet at a time. The
+            // chip stays in its place, so the other chips do not move, but is out of reach while a sheet is up.
+            HelpButton(topic: .aimScreen, appearance: .chip, action: { sheet = .help })
+                .opacity(sheet == nil ? 1 : 0)
+                .disabled(sheet != nil)
+                .accessibilityHidden(sheet != nil)
         }
         .frame(maxWidth: .infinity)
     }

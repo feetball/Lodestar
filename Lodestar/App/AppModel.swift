@@ -78,7 +78,11 @@ final class AppModel {
     /// Latest scene phase reported by the app.
     private(set) var scenePhase: ScenePhase = .inactive
 
+    /// Most saved sites whose estimated time zone is looked up again per foreground; the geocoder is rate limited.
+    private static let timeZoneUpgradesPerForeground = 5
+
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
+    @ObservationIgnored private var timeZoneUpgradeTask: Task<Void, Never>?
     @ObservationIgnored private var hasRequestedLocationThisLaunch = false
     @ObservationIgnored private var lastAlignmentContext: AlignmentContext?
     @ObservationIgnored private var lastSunEvaluation: (date: Date, observer: Observer)?
@@ -203,6 +207,7 @@ final class AppModel {
             clock.start()
             startMaintenance()
             online.onForeground()
+            upgradeEstimatedTimeZones()
         case .background:
             settingsStore.saveNow()
             clock.stop()
@@ -354,6 +359,35 @@ final class AppModel {
                                 decimalYear: WorldMagneticModel.decimalYear(from: clock.now))
         return MagneticReference(declination: field.declination,
                                  expectedFieldMicrotesla: field.totalIntensity / 1000)
+    }
+
+    /// Looks up the real time zone of saved sites that only have the one estimated from their longitude (they were saved
+    /// without a network). That estimate has no daylight saving time, so their times are an hour off for half the year.
+    /// The lookups run one after the other off the main thread, a few per foreground, and a site that cannot be resolved
+    /// now is simply tried again at the next foreground.
+    private func upgradeEstimatedTimeZones() {
+        guard timeZoneUpgradeTask == nil else { return }
+        let pending = settings.savedSites.filter { $0.timeZone.map(SettingsFormat.isNominal) ?? true }
+        guard !pending.isEmpty else { return }
+        timeZoneUpgradeTask = Task { [weak self] in
+            for site in pending.prefix(Self.timeZoneUpgradesPerForeground) {
+                guard let zone = await TimeZoneResolver.timeZone(for: site.location), !SettingsFormat.isNominal(zone) else {
+                    continue
+                }
+                self?.applyResolvedTimeZone(zone, to: site)
+            }
+            self?.timeZoneUpgradeTask = nil
+        }
+    }
+
+    /// Stores `zone` for `site` unless the site changed while the lookup ran: it was deleted, moved, or already got a
+    /// real zone (from the site editor).
+    private func applyResolvedTimeZone(_ zone: TimeZone, to site: SavedSite) {
+        guard var current = settings.savedSites.first(where: { $0.id == site.id }),
+              current.latitude == site.latitude, current.longitude == site.longitude,
+              current.timeZone.map(SettingsFormat.isNominal) ?? true else { return }
+        current.timeZoneIdentifier = zone.identifier
+        settingsStore.updateSite(current)
     }
 
     private func startMaintenance() {

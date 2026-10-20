@@ -103,6 +103,8 @@ final class MountService {
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var nudgeTask: Task<Void, Never>?
     @ObservationIgnored private var nudgeGate: MountCancelFlag?
+    /// Tripped by Stop and Disconnect, so a GoTo that is still queued does not start its slew after them.
+    @ObservationIgnored private var motionGate: MountCancelFlag?
     @ObservationIgnored private var reconfigureTask: Task<Void, Never>?
     @ObservationIgnored private var discoveryTask: Task<Void, Never>?
     @ObservationIgnored private var discoveryFlag: MountCancelFlag?
@@ -131,6 +133,15 @@ final class MountService {
 
     var selectedOption: MountConnectionOption {
         MountConnectionOption.option(id: memory.selectedOptionID) ?? .lx200
+    }
+
+    /// The kind of mount the settings describe: the one connecting or connected, else the one chosen in the picker. After a
+    /// connection was lost the picker is back, and the person may have chosen another kind since.
+    var displayedOption: MountConnectionOption {
+        switch connection {
+        case .connecting, .connected: return connectedOption ?? selectedOption
+        case .disconnected, .lost: return selectedOption
+        }
     }
 
     var selectedOptionID: String {
@@ -500,8 +511,11 @@ final class MountService {
                 return
             }
             Task {
-                if isMoving {
+                // A GoTo that is being set up has not moved the mount yet as far as the status knows, but it may just have.
+                if isMoving || isWorking {
                     stopNudgeLoop()
+                    motionGate?.cancel()
+                    motionGate = nil
                     ending.interrupt()
                     let stopped = await ending.run(urgent: true) { controller in try controller.abort() }
                     if case .failure(let error) = stopped.result {
@@ -523,6 +537,8 @@ final class MountService {
         reconfigureTask?.cancel()
         reconfigureTask = nil
         stopNudgeLoop()
+        motionGate?.cancel()
+        motionGate = nil
         session?.shutdown()
         session = nil
         capabilities = nil
@@ -553,14 +569,22 @@ final class MountService {
             guard let ending = session else { return }
             lifecycle?.beginBackgroundTask()
             stopNudgeLoop()
+            // A GoTo that is still queued must not start after the stop.
+            motionGate?.cancel()
+            motionGate = nil
             Task {
                 // Nobody can watch the mount from here, so it is stopped and let go.
                 ending.interrupt()
-                _ = await ending.run(urgent: true) { controller in
-                    if controller.status.phase != .idle { _ = try? controller.abort() }
+                let stopped = await ending.run(urgent: true) { controller in
+                    if controller.status.phase != .idle { try controller.abort() }
                 }
                 if session === ending {
-                    finishSession(lost: "Disconnected when Lodestar went to the background. The mount was stopped.")
+                    let reason = "Disconnected when Lodestar went to the background. "
+                    if case .failure(let error) = stopped.result {
+                        finishSession(lost: reason + Self.stopFailureText(error))
+                    } else {
+                        finishSession(lost: reason + "The mount was stopped.")
+                    }
                 }
                 lifecycle?.endBackgroundTask()
             }
@@ -581,7 +605,9 @@ final class MountService {
                 let polled = outcome.status
                 self.apply(polled, detail: outcome.detail)
                 if polled.phase == .disconnected {
-                    let reason = polled.lastError?.userMessage ?? MountError.connectionLost.userMessage
+                    // The engine does not stop a mount on a dead link, so a slew or a nudge may still be running.
+                    let reason = (polled.lastError?.userMessage ?? MountError.connectionLost.userMessage)
+                        + " The mount may still be moving if it was slewing. Stop it on its hand controller if it is."
                     self.finishSession(lost: reason)
                     return
                 }
@@ -652,7 +678,17 @@ final class MountService {
         let motion = target.properMotion
         isWorking = true
         defer { isWorking = false }
-        let result = await execute { controller in try controller.goto(place, properMotion: motion) }
+        let gate = MountCancelFlag()
+        motionGate = gate
+        let result = await execute { controller in
+            // A GoTo that waited in the queue while Stop was tapped must not start a slew.
+            guard !gate.isCancelled else { return }
+            try controller.goto(place, properMotion: motion)
+        }
+        if motionGate === gate { motionGate = nil }
+        // Stop or Disconnect came first: the person knows, so there is nothing to report, not even a failure that the
+        // interruption caused.
+        if gate.isCancelled { return }
         switch result {
         case .success: slewTargetName = object.name
         case .failure(let error):
@@ -786,6 +822,9 @@ final class MountService {
             return
         }
         stopNudgeLoop()
+        // Before the interruption below: a GoTo that gets past this flag has started, so the interruption reaches it.
+        motionGate?.cancel()
+        motionGate = nil
         isStopping = true
         // Cut short the exchange that is waiting for the mount, so the stop does not sit out its timeout.
         current.interrupt()
@@ -845,6 +884,9 @@ final class MountService {
         nudgeTask = Task { [weak self] in
             while !Task.isCancelled && !gate.isCancelled {
                 guard let self else { return }
+                // The repeat is timed from the start of the command: on a slow link the command takes a good part of the
+                // pulse, and waiting the full repeat after it would let the pulse run out before the next one arrives.
+                let began = ContinuousClock.now
                 let rate = self.settings.nudgeRate
                 let result = await self.execute { controller in
                     // A command that waited in the queue while the finger lifted must not start a move.
@@ -855,7 +897,8 @@ final class MountService {
                     if !gate.isCancelled { self.errorText = error.userMessage }
                     return
                 }
-                try? await Task.sleep(for: Self.nudgeRepeat)
+                let remaining = Self.nudgeRepeat - (ContinuousClock.now - began)
+                if remaining > .zero { try? await Task.sleep(for: remaining) }
             }
         }
     }

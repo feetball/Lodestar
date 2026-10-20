@@ -9,8 +9,15 @@ struct ObjectsOptionsMenu: View {
     @Binding var showsOnlyPopular: Bool
     /// Filled when any option differs from the default list.
     let isCustomized: Bool
-    /// The horizon filter needs an observer.
+    /// The horizon filter and the altitude and rise-time orders need an observer.
     let hasLocation: Bool
+
+    /// The order the list is really in: without a location the orders that need the sky's positions fall back to name
+    /// order (see `ObjectsListBuilder.sections`), so the menu checks that one instead of the unusable choice.
+    private var shownSortOrder: Binding<ObjectsSortOrder> {
+        Binding(get: { !hasLocation && sortOrder.needsSkyPositions ? .name : sortOrder },
+                set: { sortOrder = $0 })
+    }
 
     var body: some View {
         Menu {
@@ -24,9 +31,11 @@ struct ObjectsOptionsMenu: View {
                 .labelsHidden()
             }
             Section("Sort By") {
-                Picker("Sort By", selection: $sortOrder) {
+                Picker("Sort By", selection: shownSortOrder) {
                     ForEach(ObjectsSortOrder.allCases) { option in
-                        Label(option.title, systemImage: option.systemImage).tag(option)
+                        Label(option.title, systemImage: option.systemImage)
+                            .disabled(!hasLocation && option.needsSkyPositions)
+                            .tag(option)
                     }
                 }
                 .pickerStyle(.inline)

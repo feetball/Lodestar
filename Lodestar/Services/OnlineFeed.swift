@@ -108,7 +108,8 @@ enum OnlineResource: String, CaseIterable, Sendable {
         }
     }
 
-    /// The shortest time between a failed request and the next one.
+    /// The shortest time between a failed request and the next one, for a failure the provider answered. See
+    /// `OnlineSchedule.retryWait` for the failures that wait less (no answer at all) or more (403, 429, `Retry-After`).
     var retryInterval: TimeInterval {
         switch self {
         case .stations, .visual, .starlink: return Self.celestrakMinimum

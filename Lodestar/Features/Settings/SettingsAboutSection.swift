@@ -18,7 +18,8 @@ struct SettingsAboutSection: View {
                 Text("Everything Lodestar does happens on your iPhone. There are no accounts, no analytics and no "
                      + "tracking, and Lodestar never collects your location, sites or settings. The network is used by "
                      + "Apple Maps, which loads map tiles when you open the site map, by Apple's geocoding service, "
-                     + "which receives a site's coordinates to look up its time zone while you add or edit it, and by "
+                     + "which receives a site's coordinates, rounded to about 1 km, to look up its time zone when you "
+                     + "add or edit it (and again later if it was saved without a network), and by "
                      + "the optional downloads in Online Data, which are off until you switch them on: CelesTrak, the "
                      + "Minor Planet Center and MET Norway see your IP address, and MET Norway also your location "
                      + "rounded to about 10 km. GoTo mount control talks to the mount on your local network only.")

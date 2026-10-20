@@ -291,7 +291,9 @@ struct SkyChartFramingBar: View {
                     .foregroundStyle(palette.tertiaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                HelpButton(topic: .planFraming)
+                // The 44 pt touch target reaches over the card's padding; the layout keeps the size of the symbol.
+                HelpButton(topic: .planFraming, appearance: .inline)
+                    .padding(-11)
             }
         }
         .card(palette, padding: 12)

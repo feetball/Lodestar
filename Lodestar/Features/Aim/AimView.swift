@@ -54,6 +54,9 @@ private struct AimScreen: View {
             .onChange(of: model.guidanceTarget?.id, initial: true) {
                 model.syncTarget()
             }
+            .onChange(of: app.selectedTab == .aim, initial: true) { _, isShowing in
+                model.useCameraZoom(isShowing: isShowing)
+            }
             .task(id: WorkKey(skyInputs: skyInputs, isActive: isActive)) {
                 guard isActive else { return }
                 await model.keepSkyCurrent(skyInputs)
@@ -112,6 +115,8 @@ private struct AimScreen: View {
                 .presentationDetents([.fraction(0.5), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.5)))
                 .presentationDragIndicator(.visible)
+        case .help:
+            HelpSheet(topic: .aimScreen)
         }
     }
 }

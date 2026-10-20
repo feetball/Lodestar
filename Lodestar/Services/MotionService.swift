@@ -123,6 +123,16 @@ final class MotionService {
         return pipeline.withLock { $0.latest }
     }
 
+    /// The sample nearest `time` (seconds since boot, as `MotionSample.timestamp`) among those of the last half second,
+    /// or `nil` when none is close to it. It pairs the attitude with a camera frame captured at `time`. Callable from
+    /// any thread; cheap.
+    nonisolated func sample(at time: TimeInterval) -> MotionSample? {
+        #if DEBUG
+        if let sample = screenshotSample.withLock({ $0 }) { return sample }
+        #endif
+        return pipeline.withLock { $0.sample(at: time) }
+    }
+
     #if DEBUG
     /// A fixed sample that replaces the sensors in screenshot mode.
     private let screenshotSample = OSAllocatedUnfairLock<MotionSample?>(initialState: nil)

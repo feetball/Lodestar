@@ -3,25 +3,11 @@ import SwiftUI
 /// Settings ▸ Online Data: one switch per optional download with what it is for, what leaves the phone, when it was last
 /// updated, an "Update now" button and the last error. The first switch asks for confirmation once.
 struct SettingsOnlineDataSection: View {
-    @Environment(AppModel.self) private var app
-    #if DEBUG
-    // The visual review opens the first-time explanation (`screen=online-first-time`).
-    @State private var pending: OnlineFeed? = ScreenshotMode.current?.screen == .onlineFirstTime ? .satellites : nil
-    #else
-    @State private var pending: OnlineFeed?
-    #endif
-
     var body: some View {
         SettingsSection(title: OnlineText.sectionTitle, footer: OnlineText.footer) {
             SettingsCaption(OnlineText.intro)
-                .sheet(item: $pending) { feed in
-                    OnlineFirstTimeSheet(feed: feed)
-                        .presentationDetents([.medium, .large])
-                        .presentationDragIndicator(.visible)
-                        .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
-                }
             ForEach(OnlineFeed.allCases) { feed in
-                OnlineFeedRows(feed: feed) { pending = feed }
+                OnlineFeedRows(feed: feed)
             }
         }
     }
@@ -30,10 +16,21 @@ struct SettingsOnlineDataSection: View {
 /// The rows of one feed.
 private struct OnlineFeedRows: View {
     let feed: OnlineFeed
-    /// Called when the first feed is switched on before the explanation has been read.
-    let askFirst: () -> Void
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    /// Whether the first-time explanation is open. It hangs on the switch that opens it, a row that is certainly alive
+    /// when it is tapped: a row of a list that has scrolled out of view does not present anything.
+    @State private var asksFirst: Bool
+
+    init(feed: OnlineFeed) {
+        self.feed = feed
+        #if DEBUG
+        // The visual review opens the first-time explanation (`screen=online-first-time`).
+        _asksFirst = State(initialValue: feed == .satellites && ScreenshotMode.current?.screen == .onlineFirstTime)
+        #else
+        _asksFirst = State(initialValue: false)
+        #endif
+    }
 
     var body: some View {
         let online = app.online
@@ -43,7 +40,7 @@ private struct OnlineFeedRows: View {
                 get: { online.isEnabled(feed) },
                 set: { newValue in
                     if newValue && !online.hasExplained {
-                        askFirst()
+                        asksFirst = true
                     } else {
                         online.setEnabled(feed, newValue)
                     }
@@ -54,6 +51,12 @@ private struct OnlineFeedRows: View {
                 .foregroundStyle(palette.tertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .sheet(isPresented: $asksFirst) {
+            OnlineFirstTimeSheet(feed: feed)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
         }
         if status.isEnabled {
             // The "ago" text and the button's availability move on without any change to the status.

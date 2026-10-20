@@ -230,11 +230,12 @@ public struct StreakAssessment: Sendable {
 /// **Method.** At the start of the exposure every satellite is propagated once and counted (above the horizon,
 /// sunlit above 20°, ...). A *prefilter* then drops every satellite that cannot reach the frame, the sunlight and
 /// the sky above the minimum altitude within the window: a satellite at range `ρ` moves at most `v·T` kilometres
-/// in `T` seconds (`v` is an upper bound of its speed), so its direction changes by at most `asin(v·T/ρ)`. The
-/// survivors are sampled on a step that moves them by at most half the frame's smaller side (never more than 3°),
-/// and consecutive samples are joined by a straight line on the gnomonic picture plane (great circles are straight
-/// there), clipped against the frame, the horizon and the shadow's edge, which gives entry and exit times to a
-/// fraction of the step. The Sun comes from hourly nodes of the ephemeris.
+/// in `T` seconds (`v` is an upper bound of its speed), so its direction changes by at most `asin(v·T/ρ)` (by any
+/// angle when `v·T` reaches `ρ`: it may fly past the observer). The survivors are sampled on a step that moves them
+/// by at most half the frame's smaller side (never more than 3°), and consecutive samples are joined by a straight
+/// line on the gnomonic picture plane (great circles are straight there), clipped against the frame, the horizon and
+/// the shadow's edge, which gives entry and exit times to a fraction of the step. The Sun comes from hourly nodes of
+/// the ephemeris.
 ///
 /// **Cost.** About 3 microseconds per satellite for the prefilter: 10 000 Starlink element sets take 30 to
 /// 90 ms on a desktop and well under a second on a phone. The fine check adds about 1 microsecond per sample
@@ -357,6 +358,14 @@ final class StreakEvaluator {
         self.sampleArc = AstroMath.clamp(0.5 * min(frame.widthDegrees, frame.heightDegrees), 0.2, 3.0)
     }
 
+    /// The most the direction to a satellite at `range` kilometres can turn, in radians, while it covers at most
+    /// `speed * window` kilometres. That is `asin(v·T/ρ)` only while the satellite cannot reach the observer; one
+    /// that can cover its range may fly past and end up on the other side, so then any direction is possible.
+    static func maximumTurn(speed: Double, window: Double, range: Double) -> Double {
+        let ratio = speed * window / range
+        return ratio < 1.0 ? asin(ratio) : Double.pi
+    }
+
     func evaluate(_ satellite: Satellite, _ output: inout [RawCrossing]) -> StreakOutcome {
         let propagator = satellite.propagator
         let minutes = (start - propagator.epochReferenceSeconds) / 60.0
@@ -374,7 +383,7 @@ final class StreakEvaluator {
 
         // Prefilter: how far can the direction to the satellite turn within the window?
         let maximumSpeed = propagator.maximumSpeedKilometersPerSecond
-        let reach = asin(min(1.0, maximumSpeed * window / topocentric.range))
+        let reach = Self.maximumTurn(speed: maximumSpeed, window: window, range: topocentric.range)
         let direction = Vector3(topocentric.east, topocentric.north, topocentric.up) / topocentric.range
         let separation = acos(AstroMath.clamp(direction.dot(frame.boresight), -1.0, 1.0))
         if separation - reach > cornerRadians { return outcome }

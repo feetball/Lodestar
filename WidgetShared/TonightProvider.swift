@@ -6,13 +6,15 @@ extension TonightEntry: TimelineEntry {}
 /// Feeds the widgets and the complications: where the device is, and a day of entries worked out for it.
 ///
 /// Everything runs on the device with LodestarKit: no network, no App Group. The location comes from Core Location
-/// in the widget itself (the system shares the app's authorization); with none, the entry asks the user to open
-/// Lodestar.
+/// in the widget itself (the system shares the app's authorization), so a widget or complication always shows the
+/// device's own place, never the observer chosen in the iPhone app (the watch app may show that one). With no
+/// place, the entry says what the user has to do: open Lodestar to allow location, or allow it in Settings.
 struct TonightProvider: TimelineProvider {
     /// How long a timeline is used before a new one is asked for (it holds entries for a day).
     static let reloadInterval: TimeInterval = 6 * 3_600
-    /// How long the "open Lodestar" state waits before trying again.
-    static let needsLocationReloadInterval: TimeInterval = 15 * 60
+    /// How long the "allow location" state waits before trying again. Long, because it can only end once the user
+    /// has acted, and the app asks for a reload whenever it comes forward.
+    static let needsLocationReloadInterval: TimeInterval = 3_600
 
     func placeholder(in context: Context) -> TonightEntry {
         TonightBuilder.entry(for: .preview(), at: Date())
@@ -24,10 +26,18 @@ struct TonightProvider: TimelineProvider {
             return
         }
         Task { @MainActor in
+            // A snapshot has to come back quickly, so it does not wait for a fresh fix: the place remembered from
+            // the last timeline will do.
             let locator = TonightLocator()
-            let place = await locator.currentPlace()
             let now = Date()
-            completion(place.map { TonightBuilder.entry(for: $0, at: now) } ?? .needsLocation(at: now))
+            guard locator.isAuthorized, let place = TonightPlaceStore.load(.device) else {
+                completion(.needsLocation(at: now, issue: locator.locationIssue))
+                return
+            }
+            let entry = await Task.detached(priority: .userInitiated) {
+                TonightBuilder.entry(for: place, at: now)
+            }.value
+            completion(entry)
         }
     }
 
@@ -37,7 +47,7 @@ struct TonightProvider: TimelineProvider {
             let place = await locator.currentPlace()
             let now = Date()
             guard let place else {
-                completion(Timeline(entries: [.needsLocation(at: now)],
+                completion(Timeline(entries: [.needsLocation(at: now, issue: locator.locationIssue)],
                                     policy: .after(now.addingTimeInterval(Self.needsLocationReloadInterval))))
                 return
             }

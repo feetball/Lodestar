@@ -2,16 +2,62 @@ import SwiftUI
 import UIKit
 import LodestarKit
 
+/// What Settings ▸ Location has asked to be presented: the site editor, and the skyline recorder or the confirmation
+/// before a skyline is cleared. The rows only set it; the sheets themselves hang on the Settings form
+/// (`settingsLocationSheets`), because a presentation attached to one row is lost when that row has scrolled out of view
+/// and a list of sites can be long.
+struct SettingsLocationPresentation {
+    var editorTarget: SiteEditorTarget?
+    var horizonFlow = HorizonFlowState()
+    /// A place saved from "Current Location" to record its skyline: record it once the editor has closed.
+    var recordsAfterSaving = false
+    var siteToRecord: UUID?
+}
+
+extension View {
+    /// Presents what `presentation` asks for. Attach it once, to the Settings form, which is always on screen.
+    func settingsLocationSheets(_ presentation: Binding<SettingsLocationPresentation>) -> some View {
+        modifier(SettingsLocationSheets(presentation: presentation))
+    }
+}
+
+private struct SettingsLocationSheets: ViewModifier {
+    @Environment(AppModel.self) private var app
+    @Binding var presentation: SettingsLocationPresentation
+
+    func body(content: Content) -> some View {
+        content
+            .horizonFlow($presentation.horizonFlow)
+            .sheet(item: $presentation.editorTarget, onDismiss: recordPendingSkyline) { target in
+                SettingsSheetRoot {
+                    SiteEditor(target: target) { site in
+                        // A newly added site becomes the observing location, as in onboarding.
+                        if case .new = target {
+                            app.settingsStore.settings.locationSource = .site(site.id)
+                            if presentation.recordsAfterSaving { presentation.siteToRecord = site.id }
+                        }
+                    }
+                }
+            }
+    }
+
+    /// After the editor has closed, records the skyline of a place that was saved for it.
+    private func recordPendingSkyline() {
+        presentation.recordsAfterSaving = false
+        guard let id = presentation.siteToRecord else { return }
+        presentation.siteToRecord = nil
+        if let site = app.settings.savedSites.first(where: { $0.id == id }) {
+            presentation.horizonFlow.recording = site
+        }
+    }
+}
+
 /// Settings ▸ Location: where the sky is computed for. The device's position or one of the saved observing sites,
 /// with the status of location access, and adding, editing and deleting sites.
 struct SettingsLocationSection: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
-    @State private var editorTarget: SiteEditorTarget?
-    @State private var horizonFlow = HorizonFlowState()
-    /// A place saved from "Current Location" to record its skyline: record it once the editor has closed.
-    @State private var recordsAfterSaving = false
-    @State private var siteToRecord: UUID?
+    @Binding var presentation: SettingsLocationPresentation
 
     var body: some View {
         let store = app.settingsStore
@@ -29,13 +75,12 @@ struct SettingsLocationSection: View {
                 store.settings.locationSource = .device
                 app.location.requestAuthorization()
             }
-            .horizonFlow($horizonFlow)
             if settings.locationSource == .device {
                 accessPrompt
                 HorizonDeviceRow(blocker: skylineBlocker(isFull: isFull)) {
                     if let fix = app.location.fix {
-                        recordsAfterSaving = true
-                        editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
+                        presentation.recordsAfterSaving = true
+                        presentation.editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
                     }
                 }
             }
@@ -43,30 +88,19 @@ struct SettingsLocationSection: View {
                 SettingsSavedSiteRow(
                     site: site,
                     isSelected: settings.locationSource == .site(site.id),
-                    horizonFlow: $horizonFlow,
+                    horizonFlow: $presentation.horizonFlow,
                     onSelect: { store.settings.locationSource = .site(site.id) },
-                    onEdit: { editorTarget = .existing(site) })
+                    onEdit: { presentation.editorTarget = .existing(site) })
             }
             Button {
-                editorTarget = .new(SiteDraft(name: "Site \(settings.savedSites.count + 1)"))
+                presentation.editorTarget = .new(SiteDraft(name: "Site \(settings.savedSites.count + 1)"))
             } label: {
                 Label("Add Site\u{2026}", systemImage: "plus.circle")
             }
             .disabled(isFull)
-            .sheet(item: $editorTarget, onDismiss: recordPendingSkyline) { target in
-                SettingsSheetRoot {
-                    SiteEditor(target: target) { site in
-                        // A newly added site becomes the observing location, as in onboarding.
-                        if case .new = target {
-                            app.settingsStore.settings.locationSource = .site(site.id)
-                            if recordsAfterSaving { siteToRecord = site.id }
-                        }
-                    }
-                }
-            }
             if let fix = app.location.fix {
                 Button {
-                    editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
+                    presentation.editorTarget = .new(SiteDraft(name: "Current Location", fix: fix))
                 } label: {
                     Label("Save Current Location as Site\u{2026}", systemImage: "location")
                 }
@@ -83,16 +117,6 @@ struct SettingsLocationSection: View {
         if app.location.fix == nil { return "Lodestar does not have your position yet." }
         if isFull { return "You have reached the limit of \(AppSettings.maximumSavedSites) saved sites. Delete one first." }
         return nil
-    }
-
-    /// After the editor has closed, records the skyline of a place that was saved for it.
-    private func recordPendingSkyline() {
-        recordsAfterSaving = false
-        guard let id = siteToRecord else { return }
-        siteToRecord = nil
-        if let site = app.settings.savedSites.first(where: { $0.id == id }) {
-            horizonFlow.recording = site
-        }
     }
 
     /// What to do when the device location is the source but it cannot be used yet.
@@ -228,7 +252,10 @@ private struct SettingsSavedSiteRow: View {
     private var subtitle: String {
         var parts = [SettingsFormat.coordinates(of: site.location), SettingsFormat.elevation(site.elevation)]
         if let zone = site.timeZone {
-            parts.append(SettingsFormat.utcOffset(of: zone, at: Date()))
+            // An estimate from the longitude has no daylight saving time; it is replaced by the real zone once the
+            // app is online (see `AppModel.upgradeEstimatedTimeZones`).
+            let offset = SettingsFormat.utcOffset(of: zone, at: Date())
+            parts.append(SettingsFormat.isNominal(zone) ? "\(offset) (estimated)" : offset)
         }
         return parts.joined(separator: " \u{00B7} ")
     }

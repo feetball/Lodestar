@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The sky laid over the camera picture: a `Canvas` redrawn about 30 times a second from the newest motion sample.
+/// The sky laid over the camera picture: a `Canvas` redrawn about 30 times a second from the newest motion sample, or,
+/// with the camera picture behind it, from the sample current when that picture was captured.
 ///
 /// The frame is pulled from the engine inside the timeline, so the sensor rate never reaches SwiftUI's observation;
 /// the timeline pauses while the Aim tab is not showing.
@@ -12,7 +13,9 @@ struct SkyOverlayView: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isActive)) { timeline in
-            let frame = model.engine.frame()
+            // Over the camera picture the sky is drawn with the attitude the picture was captured at; the guidance
+            // elsewhere on the screen keeps using the newest.
+            let frame = model.engine.frame(capturedAt: model.cameraFrameTime)
             let content = model.skyContent
             let configuration = model.configuration
             let camera = model.cameraGeometry

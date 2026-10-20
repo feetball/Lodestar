@@ -507,11 +507,11 @@ public enum AlpacaResponseParser {
                 throw AlpacaCodec.error(number: number, message: message)
             }
         }
-        let echoed = try optionalInteger(root, "ClientTransactionID")
+        let echoed = try optionalTransactionID(root, "ClientTransactionID")
         if let echoed, echoed != 0, echoed != request.clientTransactionID {
             throw MountError.malformedReply(detail: "the reply belongs to another request")
         }
-        return AlpacaReply(clientTransactionID: echoed, serverTransactionID: try optionalInteger(root, "ServerTransactionID"),
+        return AlpacaReply(clientTransactionID: echoed, serverTransactionID: try optionalTransactionID(root, "ServerTransactionID"),
                            value: root.field("Value"))
     }
 
@@ -545,10 +545,15 @@ public enum AlpacaResponseParser {
         }
     }
 
-    private static func optionalInteger(_ root: MountJSON, _ name: String) throws -> Int? {
+    /// A transaction id member: absent, or a whole number up to the 4 294 967 295 of the uint32 the Alpaca API defines (a server
+    /// may well count milliseconds or hash into it). An id that does not fit an `Int` (32-bit watches) reads as nil, because
+    /// nothing depends on its value.
+    private static func optionalTransactionID(_ root: MountJSON, _ name: String) throws -> Int? {
         guard let field = root.field(name) else { return nil }
-        guard let integer = AlpacaCodec.integer(field) else { throw MountError.malformedReply(detail: "\(name) is not an integer") }
-        return integer
+        guard case let .number(number) = field, number == number.rounded(.down), number >= -2_147_483_647, number <= 4_294_967_295 else {
+            throw MountError.malformedReply(detail: "\(name) is not an integer")
+        }
+        return Int(exactly: number)
     }
 
     private static func text(_ root: MountJSON, _ name: String) -> String {

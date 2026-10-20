@@ -31,8 +31,8 @@ struct PlanisphereRenderer {
     /// The step of the mosaic being shot, or `nil` without one.
     let mosaic: MosaicDisplay?
 
-    /// The zoom from which the chart draws obscure deep-sky objects (prominence 4).
-    private static let obscureMinimumZoom: CGFloat = 2
+    /// The zoom from which the chart draws obscure deep-sky objects (prominence 4), and from which a tap can pick them.
+    static let obscureMinimumZoom: CGFloat = 2
 
     /// Opacity of the ground's shade over the sky behind the skyline.
     private static let groundShade = 0.7

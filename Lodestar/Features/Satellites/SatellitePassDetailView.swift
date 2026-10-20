@@ -50,7 +50,7 @@ struct SatellitePassDetailView: View {
             let item = item
             track = await Task.detached(priority: .userInitiated) {
                 PassTrack(looks: item.satellite.track(from: item.pass.rise.date, to: item.pass.set.date, step: 5, observer: observer),
-                     peak: item.satellite.look(at: item.pass.culmination.date, observer: observer))
+                     peak: item.satellite.look(at: item.peak.date, observer: observer))
             }.value
         }
     }
@@ -71,7 +71,7 @@ struct SatellitePassDetailView: View {
         return VStack(alignment: .leading, spacing: 8) {
             CardTitle(title: "Pass", systemImage: "clock")
             InfoRow(label: "Rise", value: SatelliteText.point(pass.rise, in: timeZone))
-            InfoRow(label: "Peak", value: SatelliteText.point(pass.culmination, in: timeZone))
+            InfoRow(label: "Peak", value: SatelliteText.point(item.peak, in: timeZone))
             InfoRow(label: "Set", value: SatelliteText.point(pass.set, in: timeZone))
             if let span = pass.visibleSpan {
                 InfoRow(label: "Visible",
@@ -88,7 +88,7 @@ struct SatellitePassDetailView: View {
     }
 
     private func aimSection(now: Date) -> some View {
-        let peakPassed = now > item.pass.culmination.date.addingTimeInterval(Self.peakGrace)
+        let peakPassed = now > item.peak.date.addingTimeInterval(Self.peakGrace)
         return VStack(alignment: .leading, spacing: 10) {
             CardTitle(title: "Aim", systemImage: "scope")
             Button {

@@ -62,6 +62,9 @@ struct TonightReport: Sendable {
     let tonightStart: Date
     /// How many nights this one is after tonight: 1 is tomorrow night, -1 is last night.
     let nightsFromTonight: Int
+    /// When tonight turns into the next night: sunrise, or the end of the night when the Sun does not rise. From then on
+    /// `tonightStart` and `nightsFromTonight` are out of date, whichever night this report is for.
+    let tonightExpiry: Date
     /// Whether the site's recorded skyline was applied to the Moon, the Milky Way core, the planets and the targets.
     let appliesSkyline: Bool
     /// The comets that are bright tonight; `nil` while the catalog has not been loaded (the card is left out).
@@ -69,7 +72,4 @@ struct TonightReport: Sendable {
 
     /// Local noon of the date this night starts on.
     var nightStart: Date { summary.night.start }
-
-    /// When tonight turns into the next night: sunrise, or the end of the night when the Sun does not rise.
-    var expiry: Date { summary.twilight.sunrise ?? summary.night.end }
 }

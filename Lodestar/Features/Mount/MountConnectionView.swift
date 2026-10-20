@@ -106,11 +106,11 @@ private struct MountStatusSection: View {
                 StatusChip(systemImage: "wifi.exclamationmark", text: "Connection lost", tone: .critical)
                 Spacer(minLength: 0)
             }
+            // The reason itself says whether the mount may still be moving (`MountService` words it where the loss is found).
             Text(reason)
                 .font(.subheadline)
                 .foregroundStyle(palette.primaryText)
                 .fixedSize(horizontal: false, vertical: true)
-            SettingsCaption("The mount may still be moving if it was slewing. Stop it on its hand controller if it is.")
         }
     }
 
@@ -451,7 +451,9 @@ private struct MountControlsSection: View {
                     isOn: Binding(get: { status.isTracking ?? false }, set: { service.setTracking($0) }))
                     .disabled(status.phase == .slewing)
             }
-            if capabilities?.canSetSiteAndTime == true, let observer = app.observerContext?.observer {
+            // A mount that Lodestar aligns is sent nothing (see `MountAlignmentText.siteAndTime`), so there is nothing to send.
+            if capabilities?.canSetSiteAndTime == true, !service.usesLodestarAlignment,
+               let observer = app.observerContext?.observer {
                 VStack(alignment: .leading, spacing: 4) {
                     Button("Send location and time to the mount") {
                         Task { await service.sendSiteAndTime(location: observer.location) }
@@ -490,7 +492,7 @@ private struct MountLimitsSection: View {
 
     var body: some View {
         @Bindable var service = MountService.shared
-        let option = service.connectedOption ?? service.selectedOption
+        let option = service.displayedOption
         SettingsSection(title: "Limits") {
             SettingsSliderRow(title: "Altitude limit", valueText: AppFormat.altitude(service.settings.altitudeLimit),
                               value: $service.settings.altitudeLimit, range: MountUserSettings.altitudeLimitRange,
@@ -535,7 +537,7 @@ private struct MountAdvancedSection: View {
 
     var body: some View {
         @Bindable var service = MountService.shared
-        let fields = (service.connectedOption ?? service.selectedOption).advancedFields
+        let fields = service.displayedOption.advancedFields
         if !fields.isEmpty {
             SettingsSection(title: "Advanced", footer: "These apply the next time you connect.") {
                 DisclosureGroup("Advanced options", isExpanded: $isExpanded) {

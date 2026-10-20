@@ -28,7 +28,7 @@ struct OnlineRefresher: Sendable {
     /// What the schedule needs to know about `resource`.
     func state(_ resource: OnlineResource) async -> OnlineResourceState {
         OnlineResourceState(lastAttempt: store.lastAttempt(resource), lastAttemptFailed: store.lastAttemptFailed(resource),
-                            meta: cache.readMeta(resource.key))
+                            retryWait: store.retryWait(resource), meta: cache.readMeta(resource.key))
     }
 
     /// Requests `url` for `resource`. `key` names the copy wanted (the forecast's rounded coordinates); the validators of
@@ -37,16 +37,22 @@ struct OnlineRefresher: Sendable {
         let cached = cache.readMeta(resource.key).flatMap { $0.key == key ? $0 : nil }
         let previousAttempt = store.lastAttempt(resource)
         let previousFailed = store.lastAttemptFailed(resource)
+        let previousWait = store.retryWait(resource)
         store.setLastAttempt(resource, now)
         store.setLastAttemptFailed(resource, true)
+        // Until the outcome is known (the app may be killed meanwhile) the resource's own retry interval applies.
+        store.setRetryWait(resource, nil)
         let request = OnlineRequest(url: url, maximumBytes: resource.maximumBytes, etag: cached?.etag,
                                     lastModified: cached?.lastModified, allowsExpensiveNetwork: !resource.requiresUnmetered)
         switch await downloader.fetch(request) {
-        case .failed(let failure, let status):
+        case .failed(let failure, let status, let retryAfter):
             if failure.sentNothing {
                 // Nothing reached the provider, so the request interval is not used up.
                 store.setLastAttempt(resource, previousAttempt)
                 store.setLastAttemptFailed(resource, previousFailed)
+                store.setRetryWait(resource, previousWait)
+            } else {
+                store.setRetryWait(resource, OnlineSchedule.retryWait(resource, after: failure, retryAfter: retryAfter))
             }
             return .failed(failure, message: failure.message(statusCode: status))
         case .notModified(let expires):

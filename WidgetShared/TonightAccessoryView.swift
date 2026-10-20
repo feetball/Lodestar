@@ -12,8 +12,8 @@ struct TonightAccessoryView: View {
 
     var body: some View {
         switch entry.content {
-        case .needsLocation:
-            needsLocation
+        case .needsLocation(let issue):
+            needsLocation(issue)
         case .night(let night):
             let lines = TonightLines(night: night, now: entry.date)
             switch family {
@@ -123,7 +123,7 @@ struct TonightAccessoryView: View {
     // MARK: Without a place
 
     @ViewBuilder
-    private var needsLocation: some View {
+    private func needsLocation(_ issue: TonightLocationIssue) -> some View {
         switch family {
         case .accessoryCircular:
             ZStack {
@@ -133,33 +133,33 @@ struct TonightAccessoryView: View {
                     .widgetAccentable()
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(TonightNeedsLocationText.spoken)
+            .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
                 Label(TonightLines.title, systemImage: "moon.stars")
                     .font(.headline)
                     .widgetAccentable()
-                Text(TonightNeedsLocationText.full)
+                Text(TonightNeedsLocationText.full(issue))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(TonightNeedsLocationText.spoken)
+            .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         #if os(watchOS)
         case .accessoryCorner:
             Image(systemName: "location.slash")
                 .font(.title2)
                 .widgetAccentable()
-                .widgetLabel { Text("Set location") }
+                .widgetLabel { Text(TonightNeedsLocationText.corner(issue)) }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(TonightNeedsLocationText.spoken)
+                .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         #endif
         default:
-            Label(TonightNeedsLocationText.short, systemImage: "location.slash")
+            Label(TonightNeedsLocationText.short(issue), systemImage: "location.slash")
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(TonightNeedsLocationText.spoken)
+                .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         }
     }
 

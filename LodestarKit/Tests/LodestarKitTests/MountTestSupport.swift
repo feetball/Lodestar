@@ -37,6 +37,10 @@ enum MountTestSupport {
     /// 2026-10-18 04:00 UTC, about 22:04 the evening before in Colorado: right ascension 22.7 h is near the meridian.
     static let start = Date(timeIntervalSince1970: 1_792_296_000)
 
+    /// 2026-10-18 19:00 UTC, 13:00 in Colorado (local apparent noon is at 18:47 UTC): the Sun stands about 40 degrees up in
+    /// the south, at right ascension 13.5 h and declination -9.6 degrees.
+    static let midday = Date(timeIntervalSince1970: 1_792_350_000)
+
     /// The Andromeda galaxy's centre (J2000): high in the east at `start`.
     static let andromeda = EquatorialCoordinate(rightAscensionHours: 0.7123, declination: 41.2689)
 
@@ -55,8 +59,8 @@ enum MountTestSupport {
     static let rigNames = ["lx200-onstep", "lx200-meade-low", "nexstar-celestron", "nexstar-synscan", "alpaca-topocentric", "alpaca-j2000"]
 
     static func rig(_ name: String, settings: MountSettings = .standard, chunkSize: Int = 0, slewRate: Double = 4.0,
-                    configure: (MountRig) -> Void = { _ in }) -> MountRig {
-        let clock = ManualMountClock(start: start)
+                    begin: Date = MountTestSupport.start, configure: (MountRig) -> Void = { _ in }) -> MountRig {
+        let clock = ManualMountClock(start: begin)
         let mount = MountSimulatorModel(clock: clock, start: parkPosition, slewRateDegreesPerSecond: slewRate)
         let driver: MountDriver
         var stream: MountSimulatedStreamTransport?

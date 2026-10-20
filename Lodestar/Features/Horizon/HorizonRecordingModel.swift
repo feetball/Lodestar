@@ -204,6 +204,9 @@ final class HorizonRecordingModel {
         recorder.finish(fill: fill, base: storedSkyline)
     }
 
+    /// For each whole degree 0…359, whether the sweep has reached it.
+    var recordedMask: [Bool] { recorder.recordedMask }
+
     // MARK: Reading
 
     private func publish(now: Date) {
@@ -227,11 +230,12 @@ final class HorizonRecordingModel {
         if recent == .lowQuality {
             return isHeadingMissing ? .headingNotSet : .calibrateCompass
         }
+        // Before the speed: samples out of range do not update the recorder's sweep rate, so it may be stale.
+        if recent == .outOfRange { return .aimAtSkyline }
         let maximumRate = recorder.configuration.maximumSweepRate
         if recent == .tooFast || (recorder.sweepRate ?? 0) > Self.warningFraction * maximumRate {
             return .slowDown
         }
-        if recent == .outOfRange { return .aimAtSkyline }
         if hasInterference { return .interference }
         if recorder.lastAzimuth == nil { return .waiting }
         if recorder.recordedBinCount >= HorizonProfile.binCount { return .complete }

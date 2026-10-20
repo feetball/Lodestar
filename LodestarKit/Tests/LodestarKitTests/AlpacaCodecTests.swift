@@ -272,6 +272,25 @@ final class AlpacaCodecTests: XCTestCase {
         XCTAssertTrue(detail.hasPrefix("bad thing"))
     }
 
+    func testTransactionIDsMayUseTheWholeUnsigned32BitRange() throws {
+        // The Alpaca API defines both transaction ids as uint32: a server may count milliseconds or hash into it.
+        let request = AlpacaRequestBuilder().slewing()
+        let reply = try AlpacaResponseParser.parse(ok("true", client: request.clientTransactionID, server: 3_000_000_000), for: request)
+        XCTAssertEqual(try reply.booleanValue(), true)
+        XCTAssertEqual(reply.serverTransactionID, 3_000_000_000)
+        let largest = try AlpacaResponseParser.parse(ok("true", client: request.clientTransactionID, server: 4_294_967_295), for: request)
+        XCTAssertEqual(largest.serverTransactionID, 4_294_967_295)
+        // Beyond uint32, negative-beyond-int32 and fractions are still garbage.
+        for server in ["4294967296", "-2147483648", "1.5", "1e10"] {
+            let body = "{\"Value\": true, \"ClientTransactionID\": \(request.clientTransactionID), \"ServerTransactionID\": \(server), "
+                + "\"ErrorNumber\": 0, \"ErrorMessage\": \"\"}"
+            assertMalformed(try AlpacaResponseParser.parse(AlpacaHTTPResponse(statusCode: 200, body: body), for: request), server)
+        }
+        // The error number keeps its stricter range.
+        let wild = "{\"ClientTransactionID\": \(request.clientTransactionID), \"ErrorNumber\": 3000000000}"
+        assertMalformed(try AlpacaResponseParser.parse(AlpacaHTTPResponse(statusCode: 200, body: wild), for: request), "ErrorNumber")
+    }
+
     func testBrokenBodiesAreRejected() {
         let request = AlpacaRequestBuilder().slewing()
         let bodies = [

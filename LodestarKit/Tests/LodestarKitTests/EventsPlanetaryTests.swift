@@ -141,6 +141,44 @@ final class EventsPlanetaryTests: XCTestCase {
         Support.assertNear(1.01664, found[1].1.distanceAU, tolerance: 1e-4, "aphelion distance")
     }
 
+    func testApsidesAreFoundFarFromThePresent() {
+        // The apsides drift through the calendar by about 1.75 days a century: around 1500 the perihelion is in late
+        // December, around 2500 it is on 11 January, outside a fixed window around 3 January. Meeus (ch. 38) gives the
+        // mean instants (JDE = 2451547.507 + 365.2596358 k, whole k perihelion, k + 0.5 aphelion); the planets and the
+        // Moon move the true ones by up to about two days, so allow three.
+        let cases: [(Double, EarthApsisKind)] = [(0, .perihelion), (0.5, .aphelion)]
+        for k in [-500.0, 500.0] {
+            for (offset, kind) in cases {
+                let estimate = JulianDate(tt: 2_451_547.507 + 365.259_635_8 * (k + offset)).date
+                let label = "\(kind) k \(k + offset)"
+                let found = Support.apsides(EarthApsisFinder.events(from: estimate.addingTimeInterval(-20 * 86_400),
+                                                                    to: estimate.addingTimeInterval(20 * 86_400)))
+                XCTAssertEqual(found.map { $0.1.kind }, [kind], label)
+                guard let apsis = found.first else { continue }
+                XCTAssertTrue(abs(Support.seconds(apsis.0.date, estimate)) < 3 * 86_400, "\(label): \(apsis.0.date)")
+                // The distance is the extreme of its kind around the event.
+                let jd = JulianDate(date: apsis.0.date)
+                func distance(_ days: Double) -> Double { Ephemeris.geocentricJ2000(of: .sun, at: jd.addingDays(days)).length }
+                let sign = kind == .perihelion ? 1.0 : -1.0
+                XCTAssertTrue(sign * (distance(-5) - distance(0)) > 0 && sign * (distance(5) - distance(0)) > 0, label)
+                Support.assertNear(kind == .perihelion ? 0.9833 : 1.0167, apsis.1.distanceAU, tolerance: 1e-3, "\(label) distance")
+            }
+        }
+    }
+
+    func testApsidesOfWholeYearsFarFromThePresent() {
+        // 2500: perihelion about 11 January, aphelion about 13 July. 1500: aphelion about 26 June, perihelion about
+        // 26 December (the one before it, in 1499, is also in late December and outside the year).
+        let year2500 = Support.apsides(events({ EarthApsisFinder.events(from: $0, to: $1) }, "2500-01-01T00:00:00Z", "2500-12-31T23:59:59Z"))
+        XCTAssertEqual(year2500.map { $0.1.kind }, [.perihelion, .aphelion])
+        let year1500 = Support.apsides(events({ EarthApsisFinder.events(from: $0, to: $1) }, "1500-01-01T00:00:00Z", "1500-12-31T23:59:59Z"))
+        XCTAssertEqual(year1500.map { $0.1.kind }, [.aphelion, .perihelion])
+        // The calculator reaches them too.
+        let calculated = EventCalculator.events(from: Support.utc("2500-01-01T00:00:00Z"), to: Support.utc("2501-01-01T00:00:00Z"),
+                                                observer: nil, options: EventOptions(kinds: [.earthApsis]))
+        XCTAssertEqual(calculated.count, 2)
+    }
+
     func testApsidesAreOptionalByDefault() {
         XCTAssertTrue(!EventOptions().kinds.contains(.earthApsis))
         XCTAssertTrue(EventKind.allCases.contains(.earthApsis))

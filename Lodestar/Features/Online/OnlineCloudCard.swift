@@ -11,9 +11,16 @@ enum CloudCardText {
     static let beyondForecast = "No forecast for this night yet. The forecast reaches about nine days ahead."
     static let coarse = "Further ahead the forecast has one value every six hours."
 
-    /// "Issued 19:17 · Forecast: MET Norway · Location rounded to about 10 km."
+    /// "Issued 19:17 · Forecast: MET Norway · Location rounded to about 10 km." The issue time carries its date when the
+    /// forecast was not issued today.
     static func footnote(issuedText: String) -> String {
         "Issued \(issuedText) \u{00B7} \(attribution) \u{00B7} \(rounding)"
+    }
+
+    /// "This forecast is 14 hours old and has not been refreshed." Whole days from two days on.
+    static func stale(ageHours: Int) -> String {
+        let age = ageHours < 48 ? "\(ageHours) hours" : "\(ageHours / 24) days"
+        return "This forecast is \(age) old and has not been refreshed."
     }
 }
 
@@ -45,7 +52,7 @@ struct TonightCloudCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 CardTitle(title: CloudCardText.title, systemImage: "cloud")
                 if let forecast {
-                    CloudForecastContent(forecast: forecast, night: night, timeZone: timeZone)
+                    CloudForecastContent(forecast: forecast, night: night, timeZone: timeZone, now: app.clock.now)
                 } else {
                     let status = online.status(.clouds)
                     TonightNote(text: status.isUpdating ? CloudCardText.loading : (status.error ?? CloudCardText.loading))
@@ -68,11 +75,21 @@ private struct CloudForecastContent: View {
     let forecast: CloudForecast
     let night: DateInterval
     let timeZone: TimeZone
+    /// The live time (not a time-travel date), which the age of the forecast is measured against.
+    let now: Date
     @Environment(\.palette) private var palette
+
+    /// A forecast issued longer ago than this is flagged: the last refresh failed or has not happened, and the saved
+    /// forecast still covers tonight (it reaches about nine days ahead).
+    private static let staleAfter: TimeInterval = 12 * 3600
 
     var body: some View {
         let slots = ForecastNight.slots(forecast, night: night)
         let timeText: (Date) -> String = { AppFormat.time($0, in: timeZone) }
+        let age = now.timeIntervalSince(forecast.issuedAt)
+        if age > Self.staleAfter {
+            TonightNote(text: CloudCardText.stale(ageHours: Int(age / 3600)), style: .warning)
+        }
         if slots.isEmpty {
             let beforeStart = forecast.hours.first.map { night.end <= $0.time } ?? false
             TonightNote(text: beforeStart ? CloudCardText.beforeForecast : CloudCardText.beyondForecast)
@@ -88,7 +105,15 @@ private struct CloudForecastContent: View {
                 TonightNote(text: CloudCardText.coarse, style: .footnote)
             }
         }
-        TonightNote(text: CloudCardText.footnote(issuedText: timeText(forecast.issuedAt)), style: .footnote)
+        TonightNote(text: CloudCardText.footnote(issuedText: issuedText(timeText: timeText)), style: .footnote)
+    }
+
+    /// The issue time of the forecast, with its date when that is not today in the observer's time zone.
+    private func issuedText(timeText: (Date) -> String) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        if calendar.isDate(forecast.issuedAt, inSameDayAs: now) { return timeText(forecast.issuedAt) }
+        return AppFormat.dateTime(forecast.issuedAt, in: timeZone)
     }
 }
 

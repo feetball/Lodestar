@@ -275,6 +275,24 @@ final class CometsParsingTests: XCTestCase {
         XCTAssertEqual(cometError(replacing(good, 97, 100, "-1.0")), .fieldOutOfRange(.slopeParameter, value: -1.0))
     }
 
+    func testCometPerihelionDayMustExistInItsMonth() throws {
+        let good = CometsTestData.cometPonsBrooks
+        func line(_ year: String, _ month: String, _ day: String) -> String {
+            replacing(replacing(replacing(good, 15, 18, year), 20, 21, month), 23, 29, day)
+        }
+        // A day the month does not have used to roll over into the next month, and a day before the 1st into the previous one.
+        XCTAssertEqual(cometError(line("2026", " 2", "31.5000")), .fieldOutOfRange(.perihelionDay, value: 31.5))
+        XCTAssertEqual(cometError(line("2025", " 2", "29.0000")), .fieldOutOfRange(.perihelionDay, value: 29.0))
+        XCTAssertEqual(cometError(line("2024", " 2", "30.0000")), .fieldOutOfRange(.perihelionDay, value: 30.0))
+        XCTAssertEqual(cometError(line("2026", " 4", "31.0000")), .fieldOutOfRange(.perihelionDay, value: 31.0))
+        XCTAssertEqual(cometError(line("2026", " 4", "0.5000")), .fieldOutOfRange(.perihelionDay, value: 0.5))
+        XCTAssertEqual(cometError(line("2026", " 4", "0.0000")), .fieldOutOfRange(.perihelionDay, value: 0.0))
+        // The first instant of a month, the leap day and the last fraction of a 30-day month are fine.
+        XCTAssertEqual(try comet(line("2024", " 1", "1.0000")).orbit.perihelionJulianDayTT, 2_460_310.5, accuracy: 1e-9)
+        XCTAssertEqual(try comet(line("2024", " 2", "29.0000")).orbit.perihelionJulianDayTT, 2_460_369.5, accuracy: 1e-9)
+        XCTAssertEqual(try comet(line("2024", " 4", "30.9999")).orbit.perihelionJulianDayTT, 2_460_431.4999, accuracy: 1e-6)
+    }
+
     func testCometPhotometryIsOptionalAndDefaultsTheSlope() throws {
         let good = CometsTestData.cometPonsBrooks
         XCTAssertNil(try comet(replacing(good, 92, 100, "")).photometry)

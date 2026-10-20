@@ -311,6 +311,8 @@ struct HelpButton: View {
     enum Appearance {
         /// A plain symbol, for a navigation bar.
         case toolbar
+        /// A plain symbol padded to the minimum touch target, for use outside a navigation bar.
+        case inline
         /// A round chip like the status chips of the Aim screen.
         case chip
     }
@@ -318,15 +320,27 @@ struct HelpButton: View {
     @Environment(\.palette) private var palette
     let topic: HelpTopic.ID
     var appearance = Appearance.toolbar
+    /// Opens the page through a presenter further up instead of the button's own sheet: needed where the button sits
+    /// in a view that is rebuilt while the page is open, or next to other sheets of the same screen.
+    var action: (() -> Void)? = nil
     @State private var isShowing = false
 
     var body: some View {
         Button {
-            isShowing = true
+            if let action {
+                action()
+            } else {
+                isShowing = true
+            }
         } label: {
             switch appearance {
             case .toolbar:
                 Image(systemName: "questionmark.circle")
+            case .inline:
+                Image(systemName: "questionmark.circle")
+                    // Padded to the minimum touch target.
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             case .chip:
                 Image(systemName: "questionmark")
                     .font(.caption.weight(.bold))

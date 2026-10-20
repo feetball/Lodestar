@@ -17,8 +17,9 @@ final class MountLifecycle {
     /// Asks iOS for time to finish stopping the mount after the app has left the screen.
     func beginBackgroundTask() {
         guard backgroundTask == .invalid else { return }
+        // iOS calls the handler on the main thread and wants the task ended before it returns, so no hop to a Task here.
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Stop the mount") { [weak self] in
-            Task { @MainActor in self?.endBackgroundTask() }
+            MainActor.assumeIsolated { self?.endBackgroundTask() }
         }
     }
 

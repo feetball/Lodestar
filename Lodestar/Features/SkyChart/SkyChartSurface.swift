@@ -3,6 +3,8 @@ import LodestarKit
 
 /// How the chart was placed when a drag of the fixed camera frame began.
 private struct SkyChartDragOrigin {
+    /// Where the finger touched down, which tells one drag from the next when an earlier one was cancelled.
+    let startLocation: CGPoint
     let viewport: PlanisphereViewport
     let frame: SkyFrame
 }
@@ -47,13 +49,14 @@ struct SkyChartSurface: View {
     @State private var appliedTranslation: CGSize = .zero
     /// The viewport and instant where a drag of the fixed frame began, which it is worked out from.
     @State private var dragOrigin: SkyChartDragOrigin?
-    /// Whether two fingers are pinching, which then leave the fixed frame where it is.
-    @State private var isPinching = false
     /// The frame's position angle when the turn in progress began.
     @State private var rotationStartAngle: Double?
     @State private var lastRotationActivity: Date?
     /// Counts the turns begun, for the tap of the haptics that confirms one.
     @State private var rotationCount = 0
+    /// True while two fingers are pinching, which then leave the fixed frame where it is. Like `isHoldTurning` it resets
+    /// by itself however the gesture ends, so a cancelled pinch cannot leave the frame unable to move.
+    @GestureState private var isPinching = false
     /// True while a press and hold has turned into a turn of the frame. Resets by itself however the gesture ends, so a
     /// cancelled gesture cannot leave the chart unable to move.
     @GestureState private var isHoldTurning = false
@@ -95,6 +98,10 @@ struct SkyChartSurface: View {
                 } else if !isFirstLook {
                     releaseFrame(in: size)
                 }
+            }
+            .onChange(of: app.scenePhase) {
+                // A touch interrupted by the system never ends, so what its gestures kept is dropped.
+                forgetGestureProgress()
             }
         }
         .animation(.easeOut(duration: 0.2), value: model.selection != nil)
@@ -273,9 +280,11 @@ struct SkyChartSurface: View {
 
     private func magnifyGesture(in size: CGSize) -> some Gesture {
         MagnifyGesture()
+            .updating($isPinching) { _, state, _ in
+                state = true
+            }
             .onChanged { value in
                 guard value.magnification > 0, appliedMagnification > 0 else { return }
-                isPinching = true
                 // A fixed frame keeps the sky under it while zooming; otherwise the sky under the fingers stays put.
                 let anchor = showsFixedFrame
                     ? CGPoint(x: size.width / 2, y: size.height / 2)
@@ -285,7 +294,6 @@ struct SkyChartSurface: View {
             }
             .onEnded { _ in
                 appliedMagnification = 1
-                isPinching = false
             }
     }
 
@@ -296,7 +304,7 @@ struct SkyChartSurface: View {
                 // Fingers that turn the frame or zoom leave it where it is.
                 guard !isHoldTurning, rotationStartAngle == nil, !isPinching || !showsFixedFrame else { return }
                 if showsFixedFrame {
-                    moveFrame(by: value.translation, in: size)
+                    moveFrame(by: value.translation, from: value.startLocation, in: size)
                     return
                 }
                 let step = CGSize(width: value.translation.width - appliedTranslation.width,
@@ -315,10 +323,16 @@ struct SkyChartSurface: View {
 
     /// Drags the sky under the fixed camera frame: the frame's centre becomes the sky point that `translation` brings
     /// to the middle. It is worked out from where the drag began, so that the small rounding of refraction does not
-    /// build up step by step.
-    private func moveFrame(by translation: CGSize, in size: CGSize) {
-        let origin = dragOrigin ?? SkyChartDragOrigin(viewport: viewport(in: size), frame: content.frame)
-        dragOrigin = origin
+    /// build up step by step. A drag cancelled by the system leaves its origin behind, so the origin only serves the
+    /// drag that touched down at `startLocation`.
+    private func moveFrame(by translation: CGSize, from startLocation: CGPoint, in size: CGSize) {
+        let origin: SkyChartDragOrigin
+        if let current = dragOrigin, current.startLocation == startLocation {
+            origin = current
+        } else {
+            origin = SkyChartDragOrigin(startLocation: startLocation, viewport: viewport(in: size), frame: content.frame)
+            dragOrigin = origin
+        }
         let source = CGPoint(x: origin.viewport.middle.x - translation.width,
                              y: origin.viewport.middle.y - translation.height)
         model.setFramingCenter(SkyChartFraming.skyPosition(atScreen: source, in: origin.viewport, frame: origin.frame))
@@ -337,7 +351,8 @@ struct SkyChartSurface: View {
             }
             .onEnded { _ in
                 rotationStartAngle = nil
-                lastRotationActivity = .now
+                // Without the fixed frame nothing was turned: the lift of the fingers after a pinch is no turn's end.
+                if showsFixedFrame { lastRotationActivity = .now }
             }
     }
 
@@ -347,7 +362,8 @@ struct SkyChartSurface: View {
         LongPressGesture(minimumDuration: Self.rotationPressDuration)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .updating($isHoldTurning) { value, state, _ in
-                if case .second(true, _) = value { state = true }
+                // Only the fixed frame is turned by a press; without it the drag after the press pans the chart as usual.
+                if showsFixedFrame, case .second(true, _) = value { state = true }
             }
             .onChanged { value in
                 guard showsFixedFrame else { return }
@@ -365,8 +381,21 @@ struct SkyChartSurface: View {
             }
             .onEnded { _ in
                 rotationStartAngle = nil
-                lastRotationActivity = .now
+                // Without the fixed frame nothing was turned, so the lift of the finger can still be a tap.
+                if showsFixedFrame { lastRotationActivity = .now }
             }
+    }
+
+    /// Drops what the gestures keep between their steps. SwiftUI never calls `onEnded` of a gesture that the system
+    /// cancelled, such as by a swipe from the edge of the screen or when the app goes to the background.
+    private func forgetGestureProgress() {
+        appliedMagnification = 1
+        appliedTranslation = .zero
+        rotationStartAngle = nil
+        if dragOrigin != nil {
+            dragOrigin = nil
+            model.saveFramingCenter()
+        }
     }
 
     /// Starts a turn of the frame from its present angle, with a tap of the haptics.

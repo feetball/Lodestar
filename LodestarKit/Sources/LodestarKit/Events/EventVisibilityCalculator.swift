@@ -189,8 +189,14 @@ final class EventVisibilityCalculator {
                                darknessLimit: 0, contacts: contacts)
     }
 
+    /// The night (local noon to noon) that contains `date`. The day is decided by comparing `date` with its own local noon
+    /// rather than by shifting 12 absolute hours, which lands an hour off on the 23- and 25-hour days of a time change.
     private func twilight(_ date: Date) -> NightTwilight {
-        let reference = date.addingTimeInterval(-12 * 3600)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let own = TwilightCalculator.nightInterval(startingOn: date, timeZone: timeZone)
+        let reference = date >= own.start ? date
+            : (calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400))
         let key = TwilightCalculator.nightInterval(startingOn: reference, timeZone: timeZone).start
         if let known = nights[key] { return known }
         let night = TwilightCalculator.night(startingOn: reference, observer: observer, timeZone: timeZone)

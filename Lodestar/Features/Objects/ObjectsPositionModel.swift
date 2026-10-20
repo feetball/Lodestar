@@ -12,8 +12,12 @@ struct ObjectSkyPosition: Sendable, Equatable {
     let azimuth: Double
     /// The next rising (clearing the skyline, if there is one) within `ObjectsPositionCalculator.riseSearchWindow`.
     let nextRise: Date?
-    /// `true` when the object stays below the horizon (or behind the skyline) throughout the search window.
+    /// `true` when an object that keeps its place among the stars (a star, a deep-sky object or a celestial pole)
+    /// stays below the horizon (or behind the skyline) throughout the search window, which is for good.
     let neverRises: Bool
+    /// `true` when the Sun, the Moon, a planet, a comet or an asteroid has no rising in the search window. It moves, so
+    /// that says nothing about later days.
+    let noRiseInWindow: Bool
     /// The current magnitude of the Sun, the Moon, the planets, comets and asteroids, whose brightness changes; `nil`
     /// for other objects.
     let magnitude: Double?
@@ -56,11 +60,14 @@ enum ObjectsPositionCalculator {
             } else {
                 events = RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: window)
             }
+            let staysBelow = events.circumstance == .alwaysDown
+            let isStationary = staysAmongStars(object)
             result[object.id] = ObjectSkyPosition(
                 altitude: horizontal.altitude,
                 azimuth: horizontal.azimuth,
                 nextRise: events.rise,
-                neverRises: events.circumstance == .alwaysDown,
+                neverRises: staysBelow && isStationary,
+                noRiseInWindow: staysBelow && !isStationary,
                 magnitude: object.isSolarSystem ? frame.currentMagnitude(of: object) : nil,
                 computedAt: date,
                 isAboveHorizon: isAbove,
@@ -69,6 +76,15 @@ enum ObjectsPositionCalculator {
                 smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) })
         }
         return result
+    }
+
+    /// Whether the object keeps its place among the stars, so that a rising missing from the search window is missing
+    /// for good. The solar-system bodies and the small bodies move, and may rise on a later day.
+    private static func staysAmongStars(_ object: CelestialObject) -> Bool {
+        switch object.position {
+        case .fixed, .celestialPole: return true
+        case .solarSystem, .smallBody: return false
+        }
     }
 }
 

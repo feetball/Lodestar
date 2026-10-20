@@ -45,11 +45,19 @@ struct TonightPlace: Sendable, Equatable, Codable {
     }
 }
 
+/// Why there is no place, which decides what the user is asked to do about it.
+enum TonightLocationIssue: Sendable, Equatable {
+    /// The user has not been asked yet (or nothing is known): opening Lodestar shows the permission prompt.
+    case notAsked
+    /// The user said no, or location is restricted: only Settings can change that.
+    case deniedOrRestricted
+}
+
 /// What a widget or complication shows at one moment of its timeline.
 struct TonightEntry: Sendable, Equatable {
     enum Content: Sendable, Equatable {
-        /// No place is known: the user has to open Lodestar (and allow location) first.
-        case needsLocation
+        /// No place is known: the user has to allow location first, in Lodestar or in Settings.
+        case needsLocation(TonightLocationIssue)
         case night(TonightNight)
     }
 
@@ -57,8 +65,8 @@ struct TonightEntry: Sendable, Equatable {
     let date: Date
     let content: Content
 
-    static func needsLocation(at date: Date) -> TonightEntry {
-        TonightEntry(date: date, content: .needsLocation)
+    static func needsLocation(at date: Date, issue: TonightLocationIssue = .notAsked) -> TonightEntry {
+        TonightEntry(date: date, content: .needsLocation(issue))
     }
 }
 

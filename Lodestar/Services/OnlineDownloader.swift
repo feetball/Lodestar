@@ -26,6 +26,8 @@ enum OnlineFailure: Sendable, Equatable {
     case timeout
     /// No route, DNS failure, reset connection.
     case network
+    /// The provider answered, then the connection broke or stalled while the data was arriving.
+    case interrupted
     /// The phone is offline; nothing was sent.
     case offline
     /// The feed needs a network that is not expensive or constrained; nothing was sent.
@@ -49,6 +51,7 @@ enum OnlineFailure: Sendable, Equatable {
         case .tooLarge: return "The download was larger than expected."
         case .timeout: return "The provider did not answer in time."
         case .network: return "No connection to the provider."
+        case .interrupted: return "The connection broke while the data was arriving."
         case .offline: return "No network connection."
         case .waitingForUnmetered:
             return "Waiting for an unmetered network such as Wi-Fi: this download is too large for mobile data."
@@ -68,8 +71,9 @@ enum OnlineResult: Sendable {
     case downloaded(bytes: Data, etag: String?, lastModified: String?, expires: Date?)
     /// HTTP 304: the copy we have is current.
     case notModified(expires: Date?)
-    /// Nothing arrived. `statusCode` is the HTTP status when there was one.
-    case failed(OnlineFailure, statusCode: Int?)
+    /// Nothing arrived. `statusCode` is the HTTP status when there was one; `retryAfter` is the seconds the server asked
+    /// us to wait (`Retry-After`), when it did.
+    case failed(OnlineFailure, statusCode: Int?, retryAfter: TimeInterval? = nil)
 }
 
 /// Downloads one file over HTTPS with `URLSession`: time-outs, a size limit, conditional requests (`ETag`,
@@ -136,6 +140,7 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
     /// Set when this delegate cancelled the task itself; it explains the cancellation error.
     private var abort: OnlineFailure?
     private var abortStatus: Int?
+    private var abortRetryAfter: TimeInterval?
     private var redirects = 0
     /// The result of a task that finished (was cancelled) before `start` was called.
     private var earlyResult: OnlineResult?
@@ -153,11 +158,12 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
         if let early { continuation.resume(returning: early) }
     }
 
-    private func setAbort(_ failure: OnlineFailure, status: Int? = nil) {
+    private func setAbort(_ failure: OnlineFailure, status: Int? = nil, retryAfter: TimeInterval? = nil) {
         lock.lock()
         if abort == nil {
             abort = failure
             abortStatus = status
+            abortRetryAfter = retryAfter
         }
         lock.unlock()
     }
@@ -197,10 +203,10 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
         case 304:
             completionHandler(.allow)
         case 403:
-            setAbort(.forbidden, status: 403)
+            setAbort(.forbidden, status: 403, retryAfter: Self.retryAfter(http))
             completionHandler(.cancel)
         case 429:
-            setAbort(.rateLimited, status: 429)
+            setAbort(.rateLimited, status: 429, retryAfter: Self.retryAfter(http))
             completionHandler(.cancel)
         case 200...299:
             if http.expectedContentLength > Int64(maximumBytes) {
@@ -210,7 +216,7 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
                 completionHandler(.allow)
             }
         default:
-            setAbort(.httpError, status: http.statusCode)
+            setAbort(.httpError, status: http.statusCode, retryAfter: Self.retryAfter(http))
             completionHandler(.cancel)
         }
     }
@@ -233,20 +239,27 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
         let response = self.response
         let abort = self.abort
         let abortStatus = self.abortStatus
+        let abortRetryAfter = self.abortRetryAfter
         let body = self.body
-        let result = Self.result(response: response, body: body, error: error, abort: abort, abortStatus: abortStatus)
+        let result = Self.result(response: response, body: body, error: error, abort: abort, abortStatus: abortStatus,
+                                 abortRetryAfter: abortRetryAfter)
         if continuation == nil { earlyResult = result }
         lock.unlock()
         continuation?.resume(returning: result)
     }
 
     private static func result(response: HTTPURLResponse?, body: Data, error: Error?, abort: OnlineFailure?,
-                               abortStatus: Int?) -> OnlineResult {
+                               abortStatus: Int?, abortRetryAfter: TimeInterval?) -> OnlineResult {
         if let response, response.statusCode == 304 {
             return .notModified(expires: date(response, "Expires"))
         }
-        if let abort { return .failed(abort, statusCode: abortStatus) }
-        if let error { return .failed(failure(for: error), statusCode: nil) }
+        if let abort { return .failed(abort, statusCode: abortStatus, retryAfter: abortRetryAfter) }
+        if let error {
+            let kind = failure(for: error)
+            // Once the provider has answered, a broken connection is not "no connection": it may have counted the request.
+            if response != nil && (kind == .network || kind == .timeout) { return .failed(.interrupted, statusCode: nil) }
+            return .failed(kind, statusCode: nil)
+        }
         guard let response, (200...299).contains(response.statusCode) else { return .failed(.httpError, statusCode: response?.statusCode) }
         guard !body.isEmpty else { return .failed(.empty, statusCode: nil) }
         return .downloaded(bytes: body, etag: response.value(forHTTPHeaderField: "ETag"),
@@ -270,10 +283,25 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
     /// An HTTP date header ("Sun, 18 Oct 2026 19:50:18 GMT"), or `nil`; `Expires: 0` and other invalid values count as none.
     private static func date(_ response: HTTPURLResponse, _ name: String) -> Date? {
         guard let text = response.value(forHTTPHeaderField: name) else { return nil }
+        return httpDate(text)
+    }
+
+    private static func httpDate(_ text: String) -> Date? {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(identifier: "GMT")
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
         return formatter.date(from: text)
+    }
+
+    /// The `Retry-After` header as seconds from now: it holds a number of seconds or an HTTP date. `nil` when it is
+    /// missing, invalid or not in the future.
+    private static func retryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
+        guard let text = response.value(forHTTPHeaderField: "Retry-After")?.trimmingCharacters(in: .whitespaces) else {
+            return nil
+        }
+        let seconds = TimeInterval(text) ?? httpDate(text)?.timeIntervalSinceNow
+        guard let seconds, seconds.isFinite, seconds > 0 else { return nil }
+        return seconds
     }
 }

@@ -108,7 +108,7 @@ struct SmallBodyNoOrbitRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Remove from favorites")
+            .accessibilityLabel("Remove \(SmallBodyFavorites.name(ofID: id)) from favorites")
         }
         .padding(.leading, 16)
         .padding(.trailing, 8)

@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 /// Tonight at a glance: the dark window, the Moon, the Milky Way core and the next event, worked out on the device
-/// for where it is. Tapping it opens the app's Tonight tab.
+/// for where it is (its own location, not the observer chosen in the app). Tapping it opens the app's Tonight tab.
 struct TonightWidget: Widget {
     static let kind = "net.kuecker.Lodestar.widgets.tonight"
 
@@ -11,7 +11,7 @@ struct TonightWidget: Widget {
             TonightWidgetView(entry: entry)
         }
         .configurationDisplayName("Tonight")
-        .description("When it gets dark, the Moon, the Milky Way core and the next event, for where you are.")
+        .description("When it gets dark, the Moon, the Milky Way core and the next event, for where this iPhone is.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
