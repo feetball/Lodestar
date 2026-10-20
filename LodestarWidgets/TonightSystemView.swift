@@ -7,6 +7,8 @@ struct TonightSystemView: View {
     let entry: TonightEntry
     let isMedium: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     /// The four things a widget shows.
     private enum Slot {
         case dark, moon, core, event
@@ -67,6 +69,9 @@ struct TonightSystemView: View {
                         .foregroundStyle(TonightStyle.primaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.75)
+                        // The phase keeps both its lines ("First" / "Quarter"); the lines under it give way.
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
                     Text("\(lines.moon.trailing ?? "") lit")
                         .font(.caption)
                         .foregroundStyle(TonightStyle.secondaryText)
@@ -81,7 +86,8 @@ struct TonightSystemView: View {
                 .widgetAccentable()
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-            if let detail = lines.dark.detail {
+            // Larger text leaves no height for this line; the full text is in the spoken label.
+            if dynamicTypeSize <= .large, let detail = lines.dark.detail {
                 Text(detail)
                     .font(.caption2)
                     .foregroundStyle(TonightStyle.secondaryText)
@@ -115,7 +121,7 @@ struct TonightSystemView: View {
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(slot == .dark ? TonightStyle.accent : TonightStyle.primaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.85)
             if let detail = item.detail {
                 Text(detail)
                     .font(.caption2)
@@ -143,16 +149,20 @@ struct TonightSystemView: View {
                     .foregroundStyle(TonightStyle.secondaryText)
                     .accessibilityHidden(true)
             }
+            // When the line is too wide the figure at the end keeps its room, then the badge; the label gives way first.
             Text(short ? item.shortLabel : item.label)
                 .font(.caption2)
                 .foregroundStyle(TonightStyle.secondaryText)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             if let badge = item.badge {
                 Text("\u{00B7} \(badge)")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(TonightStyle.accent)
                     .widgetAccentable()
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
             }
             if let trailing = item.trailing {
                 Spacer(minLength: 2)
@@ -160,6 +170,8 @@ struct TonightSystemView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(TonightStyle.primaryText)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(2)
             }
         }
     }

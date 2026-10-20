@@ -206,6 +206,7 @@ private struct SettingsDeviceLocationRow: View {
 /// A saved site: tap the name to observe from it, tap the pencil to edit it.
 private struct SettingsSavedSiteRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let site: SavedSite
     let isSelected: Bool
     @Binding var horizonFlow: HorizonFlowState
@@ -213,40 +214,64 @@ private struct SettingsSavedSiteRow: View {
     let onEdit: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onSelect) {
+        if dynamicTypeSize.isAccessibilitySize {
+            // At the largest text sizes the two icon buttons would leave the text a column of a few letters, so they
+            // move to their own line under the text.
+            VStack(alignment: .leading, spacing: 4) {
+                selectButton
                 HStack(spacing: 12) {
-                    SettingsSelectionMark(isSelected: isSelected)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(site.name)
-                            .foregroundStyle(palette.primaryText)
-                        Text(subtitle)
+                    HorizonSiteMenu(site: site, flow: $horizonFlow)
+                    editButton
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        } else {
+            HStack(spacing: 12) {
+                selectButton
+                HorizonSiteMenu(site: site, flow: $horizonFlow)
+                editButton
+            }
+        }
+    }
+
+    private var selectButton: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                SettingsSelectionMark(isSelected: isSelected)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(site.name)
+                        .foregroundStyle(palette.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if site.horizon != nil {
+                        Text("Horizon: \(HorizonText.status(of: site))")
                             .font(.footnote)
                             .foregroundStyle(palette.secondaryText)
-                        if site.horizon != nil {
-                            Text("Horizon: \(HorizonText.status(of: site))")
-                                .font(.footnote)
-                                .foregroundStyle(palette.secondaryText)
-                        }
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    Spacer(minLength: 0)
                 }
-                .contentShape(Rectangle())
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(isSelected ? .isSelected : [])
-            HorizonSiteMenu(site: site, flow: $horizonFlow)
-            Button(action: onEdit) {
-                Image(systemName: "pencil.circle")
-                    .font(.title3)
-                    .foregroundStyle(palette.accent)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Edit \(site.name)")
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var editButton: some View {
+        Button(action: onEdit) {
+            Image(systemName: "pencil.circle")
+                .font(.title3)
+                .foregroundStyle(palette.accent)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit \(site.name)")
     }
 
     private var subtitle: String {

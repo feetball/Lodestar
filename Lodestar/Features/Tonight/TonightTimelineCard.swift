@@ -68,8 +68,12 @@ struct TonightTimelineCard: View {
 /// Swatches for the levels of the sky bar, brightest first.
 private struct TonightSkyLegend: View {
     @Environment(\.palette) private var palette
+    /// The least width of a swatch with its label; it grows with the text so that fewer, wider columns are used.
+    @ScaledMetric(relativeTo: .caption2) private var columnWidth: CGFloat = 92
 
-    private let columns = [GridItem(.adaptive(minimum: 92), spacing: 8, alignment: .leading)]
+    private var columns: [GridItem] {
+        [GridItem(.adaptive(minimum: columnWidth), spacing: 8, alignment: .leading)]
+    }
 
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
@@ -83,7 +87,7 @@ private struct TonightSkyLegend: View {
                     Text(level.title)
                         .font(.caption2)
                         .foregroundStyle(palette.secondaryText)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

@@ -47,6 +47,7 @@ struct TonightPlanetsCard: View {
 /// One visible planet: name, brightness, when it is up in the dark and how high it gets.
 private struct TonightPlanetRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let planet: PlanetVisibility
     /// The catalog entry the row opens; `nil` while the catalog is loading.
@@ -69,15 +70,17 @@ private struct TonightPlanetRow: View {
         HStack(alignment: .top, spacing: 10) {
             ObjectIcon(category: .planet)
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(planet.body.displayName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(palette.primaryText)
-                    Spacer(minLength: 8)
-                    Text(AppFormat.magnitude(planet.magnitude))
-                        .font(.subheadline)
-                        .monospacedDigit()
-                        .foregroundStyle(palette.secondaryText)
+                if dynamicTypeSize.isAccessibilitySize {
+                    // The name and the magnitude each get the whole width, so the name is not broken mid-word.
+                    nameText
+                    magnitudeText
+                } else {
+                    HStack(alignment: .firstTextBaseline) {
+                        nameText
+                        Spacer(minLength: 8)
+                        magnitudeText
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                 }
                 Text(timing)
                     .font(.footnote)
@@ -99,13 +102,25 @@ private struct TonightPlanetRow: View {
         .accessibilityLabel(spokenSummary)
     }
 
+    private var nameText: some View {
+        Text(planet.body.displayName)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(palette.primaryText)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var magnitudeText: some View {
+        Text(AppFormat.magnitude(planet.magnitude))
+            .font(.subheadline)
+            .monospacedDigit()
+            .foregroundStyle(palette.secondaryText)
+    }
+
     /// "Up 20:15 – 05:40 · highest 62°".
     private var timing: String {
-        var text = "Up " + TonightFormat.windows(planet.visibleIntervals, in: timeZone)
-        if let altitude = planet.maxAltitudeDuringDarkness {
-            text += " \u{00B7} highest " + AngleFormatter.formatDegrees(altitude, decimals: 0)
-        }
-        return text
+        let up = "Up " + TonightFormat.windows(planet.visibleIntervals, in: timeZone)
+        guard let altitude = planet.maxAltitudeDuringDarkness else { return up }
+        return TonightFormat.dotted([up, "highest " + AngleFormatter.formatDegrees(altitude, decimals: 0)])
     }
 
     private var spokenSummary: String {

@@ -25,7 +25,7 @@ struct TonightWidgetView: View {
     var body: some View {
         content
             // The Home Screen layouts have a fixed size: beyond this the text only truncates ("Fir…", "Da… · n…").
-            .dynamicTypeSize(Self.isHomeScreen(family) ? .xSmall ... .xxxLarge : .xSmall ... .accessibility5)
+            .dynamicTypeSize(Self.dynamicTypeRange(for: family))
             .widgetURL(TonightLink.url)
             .containerBackground(for: .widget) {
                 switch family {
@@ -37,8 +37,19 @@ struct TonightWidgetView: View {
             }
     }
 
-    private static func isHomeScreen(_ family: WidgetFamily) -> Bool {
-        family == .systemSmall || family == .systemMedium
+    /// The medium widget's tiles are about 133 pt wide, so its text stops growing earlier than the small one's: at xLarge
+    /// the bold value is still larger than its label and fits without shrinking far. The small one is about 126 pt high
+    /// inside its margins: at xxLarge the Moon phase on two lines, its "lit" line, the label and the dark window on two
+    /// lines still fit (the window shrinks a little); at xxxLarge they need about 140 pt, so the window would be cut to
+    /// one line again ("7:13 PM – 5:13…"). The inline widget is one line of 257 pt: "Dark until 5:13 · 54%" is about
+    /// 160 pt at the default size, so it stops growing at xxLarge instead of being cut to "Dark until 5:…".
+    private static func dynamicTypeRange(for family: WidgetFamily) -> ClosedRange<DynamicTypeSize> {
+        switch family {
+        case .systemSmall: return .xSmall ... .xxLarge
+        case .systemMedium: return .xSmall ... .xLarge
+        case .accessoryInline: return .xSmall ... .xxLarge
+        default: return .xSmall ... .accessibility5
+        }
     }
 
     @ViewBuilder

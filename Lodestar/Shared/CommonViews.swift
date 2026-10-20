@@ -35,6 +35,7 @@ enum ChipTone {
 /// A compact capsule with an icon and a short label, used for sensor/alignment status.
 struct StatusChip: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let systemImage: String
     let text: String
     var tone: ChipTone = .neutral
@@ -43,7 +44,10 @@ struct StatusChip: View {
         Label(text, systemImage: systemImage)
             .font(.caption.weight(.semibold))
             .labelStyle(.titleAndIcon)
-            .lineLimit(1)
+            // At accessibility sizes a long chip wraps ("Visible from here") instead of being cut off.
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .foregroundStyle(foreground)
@@ -64,21 +68,68 @@ struct StatusChip: View {
 /// A label/value row used in detail cards.
 struct InfoRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let label: String
     let value: String
 
+    /// The narrowest column the value is given beside its label before it goes under the label instead.
+    @ScaledMetric(relativeTo: .subheadline) private var narrowestValueColumn: CGFloat = 100
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-                .foregroundStyle(palette.secondaryText)
-            Spacer(minLength: 12)
-            Text(value)
-                .foregroundStyle(palette.primaryText)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
+        // All the rows of a card take the same shape: at accessibility sizes the value always goes under the label.
+        // Otherwise it shares the label's line, right-aligned, and wraps beside the label when it is too long for the
+        // line; it goes under the label only when that would leave it a narrow column that breaks words in two.
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                stacked
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline) {
+                        labelText
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 12)
+                        valueText
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        labelText
+                            .fixedSize(horizontal: true, vertical: false)
+                        valueText
+                            .multilineTextAlignment(.trailing)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(minWidth: 0, idealWidth: narrowestValueColumn, maxWidth: .infinity,
+                                   alignment: .trailing)
+                            .padding(.leading, 12)
+                    }
+                    stacked
+                }
+            }
         }
         .font(.subheadline)
         .accessibilityElement(children: .combine)
+    }
+
+    private var labelText: some View {
+        Text(label)
+            .foregroundStyle(palette.secondaryText)
+    }
+
+    private var valueText: some View {
+        Text(value)
+            .foregroundStyle(palette.primaryText)
+            .monospacedDigit()
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            labelText
+                .fixedSize(horizontal: false, vertical: true)
+            valueText
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

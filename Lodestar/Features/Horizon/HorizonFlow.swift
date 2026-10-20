@@ -56,6 +56,9 @@ private struct HorizonFlowModifier: ViewModifier {
 struct HorizonSiteSection: View {
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    /// The width of the "Record Skyline" icon: the mountain symbol is much wider than the other rows' icons, so it is
+    /// scaled into the same slot instead of sticking out to the left.
+    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 22
     /// The site being edited, or `nil` for a site that is not saved yet.
     let siteID: UUID?
     /// Whether the position being edited is not where the site was stored.
@@ -78,7 +81,14 @@ struct HorizonSiteSection: View {
                 Button {
                     flow.recording = site
                 } label: {
-                    Label("Record Skyline\u{2026}", systemImage: "mountain.2")
+                    Label {
+                        Text("Record Skyline\u{2026}")
+                    } icon: {
+                        Image(systemName: "mountain.2")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: iconWidth, height: iconWidth)
+                    }
                 }
                 if site.horizon != nil {
                     Button {

@@ -183,14 +183,24 @@ private struct CloudStrip: View {
             }
         }
 
-        // Hour labels on the whole hours of the observer's time zone.
+        // Hour labels on the whole hours of the observer's time zone, thinned further when the (larger) labels would
+        // touch at a big text size.
         let axisTop = totalHeight + 3 * (layerHeight + gap)
-        for tick in Self.hourTicks(from: first.start, to: last.end, timeZone: timeZone) {
-            let text = Text(tick.formatted(Date.FormatStyle(timeZone: timeZone).hour()))
+        let hourFormat = Date.FormatStyle(timeZone: timeZone).hour()
+        let ticks = Self.hourTicks(from: first.start, to: last.end, timeZone: timeZone).map { tick in
+            (tick, context.resolve(Text(tick.formatted(hourFormat))
                 .font(labelFont.monospacedDigit())
-                .foregroundStyle(palette.secondaryText)
-            let tickX = min(max(x(tick), left + 12 * scale), size.width - 12 * scale)
-            context.draw(text, at: CGPoint(x: tickX, y: axisTop + 2), anchor: .top)
+                .foregroundStyle(palette.secondaryText)))
+        }
+        let hourLabelWidth = ticks.map { $0.1.measure(in: size).width }.max() ?? 0
+        var step = 1
+        if ticks.count > 1 {
+            let pitch = abs(x(ticks[1].0) - x(ticks[0].0))
+            step = [1, 2, 3, 4, 6].first { pitch * CGFloat($0) >= hourLabelWidth + 8 * scale } ?? 12
+        }
+        for (index, entry) in ticks.enumerated() where index % step == 0 {
+            let tickX = min(max(x(entry.0), left + hourLabelWidth / 2), size.width - hourLabelWidth / 2)
+            context.draw(entry.1, at: CGPoint(x: tickX, y: axisTop + 2), anchor: .top)
         }
     }
 
