@@ -248,23 +248,42 @@ struct SettingsNumberField: View {
     /// The prefix, the field and the unit.
     private var valueGroup: some View {
         let isStacked = dynamicTypeSize.isAccessibilitySize
-        return HStack(spacing: 8) {
+        return HStack(spacing: prefix.isEmpty ? 8 : 2) {
             if !prefix.isEmpty {
                 Text(prefix)
                     .foregroundStyle(palette.secondaryText)
             }
-            TextField(title, text: $text, prompt: Text(placeholder).foregroundStyle(palette.tertiaryText))
-                .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
-                .submitLabel(.done)
-                .multilineTextAlignment(.trailing)
-                .focused($isFocused)
-                .foregroundStyle(isInvalid ? palette.critical : palette.primaryText)
-                .frame(maxWidth: isStacked ? CGFloat.infinity : 120)
+            if prefix.isEmpty {
+                numberField
+                    .frame(maxWidth: isStacked ? CGFloat.infinity : 120)
+            } else {
+                // After a prefix ("f/") the field is only as wide as its text, so the prefix sits against the number
+                // instead of at the far end of the empty part of the field.
+                Text(text.isEmpty ? placeholder : text)
+                    .lineLimit(1)
+                    .opacity(0)
+                    .accessibilityHidden(true)
+                    .padding(.horizontal, 2)
+                    .frame(minWidth: 44, maxWidth: isStacked ? 240 : 120)
+                    .overlay(alignment: .trailing) {
+                        numberField
+                    }
+            }
             if !unit.isEmpty {
                 Text(unit)
                     .foregroundStyle(palette.secondaryText)
             }
         }
+        .frame(maxWidth: isStacked ? CGFloat.infinity : nil, alignment: .trailing)
+    }
+
+    private var numberField: some View {
+        TextField(title, text: $text, prompt: Text(placeholder).foregroundStyle(palette.tertiaryText))
+            .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
+            .submitLabel(.done)
+            .multilineTextAlignment(.trailing)
+            .focused($isFocused)
+            .foregroundStyle(isInvalid ? palette.critical : palette.primaryText)
     }
 
     private var rangeHint: String {

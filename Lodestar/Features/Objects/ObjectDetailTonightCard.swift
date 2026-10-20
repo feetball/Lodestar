@@ -87,7 +87,7 @@ struct ObjectDetailTonightCard: View {
     private func value(of event: ObjectDetailEvent, in night: ObjectDetailNight) -> String {
         let time = AppFormat.time(event.date, in: timeZone)
         guard event.kind == .transit, let altitude = night.transitAltitude else { return time }
-        return "\(time) \u{00B7} \(AppFormat.altitude(altitude))"
+        return "\(time)\u{00A0}\u{00B7} \(AppFormat.altitude(altitude))"
     }
 
     @ViewBuilder
