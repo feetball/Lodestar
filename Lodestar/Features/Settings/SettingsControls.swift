@@ -189,7 +189,7 @@ struct SettingsNumberField: View {
                     Text(prefix)
                         .foregroundStyle(palette.secondaryText)
                 }
-                TextField(title, text: $text, prompt: Text(placeholder))
+                TextField(title, text: $text, prompt: Text(placeholder).foregroundStyle(palette.tertiaryText))
                     .keyboardType(range.lowerBound < 0 ? .numbersAndPunctuation : .decimalPad)
                     .submitLabel(.done)
                     .multilineTextAlignment(.trailing)
