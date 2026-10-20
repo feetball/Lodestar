@@ -135,7 +135,7 @@ extension MountServiceTests {
     func testRemovingAndClearingWaitForTheMountToBeIdle() async {
         await connectFake(lodestar: true)
         service.nudgeOnce(.north)
-        await expect("the nudge to start") { self.service.status.phase == .nudging }
+        await mountServiceExpect("the nudge to start") { self.service.status.phase == .nudging }
         await service.removeAlignedStar(at: 0)
         await service.clearAlignment()
         XCTAssertNil(service.errorText)
@@ -154,7 +154,7 @@ extension MountServiceTests {
 
     private func connectSimulatedSkyWatcher() async {
         service.connectDemo(.demoSkyWatcher, observer: observer)
-        await expect("the simulated Sky-Watcher mount") { self.service.connection == .connected }
+        await mountServiceExpect("the simulated Sky-Watcher mount") { self.service.connection == .connected }
     }
 
     /// The simulated telescope is turned to the star, as a person would with the nudge pad, and the mount is synced.
@@ -217,7 +217,7 @@ extension MountServiceTests {
         XCTAssertEqual(service.slewTargetName, "Beta Test")
         XCTAssertEqual(service.status.phase, .slewing)
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertEqual(service.status.phase, .idle)
         XCTAssertEqual(service.status.outcome, .aborted)
     }
@@ -298,8 +298,8 @@ extension MountServiceTests {
         let elsewhere = Observer(location: GeographicLocation(latitude: base.latitude + 1.0, longitude: base.longitude,
                                                               elevation: base.elevation))
         service.updateObserver(elsewhere)
-        await expect("the alignment to be dropped") { self.service.needsFirstSync }
-        await expect("the notice") { self.service.noticeText != nil }
+        await mountServiceExpect("the alignment to be dropped") { self.service.needsFirstSync }
+        await mountServiceExpect("the notice") { self.service.noticeText != nil }
         XCTAssertEqual(service.noticeText, "Your location changed, so the star alignment was cleared. Align on a star again.")
         XCTAssertTrue(service.syncedObjects.isEmpty)
         XCTAssertNil(service.alignmentHomeError)
@@ -338,7 +338,7 @@ extension MountServiceTests {
 
     func testAMountThatStartedAwayFromHomeSaysSoUntilThePersonDeclaresHome() async {
         service.connectDemo(equatorialOption(axis1: 45.0, axis2: 10.0), observer: observer)
-        await expect("the equatorial mount") { self.service.connection == .connected }
+        await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertEqual(service.driverDetail?.arrangement, .equatorial)
         XCTAssertTrue(service.startsAwayFromHome)
         XCTAssertEqual(service.startPositionLine, "The mount is not at its home position. Switch it off and on at the home "
@@ -353,17 +353,17 @@ extension MountServiceTests {
 
     func testTheOtherSideOfThePierIsNamed() async {
         service.connectDemo(equatorialOption(axis1: 45.0, axis2: -10.0), observer: observer)
-        await expect("the equatorial mount") { self.service.connection == .connected }
+        await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertEqual(service.pierSideLine, "Telescope west of the pier")
         XCTAssertEqual(service.trackingAndPierLine, "Tracking is off \u{00B7} Telescope west of the pier")
     }
 
     func testTrackingThatStopsAtTheMeridianIsExplained() async {
         service.connectDemo(equatorialOption(axis1: 100.0, axis2: 10.0), observer: observer)
-        await expect("the equatorial mount") { self.service.connection == .connected }
+        await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertNil(service.trackingStopText, "tracking has not been tried yet")
         service.setTracking(true)
-        await expect("the poll to notice that the mount is past the meridian limit") { self.service.trackingStopText != nil }
+        await mountServiceExpect("the poll to notice that the mount is past the meridian limit") { self.service.trackingStopText != nil }
         XCTAssertEqual(service.driverDetail?.trackingStopReason, .outsideMountLimits)
         XCTAssertEqual(service.trackingStopText, "Tracking stopped at the meridian. Tap Go to to flip the mount")
         XCTAssertEqual(service.trackingLine, "Tracking is off")

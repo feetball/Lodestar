@@ -129,7 +129,7 @@ extension MountServiceTests {
         // The sync is what aligns it, so it stays available.
         XCTAssertNil(service.syncUnavailableReason(for: highTarget()))
         fake.configure { $0.aligned = true }
-        await expect("the next poll to report the alignment") { service.alignmentWarning == nil }
+        await mountServiceExpect("the next poll to report the alignment") { service.alignmentWarning == nil }
         XCTAssertNil(service.goToUnavailableReason(for: highTarget(), observer: observer))
     }
 
@@ -159,7 +159,7 @@ extension MountServiceTests {
     func testNoMoveIsOfferedWhileTheMountNudges() async {
         await connectFake()
         service.nudgeOnce(.north)
-        await expect("the nudge to start") { service.status.phase == .nudging }
+        await mountServiceExpect("the nudge to start") { service.status.phase == .nudging }
         XCTAssertEqual(service.goToUnavailableReason(for: highTarget(), observer: observer), Self.busyText)
         XCTAssertEqual(service.syncUnavailableReason(for: highTarget()), Self.busyText)
     }
@@ -191,7 +191,7 @@ extension MountServiceTests {
         let announced = MountLifecycle.announcements.count
         await service.goTo(target, observer: observer)
         fake.finishSlew()
-        await expect("the next poll to see the arrival") { service.status.phase == .idle }
+        await mountServiceExpect("the next poll to see the arrival") { service.status.phase == .idle }
         if case .arrived(let separation)? = service.status.outcome {
             XCTAssertLessThan(separation, 0.25)
         } else {
@@ -208,9 +208,9 @@ extension MountServiceTests {
         await service.goTo(highTarget(), observer: observer)
         // Two polls have seen the mount moving; then it stops by itself, far from the target.
         let reads = fake.slewingReads
-        await expect("two polls during the slew") { fake.slewingReads >= reads + 2 }
+        await mountServiceExpect("two polls during the slew") { fake.slewingReads >= reads + 2 }
         fake.stopShort()
-        await expect("the next poll to see the stop") { service.status.phase == .idle }
+        await mountServiceExpect("the next poll to see the stop") { service.status.phase == .idle }
         var stoppedShort = false
         if case .failed(let error)? = service.status.outcome, case .slewStopped = error { stoppedShort = true }
         XCTAssertTrue(stoppedShort, "outcome \(String(describing: service.status.outcome))")
@@ -284,9 +284,9 @@ extension MountServiceTests {
     func testIsWorkingWhileAGoToWaitsForTheMount() async {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         let running = Task { await self.service.goTo(self.highTarget(), observer: self.observer) }
-        await expect("the GoTo to be under way") { service.isWorking }
+        await mountServiceExpect("the GoTo to be under way") { service.isWorking }
         XCTAssertFalse(service.isMoving, "the mount has not been asked yet")
         fake.readGate.open()
         await running.value
@@ -298,10 +298,10 @@ extension MountServiceTests {
     func testASecondGoToWhileOneIsUnderWayIsIgnored() async {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         let second = Self.target(altitude: 50.0, azimuth: 150.0, name: "Second", seenFrom: observer)
         let running = Task { await self.service.goTo(self.highTarget("First"), observer: self.observer) }
-        await expect("the first GoTo to be under way") { service.isWorking }
+        await mountServiceExpect("the first GoTo to be under way") { service.isWorking }
         await service.goTo(second, observer: observer)
         fake.readGate.open()
         await running.value
@@ -313,14 +313,14 @@ extension MountServiceTests {
     func testAGoToThatWaitedWhileStopWasTappedDoesNotStartTheSlew() async {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         let running = Task { await self.service.goTo(self.highTarget(), observer: self.observer) }
-        await expect("the GoTo to be under way") { service.isWorking }
+        await mountServiceExpect("the GoTo to be under way") { service.isWorking }
         service.stop()
         await settle()
         fake.readGate.open()
         await running.value
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertTrue(fake.slews.isEmpty)
         XCTAssertNil(service.slewTargetName)
         XCTAssertNil(service.errorText, "the person knows, so a cancelled GoTo reports nothing")
@@ -333,7 +333,7 @@ extension MountServiceTests {
     func testStopHaltsAnIdleMount() async {
         let fake = await connectFake()
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping && self.service.noticeText != nil }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping && self.service.noticeText != nil }
         XCTAssertEqual(service.noticeText, "Stopped.")
         XCTAssertNil(service.errorText)
         XCTAssertEqual(fake.abortCount, 1)
@@ -345,7 +345,7 @@ extension MountServiceTests {
         await connectFake()
         service.stop()
         XCTAssertTrue(service.isStopping)
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
     }
 
     func testStopHaltsASlew() async {
@@ -354,7 +354,7 @@ extension MountServiceTests {
         await service.goTo(highTarget(), observer: observer)
         XCTAssertTrue(service.isMoving)
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertEqual(service.status.phase, .idle)
         XCTAssertEqual(service.status.outcome, .aborted)
         XCTAssertFalse(service.isMoving)
@@ -366,9 +366,9 @@ extension MountServiceTests {
     func testStopHaltsANudge() async {
         let fake = await connectFake()
         service.nudgeOnce(.east)
-        await expect("the nudge to start") { service.status.phase == .nudging }
+        await mountServiceExpect("the nudge to start") { service.status.phase == .nudging }
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertEqual(service.status.phase, .idle)
         XCTAssertFalse(service.isMoving)
         XCTAssertEqual(fake.abortCount, 1)
@@ -381,7 +381,7 @@ extension MountServiceTests {
         await service.syncMount(to: highTarget(), observer: observer)
         XCTAssertNotNil(service.errorText)
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertNil(service.errorText)
         XCTAssertEqual(service.noticeText, "Stopped.")
     }
@@ -391,7 +391,7 @@ extension MountServiceTests {
         await service.goTo(highTarget(), observer: observer)
         fake.configure { $0.abortError = .rejected(detail: "jammed") }
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertEqual(service.errorText, "The mount may still be moving. The mount rejected the command: jammed. "
             + "Stop it on its hand controller or switch it off.")
         XCTAssertNil(service.noticeText)
@@ -404,7 +404,7 @@ extension MountServiceTests {
         await service.goTo(highTarget(), observer: observer)
         fake.configure { $0.abortError = .timeout(operation: "stop") }
         service.stop()
-        await expect("the stop to finish") { !self.service.isStopping }
+        await mountServiceExpect("the stop to finish") { !self.service.isStopping }
         XCTAssertEqual(fake.abortCount, 3, "the engine tries three times on communication failures")
         XCTAssertEqual(service.errorText, "The mount may still be moving. The mount didn't answer in time (stop). "
             + "Stop it on its hand controller or switch it off.")
@@ -413,13 +413,13 @@ extension MountServiceTests {
     func testStopGoesBeforeTheCommandsThatAreWaiting() async throws {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         service.setTracking(true)
         service.stop()
         // Both jobs are queued behind the stuck poll by now.
         await settle()
         fake.readGate.open()
-        await expect("both commands to run") { fake.trackingCalls == [true] && !self.service.isStopping }
+        await mountServiceExpect("both commands to run") { fake.trackingCalls == [true] && !self.service.isStopping }
         let events = fake.events
         let abortIndex = try XCTUnwrap(events.firstIndex(of: .abort))
         let trackingIndex = try XCTUnwrap(events.firstIndex(of: .tracking(true)))
@@ -429,7 +429,7 @@ extension MountServiceTests {
     func testStopAfterALostConnectionDoesNothing() async {
         let fake = await connectFake()
         fake.configure { $0.readError = .timeout(operation: "position") }
-        await expect("the loss of the connection", timeout: 30.0) { self.service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { self.service.connection != .connected }
         let lost = service.connection
         service.stop()
         XCTAssertEqual(service.connection, lost)
@@ -439,7 +439,7 @@ extension MountServiceTests {
     func testNoticesCanBeDismissed() async {
         await connectFake()
         service.stop()
-        await expect("the notice") { self.service.noticeText == "Stopped." }
+        await mountServiceExpect("the notice") { self.service.noticeText == "Stopped." }
         service.dismissNotice()
         XCTAssertNil(service.noticeText)
     }
@@ -532,12 +532,12 @@ extension MountServiceTests {
         let fake = await connectFake()
         XCTAssertEqual(service.trackingLine, "Tracking")
         service.setTracking(false)
-        await expect("the notice") { self.service.noticeText == "Tracking is off." }
+        await mountServiceExpect("the notice") { self.service.noticeText == "Tracking is off." }
         XCTAssertEqual(fake.trackingCalls, [false])
         XCTAssertEqual(service.trackingLine, "Tracking is off")
         XCTAssertEqual(service.trackingAndPierLine, "Tracking is off")
         service.setTracking(true)
-        await expect("the notice") { self.service.noticeText == "Tracking is on." }
+        await mountServiceExpect("the notice") { self.service.noticeText == "Tracking is on." }
         XCTAssertEqual(fake.trackingCalls, [false, true])
         XCTAssertEqual(service.trackingLine, "Tracking")
     }
@@ -555,7 +555,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         fake.configure { $0.trackingError = .parked }
         service.setTracking(true)
-        await expect("the error") { self.service.errorText != nil }
+        await mountServiceExpect("the error") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount is parked. Unpark it first.")
         XCTAssertNil(service.noticeText)
     }
@@ -565,7 +565,7 @@ extension MountServiceTests {
             fake.configure { $0.capabilities = Fake.makeCapabilities(canSetTracking: false) }
         }
         service.setTracking(false)
-        await expect("the error") { self.service.errorText != nil }
+        await mountServiceExpect("the error") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText, "This mount doesn't support switching tracking on and off.")
     }
 
@@ -573,7 +573,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         await service.goTo(highTarget(), observer: observer)
         service.setTracking(false)
-        await expect("the error") { self.service.errorText != nil }
+        await mountServiceExpect("the error") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText, Self.slewingText)
         XCTAssertTrue(fake.trackingCalls.isEmpty)
     }
@@ -640,7 +640,7 @@ extension MountServiceTests {
             placed.add("\(place.rightAscension) \(place.declination)")
         })
         service.connectDemo(option, observer: observer)
-        await expect("the connection") { self.service.connection == .connected }
+        await mountServiceExpect("the connection") { self.service.connection == .connected }
         let target = highTarget("Centred")
         let place = try XCTUnwrap(target.j2000)
         await service.centreSimulatedMount(on: target, observer: observer)

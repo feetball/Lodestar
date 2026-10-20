@@ -11,7 +11,7 @@ extension MountServiceTests {
     func testHoldingAnArrowRepeatsTheNudge() async {
         let fake = await connectFake()
         service.beginNudge(.north)
-        await expect("three pulses") { fake.nudgeStarts.count >= 3 }
+        await mountServiceExpect("three pulses") { fake.nudgeStarts.count >= 3 }
         let first = fake.nudgeStarts[0]
         XCTAssertEqual(first.direction, .north)
         XCTAssertEqual(first.rate, .center)
@@ -25,7 +25,7 @@ extension MountServiceTests {
         service.settings.nudgeRate = .find
         let fake = await connectFake()
         service.beginNudge(.west)
-        await expect("the first pulse") { !fake.nudgeStarts.isEmpty }
+        await mountServiceExpect("the first pulse") { !fake.nudgeStarts.isEmpty }
         XCTAssertEqual(fake.nudgeStarts[0].rate, .find)
         XCTAssertEqual(fake.nudgeStarts[0].direction, .west)
         service.endNudge()
@@ -34,7 +34,7 @@ extension MountServiceTests {
     func testANudgeMakesTheMountMoving() async {
         await connectFake()
         service.beginNudge(.east)
-        await expect("the mount to nudge") { self.service.status.phase == .nudging }
+        await mountServiceExpect("the mount to nudge") { self.service.status.phase == .nudging }
         XCTAssertTrue(service.isMoving)
         service.endNudge()
     }
@@ -42,9 +42,9 @@ extension MountServiceTests {
     func testLiftingTheFingerStopsTheNudge() async {
         let fake = await connectFake()
         service.beginNudge(.south)
-        await expect("the first pulse") { self.service.status.phase == .nudging }
+        await mountServiceExpect("the first pulse") { self.service.status.phase == .nudging }
         service.endNudge()
-        await expect("the mount to stop") { self.service.status.phase == .idle }
+        await mountServiceExpect("the mount to stop") { self.service.status.phase == .idle }
         XCTAssertGreaterThanOrEqual(fake.nudgeStopCount, 1)
         // The pulse that may have been on its way is over; no further one comes.
         await settle(0.3)
@@ -58,7 +58,7 @@ extension MountServiceTests {
     func testAPulseThatWaitedInTheQueueWhileTheFingerLiftedDoesNothing() async {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         service.beginNudge(.east)
         // The first pulse is queued behind the stuck poll by now.
         await settle()
@@ -75,9 +75,9 @@ extension MountServiceTests {
     func testBeginningANewNudgeReplacesTheOldLoop() async {
         let fake = await connectFake()
         service.beginNudge(.north)
-        await expect("a pulse to the north") { fake.nudgeStarts.contains { $0.direction == .north } }
+        await mountServiceExpect("a pulse to the north") { fake.nudgeStarts.contains { $0.direction == .north } }
         service.beginNudge(.south)
-        await expect("two pulses to the south") { fake.nudgeStarts.filter { $0.direction == .south }.count >= 2 }
+        await mountServiceExpect("two pulses to the south") { fake.nudgeStarts.filter { $0.direction == .south }.count >= 2 }
         await settle(0.3)
         let norths = fake.nudgeStarts.filter { $0.direction == .north }.count
         await settle(1.0)
@@ -99,7 +99,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         fake.configure { $0.nudgeError = .busy }
         service.beginNudge(.north)
-        await expect("the error") { self.service.errorText != nil }
+        await mountServiceExpect("the error") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount is busy. Try again in a moment.")
         // The engine stops the direction it failed to start, once; a loop that went on would stop it again every 0.4 s.
         let stops = fake.nudgeStopCount
@@ -151,7 +151,7 @@ extension MountServiceTests {
     func testNudgeOnceSendsASinglePulse() async {
         let fake = await connectFake()
         service.nudgeOnce(.west)
-        await expect("the pulse") { !fake.nudgeStarts.isEmpty }
+        await mountServiceExpect("the pulse") { !fake.nudgeStarts.isEmpty }
         await settle(1.0)
         XCTAssertEqual(fake.nudgeStarts.count, 1)
         XCTAssertEqual(fake.nudgeStarts[0].direction, .west)
@@ -164,7 +164,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         fake.configure { $0.nudgeError = .parked }
         service.nudgeOnce(.north)
-        await expect("the error") { self.service.errorText != nil }
+        await mountServiceExpect("the error") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount is parked. Unpark it first.")
     }
 
@@ -194,7 +194,7 @@ extension MountServiceTests {
         // 0.005 degrees is a better GPS fix; 0.02 degrees is a move.
         service.updateObserver(jitter)
         service.updateObserver(moved)
-        await expect("the new place to be sent") { !fake.siteLocations.isEmpty }
+        await mountServiceExpect("the new place to be sent") { !fake.siteLocations.isEmpty }
         await settle()
         XCTAssertEqual(fake.siteLocations, [moved.location])
     }
@@ -207,7 +207,7 @@ extension MountServiceTests {
         service.updateObserver(east)
         let moved = Observer(location: GeographicLocation(latitude: 35.0, longitude: -179.9, elevation: 0.0))
         service.updateObserver(moved)
-        await expect("the new place to be sent") { !fake.siteLocations.isEmpty }
+        await mountServiceExpect("the new place to be sent") { !fake.siteLocations.isEmpty }
         await settle()
         XCTAssertEqual(fake.siteLocations, [moved.location])
     }
@@ -245,7 +245,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         XCTAssertEqual(fake.connectCount, 1)
         service.settings.altitudeLimit = 20.0
-        await expect("the controller to be rebuilt") { fake.connectCount == 2 }
+        await mountServiceExpect("the controller to be rebuilt") { fake.connectCount == 2 }
         XCTAssertEqual(service.connection, .connected)
         XCTAssertNil(service.errorText)
         XCTAssertEqual(service.status.phase, .idle)
@@ -264,10 +264,10 @@ extension MountServiceTests {
         service.settings.altitudeLimit = 20.0
         // The rebuild looks at the mount a second later, then again every second: wait for three polls of the slew.
         let reads = fake.slewingReads
-        await expect("three polls") { fake.slewingReads >= reads + 3 }
+        await mountServiceExpect("three polls") { fake.slewingReads >= reads + 3 }
         XCTAssertEqual(fake.connectCount, 1, "the controller keeps its limits until the mount is idle")
         service.stop()
-        await expect("the controller to be rebuilt after the stop") { fake.connectCount == 2 }
+        await mountServiceExpect("the controller to be rebuilt after the stop") { fake.connectCount == 2 }
         let events = fake.events
         let abortIndex = events.firstIndex(of: .abort)
         let secondConnect = events.lastIndex(of: .connect)
@@ -280,7 +280,7 @@ extension MountServiceTests {
         let fake = await connectFake()
         fake.configure { $0.connectError = .rejected(detail: "no") }
         service.settings.altitudeLimit = 25.0
-        await expect("the report") { self.service.errorText != nil }
+        await mountServiceExpect("the report") { self.service.errorText != nil }
         XCTAssertEqual(service.errorText,
                        "The new limits could not be sent to the mount's controller. The mount rejected the command: no.")
         XCTAssertEqual(service.connection, .connected, "the session goes on with the old limits")

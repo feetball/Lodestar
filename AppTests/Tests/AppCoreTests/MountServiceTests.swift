@@ -418,7 +418,7 @@ final class MountServiceTests: XCTestCase {
         case .connecting: current.cancelConnect()
         case .connected, .lost: current.disconnect()
         }
-        let done = await waitUntil { current.connection == .disconnected }
+        let done = await mountServiceWaitUntil { current.connection == .disconnected }
         if !done { XCTFail("the shared MountService did not return to the disconnected state") }
         current.dismissError()
         current.dismissNotice()
@@ -426,23 +426,8 @@ final class MountServiceTests: XCTestCase {
 
     // MARK: Waiting
 
-    /// Polls `condition` every few milliseconds until it holds or `timeout` seconds have passed.
-    @discardableResult
-    func waitUntil(timeout: TimeInterval = 20.0, _ condition: () -> Bool) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition() {
-            if Date() >= deadline { return false }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        return true
-    }
-
-    /// Fails the test unless `condition` holds before `timeout`.
-    func expect(_ what: String, timeout: TimeInterval = 20.0, file: StaticString = #filePath, line: UInt = #line,
-                _ condition: () -> Bool) async {
-        let reached = await waitUntil(timeout: timeout, condition)
-        if !reached { XCTFail("timed out waiting for \(what)", file: file, line: line) }
-    }
+    // `mountServiceWaitUntil` and `mountServiceExpect` are free functions at the end of this file: the compiler rejects an async
+    // method of this test class that takes a non-escaping closure ("escaping local function captures non-escaping value").
 
     /// A short pause for work that cannot be observed: either something stray would have happened by now or it would not.
     func settle(_ seconds: TimeInterval = 0.5) async {
@@ -458,7 +443,7 @@ final class MountServiceTests: XCTestCase {
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake, id: id, title: title, lodestarAligned: lodestar),
                             observer: place ?? observer)
-        await expect("the connection to \(id)") { service.connection == .connected }
+        await mountServiceExpect("the connection to \(id)") { service.connection == .connected }
         return fake
     }
 
@@ -646,7 +631,7 @@ final class MountServiceTests: XCTestCase {
         XCTAssertTrue(service.isDemo)
         XCTAssertNil(service.connectedAddress)
         XCTAssertFalse(service.isConnected)
-        await expect("the connection") { service.connection == .connected }
+        await mountServiceExpect("the connection") { service.connection == .connected }
         XCTAssertEqual(service.capabilities, Fake.makeCapabilities())
         XCTAssertEqual(service.status.phase, .idle)
         XCTAssertEqual(service.status.position, EquatorialCoordinate(rightAscension: 100.0, declination: 20.0))
@@ -666,7 +651,7 @@ final class MountServiceTests: XCTestCase {
         XCTAssertTrue(service.hasConnectedBefore)
         XCTAssertTrue(service.showsAimButton)
         service.disconnect()
-        await expect("the disconnection") { service.connection == .disconnected }
+        await mountServiceExpect("the disconnection") { service.connection == .disconnected }
         XCTAssertTrue(service.hasConnectedBefore)
         XCTAssertTrue(service.showsAimButton)
     }
@@ -684,13 +669,13 @@ final class MountServiceTests: XCTestCase {
         first.connectGate.close()
         fakes.append(first)
         service.connectDemo(Self.option(for: first, id: "demo-first"), observer: observer)
-        await expect("the handshake to start") { first.connectGate.isWaiting }
+        await mountServiceExpect("the handshake to start") { first.connectGate.isWaiting }
         let second = Fake()
         fakes.append(second)
         service.connectDemo(Self.option(for: second, id: "demo-second"), observer: observer)
         XCTAssertEqual(service.connectedOption?.id, "demo-first")
         first.connectGate.open()
-        await expect("the connection") { service.connection == .connected }
+        await mountServiceExpect("the connection") { service.connection == .connected }
         XCTAssertEqual(service.connectedOption?.id, "demo-first")
         XCTAssertEqual(first.connectCount, 1)
         XCTAssertEqual(second.connectCount, 0)
@@ -715,7 +700,7 @@ final class MountServiceTests: XCTestCase {
         fake.connectGate.close()
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the handshake to start") { fake.connectGate.isWaiting }
+        await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.cancelConnect()
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertNil(service.connectedOption)
@@ -724,7 +709,7 @@ final class MountServiceTests: XCTestCase {
         XCTAssertNil(service.errorText)
         XCTAssertEqual(service.summaryText, "Not connected")
         fake.connectGate.open()
-        await expect("the abandoned session to be let go") { fake.disconnectCount >= 1 }
+        await mountServiceExpect("the abandoned session to be let go") { fake.disconnectCount >= 1 }
         await settle()
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertNil(service.capabilities)
@@ -736,7 +721,7 @@ final class MountServiceTests: XCTestCase {
         stale.connectGate.close()
         fakes.append(stale)
         service.connectDemo(Self.option(for: stale, id: "demo-stale"), observer: observer)
-        await expect("the first handshake to start") { stale.connectGate.isWaiting }
+        await mountServiceExpect("the first handshake to start") { stale.connectGate.isWaiting }
         service.cancelConnect()
         XCTAssertEqual(service.connection, .disconnected)
         // Another mount is connected while the first handshake is still stuck.
@@ -744,7 +729,7 @@ final class MountServiceTests: XCTestCase {
             fake.configure { $0.capabilities = Fake.makeCapabilities(name: "Fresh Mount") }
         }
         stale.connectGate.open()
-        await expect("the stale session to be let go") { stale.disconnectCount >= 1 }
+        await mountServiceExpect("the stale session to be let go") { stale.disconnectCount >= 1 }
         await settle()
         XCTAssertEqual(service.connection, .connected)
         XCTAssertEqual(service.connectedOption?.id, "demo-fresh")
@@ -765,7 +750,7 @@ final class MountServiceTests: XCTestCase {
         fake.connectGate.close()
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the handshake to start") { fake.connectGate.isWaiting }
+        await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.stop()
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertFalse(service.isStopping)
@@ -786,7 +771,7 @@ final class MountServiceTests: XCTestCase {
         fake.configure { $0.connectError = .timeout(operation: "handshake") }
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the failure") { service.connection == .disconnected }
+        await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "The mount didn't answer in time (handshake).")
         XCTAssertEqual(service.connectError, .timeout(operation: "handshake"))
         XCTAssertNil(service.connectedOption)
@@ -805,7 +790,7 @@ final class MountServiceTests: XCTestCase {
         fake.configure { $0.connectError = .rejected(detail: "wrong firmware") }
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the failure") { service.errorText != nil }
+        await mountServiceExpect("the failure") { service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount rejected the command: wrong firmware.")
         XCTAssertEqual(service.connection, .disconnected)
     }
@@ -815,7 +800,7 @@ final class MountServiceTests: XCTestCase {
             throw MountError.invalidInput(detail: "this mount needs a TCP connection")
         }
         service.connectDemo(option, observer: observer)
-        await expect("the failure") { service.connection == .disconnected }
+        await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "That value can't be used: this mount needs a TCP connection.")
         XCTAssertEqual(service.connectError, .invalidInput(detail: "this mount needs a TCP connection"))
         XCTAssertNil(service.connectedOption)
@@ -824,7 +809,7 @@ final class MountServiceTests: XCTestCase {
     func testAnUnexpectedFailureBecomesATransportError() async {
         let option = Self.option(id: "demo-boom") { _, _ in throw Boom() }
         service.connectDemo(option, observer: observer)
-        await expect("the failure") { service.connection == .disconnected }
+        await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "Could not talk to the mount: unexpected failure.")
         XCTAssertEqual(service.connectError, .transport(detail: "unexpected failure"))
     }
@@ -834,7 +819,7 @@ final class MountServiceTests: XCTestCase {
         broken.configure { $0.connectError = .busy }
         fakes.append(broken)
         service.connectDemo(Self.option(for: broken), observer: observer)
-        await expect("the failure") { service.connection == .disconnected }
+        await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertNotNil(service.errorText)
         await connectFake()
         XCTAssertEqual(service.connection, .connected)
@@ -846,7 +831,7 @@ final class MountServiceTests: XCTestCase {
 
     func testTheSiteAndTimeAreSentOnceWhenAMountIsConnected() async {
         let fake = await connectFake()
-        await expect("the location to be sent") { !fake.siteLocations.isEmpty }
+        await mountServiceExpect("the location to be sent") { !fake.siteLocations.isEmpty }
         XCTAssertEqual(fake.siteLocations, [observer.location])
         XCTAssertNil(service.noticeText, "the automatic send is silent")
         XCTAssertNil(service.errorText)
@@ -879,7 +864,7 @@ final class MountServiceTests: XCTestCase {
         fake.configure { $0.siteError = .rejected(detail: "clock") }
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the report") { service.errorText != nil }
+        await mountServiceExpect("the report") { service.errorText != nil }
         XCTAssertEqual(service.errorText, "Could not send the location and time. The mount rejected the command: clock.")
         XCTAssertEqual(service.connection, .connected)
     }
@@ -888,7 +873,7 @@ final class MountServiceTests: XCTestCase {
 
     func testTheSimulatedMountConnectsAndStartsHighInTheSouthernSky() async {
         service.connectDemo(observer: observer)
-        await expect("the simulated mount") { service.connection == .connected }
+        await mountServiceExpect("the simulated mount") { service.connection == .connected }
         XCTAssertTrue(service.isDemo)
         XCTAssertEqual(service.connectedOption?.id, "demo")
         XCTAssertNil(service.connectedAddress)
@@ -904,7 +889,7 @@ final class MountServiceTests: XCTestCase {
 
     func testAGoToOnTheSimulatedMountSlewsAndArrives() async {
         service.connectDemo(observer: observer)
-        await expect("the simulated mount") { service.connection == .connected }
+        await mountServiceExpect("the simulated mount") { service.connection == .connected }
         let announced = MountLifecycle.announcements.count
         // Eight degrees higher than where the simulated mount starts: about two seconds of slewing at 4 degrees a second.
         let target = Self.target(altitude: 68.0, name: "Simulated Target", seenFrom: observer)
@@ -913,7 +898,7 @@ final class MountServiceTests: XCTestCase {
         XCTAssertEqual(service.slewTargetName, "Simulated Target")
         XCTAssertEqual(service.status.phase, .slewing)
         XCTAssertTrue(service.isMoving)
-        await expect("the slew to end", timeout: 40.0) { service.status.phase == .idle }
+        await mountServiceExpect("the slew to end", timeout: 40.0) { service.status.phase == .idle }
         if case .arrived(let separation)? = service.status.outcome {
             XCTAssertLessThan(separation, 0.25)
         } else {
@@ -932,8 +917,8 @@ final class MountServiceTests: XCTestCase {
             script.position = moved
             script.tracking = false
         }
-        await expect("the poll to bring the new reading") { service.status.position == moved }
-        await expect("the new tracking state") { service.status.isTracking == false }
+        await mountServiceExpect("the poll to bring the new reading") { service.status.position == moved }
+        await mountServiceExpect("the new tracking state") { service.status.isTracking == false }
         XCTAssertEqual(service.trackingLine, "Tracking is off")
         XCTAssertEqual(service.status.phase, .idle)
     }
@@ -941,7 +926,7 @@ final class MountServiceTests: XCTestCase {
     func testPollingReportsAMountThatStartsToSlewByItself() async {
         let fake = await connectFake()
         fake.configure { $0.slewing = true }
-        await expect("the poll to see the slew") { service.status.isMoving == true }
+        await mountServiceExpect("the poll to see the slew") { service.status.isMoving == true }
         // The controller itself did not start it, so its phase stays idle.
         XCTAssertEqual(service.status.phase, .idle)
         XCTAssertFalse(service.isMoving)
@@ -954,7 +939,7 @@ final class MountServiceTests: XCTestCase {
         fake.configure { $0.readError = .timeout(operation: "position") }
         let reason = "The connection to the mount was lost. The mount may still be moving if it was slewing. "
             + "Stop it on its hand controller if it is."
-        await expect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         XCTAssertEqual(service.connection, .lost(reason))
         XCTAssertFalse(service.isConnected)
         XCTAssertNil(service.capabilities)
@@ -972,12 +957,12 @@ final class MountServiceTests: XCTestCase {
     func testReconnectingAfterALossReturnsToTheSameSimulatedMount() async {
         let fake = await connectFake()
         fake.configure { $0.readError = .timeout(operation: "position") }
-        await expect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         fake.configure { $0.readError = nil }
         service.reconnect(observer: observer)
         XCTAssertEqual(service.connection, .connecting)
         XCTAssertNil(service.errorText)
-        await expect("the new connection") { service.connection == .connected }
+        await mountServiceExpect("the new connection") { service.connection == .connected }
         XCTAssertEqual(service.connectedOption?.id, "demo-test")
         XCTAssertEqual(fake.connectCount, 2)
         XCTAssertEqual(service.status.phase, .idle)
@@ -989,7 +974,7 @@ final class MountServiceTests: XCTestCase {
         await service.goTo(highTarget(), observer: observer)
         XCTAssertEqual(service.status.phase, .slewing)
         fake.configure { $0.readError = .timeout(operation: "position") }
-        await expect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         XCTAssertEqual(service.connection, .lost("The connection to the mount was lost. The mount may still be moving if "
             + "it was slewing. Stop it on its hand controller if it is."))
         XCTAssertEqual(Array(MountLifecycle.announcements.dropFirst(announced)), ["Slewing", "Slew failed"])
@@ -1003,7 +988,7 @@ final class MountServiceTests: XCTestCase {
     func testALostConnectionCanBeDismissedByDisconnecting() async {
         let fake = await connectFake()
         fake.configure { $0.readError = .timeout(operation: "position") }
-        await expect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         service.disconnect()
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertNil(service.connectedOption)
@@ -1021,14 +1006,14 @@ final class MountServiceTests: XCTestCase {
     func testDisconnectingAnIdleMountEndsTheSession() async {
         let fake = await connectFake()
         service.disconnect()
-        await expect("the disconnection") { service.connection == .disconnected }
+        await mountServiceExpect("the disconnection") { service.connection == .disconnected }
         XCTAssertNil(service.capabilities)
         XCTAssertEqual(service.status, MountStatus.disconnected)
         XCTAssertNil(service.connectedOption)
         XCTAssertNil(service.connectedAddress)
         XCTAssertFalse(service.isDemo)
         XCTAssertEqual(service.summaryText, "Not connected")
-        await expect("the driver to be let go") { fake.disconnectCount == 1 }
+        await mountServiceExpect("the driver to be let go") { fake.disconnectCount == 1 }
         XCTAssertEqual(fake.abortCount, 0, "an idle mount needs no stop")
     }
 
@@ -1037,9 +1022,9 @@ final class MountServiceTests: XCTestCase {
         await service.goTo(highTarget(), observer: observer)
         XCTAssertTrue(service.isMoving)
         service.disconnect()
-        await expect("the disconnection") { service.connection == .disconnected }
+        await mountServiceExpect("the disconnection") { service.connection == .disconnected }
         XCTAssertEqual(fake.abortCount, 1)
-        await expect("the driver to be let go") { fake.disconnectCount == 1 }
+        await mountServiceExpect("the driver to be let go") { fake.disconnectCount == 1 }
         XCTAssertNil(service.slewTargetName)
         XCTAssertNil(service.slewStartSeparation)
         XCTAssertFalse(service.isWorking)
@@ -1050,28 +1035,28 @@ final class MountServiceTests: XCTestCase {
         await service.goTo(highTarget(), observer: observer)
         fake.configure { $0.abortError = .rejected(detail: "jammed") }
         service.disconnect()
-        await expect("the failure message") { service.errorText != nil }
+        await mountServiceExpect("the failure message") { service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount may still be moving. The mount rejected the command: jammed. "
             + "Stop it on its hand controller or switch it off.")
         XCTAssertEqual(service.connection, .connected)
         XCTAssertTrue(service.isMoving)
         fake.configure { $0.abortError = nil }
         service.disconnect()
-        await expect("the disconnection") { service.connection == .disconnected }
+        await mountServiceExpect("the disconnection") { service.connection == .disconnected }
     }
 
     func testDisconnectingWhileACommandIsBeingSetUpStillStopsTheMount() async {
         let fake = await connectFake()
         fake.readGate.close()
-        await expect("a poll to be stuck") { fake.readGate.isWaiting }
+        await mountServiceExpect("a poll to be stuck") { fake.readGate.isWaiting }
         let goTo = Task { await self.service.goTo(self.highTarget(), observer: self.observer) }
-        await expect("the GoTo to be under way") { service.isWorking }
+        await mountServiceExpect("the GoTo to be under way") { service.isWorking }
         service.disconnect()
         // Give the disconnect time to call off the queued GoTo and to queue the stop, while the worker is still stuck.
         await settle()
         fake.readGate.open()
         await goTo.value
-        await expect("the disconnection") { service.connection == .disconnected }
+        await mountServiceExpect("the disconnection") { service.connection == .disconnected }
         XCTAssertEqual(fake.abortCount, 1, "the GoTo may have started, so the mount is stopped anyway")
         XCTAssertTrue(fake.slews.isEmpty, "a GoTo that was still queued does not start after the disconnect")
         XCTAssertNil(service.errorText, "the person knows, so a cancelled GoTo reports nothing")
@@ -1083,7 +1068,7 @@ final class MountServiceTests: XCTestCase {
         fake.connectGate.close()
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the handshake to start") { fake.connectGate.isWaiting }
+        await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.disconnect()
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertNil(service.connectedOption)
@@ -1098,15 +1083,15 @@ final class MountServiceTests: XCTestCase {
         let ended = helper.backgroundTasksEnded
         helper.simulateBackground()
         XCTAssertEqual(helper.backgroundTasksBegun, begun + 1, "iOS is asked for time to stop the mount")
-        await expect("the session to end") { service.connection != .connected }
+        await mountServiceExpect("the session to end") { service.connection != .connected }
         XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount was stopped."))
-        await expect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
+        await mountServiceExpect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
         XCTAssertEqual(fake.abortCount, 0)
         XCTAssertNil(service.capabilities)
         XCTAssertEqual(service.status, MountStatus.disconnected)
         XCTAssertEqual(service.summaryText, "Connection lost")
         XCTAssertFalse(service.isConnected)
-        await expect("the driver to be let go") { fake.disconnectCount == 1 }
+        await mountServiceExpect("the driver to be let go") { fake.disconnectCount == 1 }
     }
 
     func testGoingToTheBackgroundStopsASlewingMount() async throws {
@@ -1116,10 +1101,10 @@ final class MountServiceTests: XCTestCase {
         XCTAssertEqual(service.status.phase, .slewing)
         let ended = helper.backgroundTasksEnded
         helper.simulateBackground()
-        await expect("the session to end") { service.connection != .connected }
+        await mountServiceExpect("the session to end") { service.connection != .connected }
         XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount was stopped."))
         XCTAssertEqual(fake.abortCount, 1)
-        await expect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
+        await mountServiceExpect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
         XCTAssertNil(service.slewTargetName)
     }
 
@@ -1129,7 +1114,7 @@ final class MountServiceTests: XCTestCase {
         await service.goTo(highTarget(), observer: observer)
         fake.configure { $0.abortError = .rejected(detail: "stuck") }
         helper.simulateBackground()
-        await expect("the session to end") { service.connection != .connected }
+        await mountServiceExpect("the session to end") { service.connection != .connected }
         XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount may still be "
             + "moving. The mount rejected the command: stuck. Stop it on its hand controller or switch it off."))
     }
@@ -1140,7 +1125,7 @@ final class MountServiceTests: XCTestCase {
         fake.connectGate.close()
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake), observer: observer)
-        await expect("the handshake to start") { fake.connectGate.isWaiting }
+        await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         let begun = helper.backgroundTasksBegun
         helper.simulateBackground()
         XCTAssertEqual(service.connection, .disconnected)
@@ -1159,11 +1144,33 @@ final class MountServiceTests: XCTestCase {
         let helper = try lifecycle()
         let fake = await connectFake()
         fake.configure { $0.readError = .timeout(operation: "position") }
-        await expect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
+        await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         let lost = service.connection
         let begun = helper.backgroundTasksBegun
         helper.simulateBackground()
         XCTAssertEqual(service.connection, lost)
         XCTAssertEqual(helper.backgroundTasksBegun, begun)
     }
+}
+
+// MARK: Waiting (free functions, see the note in `MountServiceTests`)
+
+/// Polls `condition` every few milliseconds until it holds or `timeout` seconds have passed.
+@MainActor
+@discardableResult
+func mountServiceWaitUntil(timeout: TimeInterval = 20.0, _ condition: () -> Bool) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !condition() {
+        if Date() >= deadline { return false }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    return true
+}
+
+/// Fails the test unless `condition` holds before `timeout`.
+@MainActor
+func mountServiceExpect(_ what: String, timeout: TimeInterval = 20.0, file: StaticString = #filePath, line: UInt = #line,
+                        _ condition: () -> Bool) async {
+    let reached = await mountServiceWaitUntil(timeout: timeout, condition)
+    if !reached { XCTFail("timed out waiting for \(what)", file: file, line: line) }
 }
