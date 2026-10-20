@@ -41,11 +41,13 @@ struct TonightWidgetView: View {
     /// the bold value is still larger than its label and fits without shrinking far. The small one is about 126 pt high
     /// inside its margins: at xxLarge the Moon phase on two lines, its "lit" line, the label and the dark window on two
     /// lines still fit (the window shrinks a little); at xxxLarge they need about 140 pt, so the window would be cut to
-    /// one line again ("7:13 PM – 5:13…").
+    /// one line again ("7:13 PM – 5:13…"). The inline widget is one line of 257 pt: "Dark until 5:13 · 54%" is about
+    /// 160 pt at the default size, so it stops growing at xxLarge instead of being cut to "Dark until 5:…".
     private static func dynamicTypeRange(for family: WidgetFamily) -> ClosedRange<DynamicTypeSize> {
         switch family {
         case .systemSmall: return .xSmall ... .xxLarge
         case .systemMedium: return .xSmall ... .xLarge
+        case .accessoryInline: return .xSmall ... .xxLarge
         default: return .xSmall ... .accessibility5
         }
     }
