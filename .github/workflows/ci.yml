@@ -14,9 +14,11 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels the run of a pull request, but never a run on main: with several merges in a row a cancelled run
+# is a commit that never got a verdict.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-and-test:
@@ -62,10 +64,25 @@ jobs:
         run: bash Tools/check-embedded-products.sh Release-iphoneos
 
       - name: Test LodestarKit
-        run: swift test --package-path LodestarKit --skip CometsOrbitTests/testSolverIsFast
+        run: swift test --package-path LodestarKit --enable-code-coverage --skip CometsOrbitTests/testSolverIsFast
+
+      # Line coverage per folder and file (Tools/coverage_report.py), also shown on the run's summary page.
+      - name: Coverage of LodestarKit
+        run: |
+          set -o pipefail
+          JSON="$(swift test --package-path LodestarKit --show-codecov-path)"
+          echo "# LodestarKit" >> "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" LodestarKit/Sources/ 97 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Test the widgets' shared code
-        run: swift test --package-path WidgetTests
+        run: swift test --package-path WidgetTests --enable-code-coverage
+
+      - name: Coverage of the widgets' shared code
+        run: |
+          set -o pipefail
+          JSON="$(swift test --package-path WidgetTests --show-codecov-path)"
+          echo "# WidgetShared/Core" >> "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" TonightCore/ 97 | tee -a "$GITHUB_STEP_SUMMARY"
 
       # A wall-clock check of a Debug build (200 000 Kepler solutions in under 5 s) that the shared runners sometimes
       # miss by a few tenths of a second; kept as its own step so that it stays visible without failing the job.
