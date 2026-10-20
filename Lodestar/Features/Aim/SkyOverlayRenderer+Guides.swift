@@ -159,7 +159,14 @@ extension SkyOverlayRenderer {
         let separation = AimFormat.angle(boresight.angle(to: direction))
         // On a backing, so a star or a line behind the number does not read as part of it.
         let style = AimLabelStyle(size: 14, weight: .bold, color: color, backing: palette.background.opacity(0.72))
-        labels.add(separation, at: CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38), style: style, priority: 3)
+        // The number sits inward of the marker, along the heading. Where the heading is sideways that is where the big
+        // arrow around the reticle points to, and its head would cover the number, so there the number sits beside the
+        // marker, on the side towards the middle of the screen.
+        var labelCenter = CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38)
+        if abs(heading.dx) > abs(heading.dy) {
+            labelCenter = CGPoint(x: tip.x, y: tip.y + (heading.dy > 0 ? -28 : 28))
+        }
+        labels.add(separation, at: labelCenter, style: style, priority: 3)
     }
 
     // MARK: Reticle
