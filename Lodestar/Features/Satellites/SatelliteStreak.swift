@@ -157,7 +157,7 @@ struct SatelliteStreakChip: View {
             .sheet(isPresented: $streak.isSheetPresented) {
                 SatelliteStreakSheet(model: model)
                     .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+                    .sheetDragIndicator(model.app.palette)
                     .themedRoot(model.app.palette, redFilter: model.app.settings.redFilterOverlay)
             }
         }

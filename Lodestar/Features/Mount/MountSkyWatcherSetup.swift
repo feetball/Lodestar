@@ -188,7 +188,8 @@ struct MountSkyWatcherSetupRows: View {
         .sheet(item: $confirmation) { confirmation in
             MountConfirmationSheet(confirmation: confirmation)
                 .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .sheetDragIndicator(app.palette)
+                .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
         }
         ForEach(suggestions) { suggestion in
             suggestionRow(suggestion, canGoTo: isAligned && service.status.phase == .idle)
