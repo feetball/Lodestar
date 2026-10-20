@@ -27,6 +27,9 @@ struct SkyOverlayRenderer {
     let mosaic: MosaicDisplay?
     /// Where the connected GoTo mount points, or `nil` without one.
     let mountMarker: AimMountMarker?
+    /// How far the bottom of the display lies above the screen's edge, in points: the off-screen marker keeps above the
+    /// cards that stand on it.
+    let bottomInset: CGFloat
 
     let projector: AimProjector
     let frustum: AimFrustum
@@ -49,7 +52,7 @@ struct SkyOverlayRenderer {
     /// - Returns: `nil` when the screen is empty.
     init?(frame: AimFrame, content: AimSkyContent?, configuration: AimConfiguration, palette: Palette,
           camera: CameraGeometry?, virtualFieldOfView: Double, hudRotation: AimHUDRotation, time: TimeInterval,
-          mosaic: MosaicDisplay?, mountMarker: AimMountMarker?, size: CGSize) {
+          mosaic: MosaicDisplay?, mountMarker: AimMountMarker?, bottomInset: CGFloat, size: CGSize) {
         guard let projection = AimProjectionFactory.projection(viewport: size, camera: camera,
                                                                virtualFieldOfView: virtualFieldOfView) else {
             return nil
@@ -77,6 +80,7 @@ struct SkyOverlayRenderer {
         self.hudRotation = hudRotation
         self.mosaic = mosaic
         self.mountMarker = mountMarker
+        self.bottomInset = bottomInset
         projector = AimProjector(projection: projection, attitude: eye, headingOffset: headingOffset)
         frustum = AimFrustum(projection: projection, attitude: eye, headingOffset: headingOffset,
                              margin: Self.clipMargin)

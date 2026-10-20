@@ -347,6 +347,8 @@ struct HelpButton: View {
                     .frame(width: 26, height: 26)
                     .foregroundStyle(palette.secondaryText)
                     .background(Circle().fill(palette.surface.opacity(0.85)))
+                    // An opaque disc below, so the sky's labels do not read through the button.
+                    .background(Circle().fill(palette.surface))
                     .overlay(Circle().strokeBorder(palette.secondaryText.opacity(0.45), lineWidth: 0.75))
                     // Padded to the minimum touch target.
                     .padding(9)

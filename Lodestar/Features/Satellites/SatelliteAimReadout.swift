@@ -47,12 +47,14 @@ private struct SatelliteAimCard: View {
                     Text(source.title)
                         .font(.headline)
                         .foregroundStyle(palette.primaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.8)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 if let horizontal = fix?.horizontal {
@@ -62,6 +64,7 @@ private struct SatelliteAimCard: View {
                     }
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(palette.secondaryText)
+                    .layoutPriority(1)
                 }
                 Button(action: onStop) {
                     Image(systemName: "xmark")
@@ -75,7 +78,7 @@ private struct SatelliteAimCard: View {
             }
             details
         }
-        .aimPanel(palette)
+        .aimPanel(palette, opacity: 0.97)
         .accessibilityElement(children: .contain)
     }
 

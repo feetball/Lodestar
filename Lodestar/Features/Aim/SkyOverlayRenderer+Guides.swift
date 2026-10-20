@@ -90,6 +90,9 @@ extension SkyOverlayRenderer {
     /// Distances from the top and bottom edges, which leave room for the status chips and the control panel.
     private static let edgeTopInset: CGFloat = 96
     private static let edgeBottomInset: CGFloat = 240
+    /// How tall the cards and the controls of the display are, with a little room. They stand on the inset that holds
+    /// the display off the screen's bottom edge (the home indicator, the tab bar), so the marker keeps this far above it.
+    private static let displayHeight: CGFloat = 218
 
     /// Draws the ring on what the guidance leads to: the panel of a mosaic being shot, else the satellite, else the target.
     mutating func drawTarget(in context: GraphicsContext) {
@@ -125,8 +128,9 @@ extension SkyOverlayRenderer {
         let length = hypot(heading.dx, heading.dy)
         heading = length > 1e-6 ? CGVector(dx: heading.dx / length, dy: heading.dy / length) : CGVector(dx: 0, dy: -1)
 
+        let edgeBottomInset = max(Self.edgeBottomInset, bottomInset + Self.displayHeight)
         let bounds = CGRect(x: Self.edgeSideInset, y: Self.edgeTopInset, width: size.width - 2 * Self.edgeSideInset,
-                            height: size.height - Self.edgeTopInset - Self.edgeBottomInset)
+                            height: size.height - Self.edgeTopInset - edgeBottomInset)
         guard bounds.width > 0, bounds.height > 0 else { return }
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         var distance = CGFloat.infinity
@@ -157,8 +161,48 @@ extension SkyOverlayRenderer {
         layer.stroke(arrow, with: .color(.black.opacity(0.5)), lineWidth: 1)
 
         let separation = AimFormat.angle(boresight.angle(to: direction))
-        labels.add(separation, at: CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38),
-                   style: AimLabelStyle(size: 14, weight: .bold, color: color), priority: 3)
+        // On an opaque backing, so a star or a line behind the number does not read as part of it: through a translucent
+        // one a star on the decimal point still showed, dimmed, as a colon.
+        let style = AimLabelStyle(size: 14, weight: .bold, color: color, backing: palette.background)
+        let labelCenter = edgeLabelCenter(for: separation, tip: tip, heading: heading)
+        labels.add(separation, at: labelCenter, style: style, priority: 3)
+    }
+
+    /// Where the number of the off-screen marker at `tip` sits: inward of the marker, along the heading, unless the big
+    /// arrow around the reticle lies there and would cover it (it orbits at the same heading, so it does whenever the
+    /// marker is not far outside the ring). Then it sits beside the marker, at the nearest place that is clear of the
+    /// arrow's head (on the side towards the middle of the screen if two are as near).
+    private func edgeLabelCenter(for text: String, tip: CGPoint, heading: CGVector) -> CGPoint {
+        let inward = CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38)
+        guard let guidance = frame.guidance, guidance.state != .onTarget else { return inward }
+        let middle = CGPoint(x: size.width / 2, y: size.height / 2)
+        let orbit = GuidanceArrowView.orbitRadius(forScreenHeight: size.height)
+        let head = CGPoint(x: middle.x + orbit * CGFloat(cos(guidance.arrowAngle)),
+                           y: middle.y - orbit * CGFloat(sin(guidance.arrowAngle)))
+        // The number's box, about, and its distance from the arrow's head (64 by 46 pt, covered by a circle of 36 pt).
+        let halfWidth = CGFloat(text.count) * 4.5 + 5
+        let halfHeight: CGFloat = 10
+        func clearance(of point: CGPoint) -> CGFloat {
+            hypot(max(abs(point.x - head.x) - halfWidth, 0), max(abs(point.y - head.y) - halfHeight, 0)) - 36
+        }
+        guard clearance(of: inward) < 4 else { return inward }
+        // Beside the marker, sideways of the heading and far enough that the box clears the marker's own arrow.
+        let sideways = CGVector(dx: -heading.dy, dy: heading.dx)
+        let gap = 16 + abs(sideways.dx) * halfWidth + abs(sideways.dy) * halfHeight
+        let beside = [gap, -gap, gap + 24, -(gap + 24)].map { offset in
+            CGPoint(x: tip.x + sideways.dx * offset, y: tip.y + sideways.dy * offset)
+        }
+        let onScreen = beside.filter { point in
+            point.x > halfWidth + 4 && point.x < size.width - halfWidth - 4
+                && point.y > halfHeight + 4 && point.y < size.height - halfHeight - 4
+        }
+        func score(_ point: CGPoint) -> CGFloat {
+            let clear = clearance(of: point)
+            return clear >= 4
+                ? 1000 - hypot(point.x - tip.x, point.y - tip.y) - 0.01 * hypot(point.x - middle.x, point.y - middle.y)
+                : clear
+        }
+        return (onScreen.isEmpty ? beside : onScreen).max { score($0) < score($1) } ?? inward
     }
 
     // MARK: Reticle

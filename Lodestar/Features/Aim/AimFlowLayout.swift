@@ -1,20 +1,22 @@
 import SwiftUI
 
-/// Lays its children out in rows that wrap when the width runs out, each row centred.
+/// Lays its children out in rows that wrap when the width runs out, each row centred. A child wider than the row is
+/// offered the row's width, so its text shrinks or wraps instead of running over the screen's edges.
 struct AimFlowLayout: Layout {
     var spacing: CGFloat = 6
     var lineSpacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let rows = rows(of: sizes, maxWidth: proposal.width ?? .infinity)
+        let limit = proposal.width ?? .infinity
+        let sizes = childSizes(of: subviews, limit: limit)
+        let rows = rows(of: sizes, maxWidth: limit)
         let height = rows.map { row in row.map { sizes[$0].height }.max() ?? 0 }.reduce(0, +)
             + lineSpacing * CGFloat(max(rows.count - 1, 0))
         return CGSize(width: rows.map { width(of: $0, sizes: sizes) }.max() ?? 0, height: height)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let sizes = childSizes(of: subviews, limit: bounds.width)
         var y = bounds.minY
         for row in rows(of: sizes, maxWidth: bounds.width) {
             var x = bounds.minX + (bounds.width - width(of: row, sizes: sizes)) / 2
@@ -25,6 +27,15 @@ struct AimFlowLayout: Layout {
                 x += sizes[index].width + spacing
             }
             y += rowHeight + lineSpacing
+        }
+    }
+
+    /// The size of each child: its ideal one, or, if that is wider than `limit`, the one it takes in `limit`.
+    private func childSizes(of subviews: Subviews, limit: CGFloat) -> [CGSize] {
+        subviews.map { subview in
+            let ideal = subview.sizeThatFits(.unspecified)
+            guard limit.isFinite, ideal.width > limit else { return ideal }
+            return subview.sizeThatFits(ProposedViewSize(width: limit, height: nil))
         }
     }
 

@@ -5,6 +5,8 @@ struct AimLabelStyle {
     let size: CGFloat
     let weight: Font.Weight
     let color: Color
+    /// A capsule drawn behind the text, for a readout that must stay legible over stars and lines; `nil` draws none.
+    var backing: Color? = nil
 }
 
 /// Collects the labels of a frame and draws as many as the budget allows, most important first, skipping any that
@@ -54,6 +56,12 @@ struct AimLabelQueue {
             var layer = context
             layer.translateBy(x: box.midX, y: box.midY)
             if rotation != .upright { layer.rotate(by: .degrees(rotation.degrees)) }
+            if let backing = request.style.backing {
+                // In the turned layer, so the text's own size, not the swapped one.
+                let pill = CGRect(x: -measured.width / 2 - 5, y: -measured.height / 2 - 2,
+                                  width: measured.width + 10, height: measured.height + 4)
+                layer.fill(Path(roundedRect: pill, cornerRadius: pill.height / 2), with: .color(backing))
+            }
             layer.draw(text, at: .zero, anchor: .center)
         }
     }

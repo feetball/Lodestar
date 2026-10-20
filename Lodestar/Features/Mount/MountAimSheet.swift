@@ -100,19 +100,34 @@ private struct MountControlPanel: View {
     private var statusCard: some View {
         let status = service.status
         return VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(palette.positive)
-                    .frame(width: 10, height: 10)
-                    .accessibilityHidden(true)
-                Text(service.displayName)
-                    .font(.headline)
-                    .lineLimit(2)
-                Spacer(minLength: 6)
-                Text(MountStatusText.phaseLine(status, targetName: service.slewTargetName))
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(palette.secondaryText)
-                    .multilineTextAlignment(.trailing)
+            // The name and the state on one line while both fit in full; else the state goes under the name, which
+            // wraps at its words instead of being cut off.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    statusDot
+                    Text(service.displayName)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 6)
+                    phaseText(status)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        statusDot
+                        Text(service.displayName)
+                            .font(.headline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    phaseText(status)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        // In line with the name: the dot's width and its spacing.
+                        .padding(.leading, 18)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             if let position = status.position {
                 Text(MountStatusText.pointing(position, style: app.settings.coordinateStyle))
@@ -160,6 +175,20 @@ private struct MountControlPanel: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var statusDot: some View {
+        Circle()
+            .fill(palette.positive)
+            .frame(width: 10, height: 10)
+            .accessibilityHidden(true)
+    }
+
+    private func phaseText(_ status: MountStatus) -> some View {
+        Text(MountStatusText.phaseLine(status, targetName: service.slewTargetName))
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(palette.secondaryText)
+            .multilineTextAlignment(.trailing)
+    }
+
     private var targetCard: some View {
         let target = model.guidanceTarget
         let observer = app.observerContext?.observer
@@ -184,8 +213,9 @@ private struct MountControlPanel: View {
                     confirmation = MountConfirmation(kind: .goTo, object: target)
                 } label: {
                     Label("Go to \(target.name)", systemImage: "location.north.line.fill")
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
-                        .lineLimit(1)
                 }
                 .buttonStyle(.lodestarPrimary)
                 .disabled(goToReason != nil || service.isWorking)
@@ -199,8 +229,9 @@ private struct MountControlPanel: View {
                     confirmation = MountConfirmation(kind: .sync, object: target)
                 } label: {
                     Label("Centered \u{2014} sync mount to \(target.name)", systemImage: "arrow.triangle.2.circlepath")
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity)
-                        .lineLimit(2)
                 }
                 .buttonStyle(.lodestarSecondary)
                 .disabled(syncReason != nil || service.isWorking)

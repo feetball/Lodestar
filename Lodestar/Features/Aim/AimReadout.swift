@@ -68,12 +68,14 @@ private struct AimTargetCard: View {
                     Text(SmallBodyText.displayName(object))
                         .font(.headline)
                         .foregroundStyle(palette.primaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.8)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(object.smallBody == nil ? subtitle : smallBody.subtitle(of: object))
                         .font(.caption)
                         .foregroundStyle(palette.secondaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 if let horizontal {
@@ -83,6 +85,7 @@ private struct AimTargetCard: View {
                     }
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(palette.secondaryText)
+                    .layoutPriority(1)
                 }
                 if let onClear {
                     Button(action: onClear) {
@@ -111,7 +114,7 @@ private struct AimTargetCard: View {
                     .foregroundStyle(palette.critical)
             }
         }
-        .aimPanel(palette)
+        .aimPanel(palette, opacity: 0.97)
         .accessibilityElement(children: .combine)
         .accessibilityActions {
             if let onClear {
@@ -156,6 +159,8 @@ struct AimMoveRow: View {
         Label(text, systemImage: systemImage)
             .font(.headline)
             .foregroundStyle(color)
+            // Wraps to the lines it needs, where the display is short of height, instead of being cut to one.
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 44)
             .aimPanel(palette, padding: 6)
     }
