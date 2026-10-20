@@ -53,7 +53,9 @@ struct ObjectDetailAltitudeChart: View {
             AxisMarks(values: night.hourTicks) { value in
                 AxisGridLine().foregroundStyle(palette.stroke)
                 AxisTick().foregroundStyle(palette.stroke)
-                AxisValueLabel {
+                // Centred on the tick, not in a one-hour bin: a bin is narrower than the label, which then showed as
+                // "..." (the last tick always, every tick at large text). Labels that would touch are left out.
+                AxisValueLabel(centered: false, anchor: .top, collisionResolution: .greedy) {
                     if let date = value.as(Date.self) {
                         Text(date.formatted(Date.FormatStyle(timeZone: timeZone).hour()))
                     }
@@ -75,6 +77,9 @@ struct ObjectDetailAltitudeChart: View {
         .chartPlotStyle { plot in
             plot.background(palette.background)
         }
+        // The labels of this dense, fixed-height chart stop growing at the largest regular text size (VoiceOver reads
+        // the summary instead); the rest of the card follows the user's setting.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .frame(height: 200)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Altitude through the night")
