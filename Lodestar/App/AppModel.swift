@@ -114,6 +114,9 @@ final class AppModel {
         settings.hasCompletedOnboarding = true
         settings.cameraPreviewEnabled = false
         settings.nightMode = demo.nightMode ? .on : .off
+        // The Aim screen starts without a target unless `target=` names one: not with the recent one that an earlier
+        // shot of the same Simulator left behind (`launch()` restores the newest of the recents).
+        settings.recentObjectIDs = []
         if let site = SavedSite(name: demo.siteName, latitude: demo.location.latitude,
                                 longitude: demo.location.longitude, elevation: demo.location.elevation,
                                 timeZoneIdentifier: demo.timeZoneIdentifier) {

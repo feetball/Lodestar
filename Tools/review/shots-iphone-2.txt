@@ -6,20 +6,10 @@ mount-sheet|dn|screen=mount-sheet target=special.ncp|pages=3
 mount-sheet-slewing|n|screen=mount-sheet-slewing target=special.ncp|fixed=6
 aim-mount|dn|screen=aim-mount target=special.ncp|
 aim-mount-slewing|n|screen=aim-mount-slewing target=special.ncp|fixed=6
-# The simulated Sky-Watcher mount: the stars are chosen by the app for the real time.
+# The simulated Sky-Watcher mount: the set-up screens (the aligned states and the Aim sheets are in shots-iphone-3.txt).
 mount-sw|dn|screen=mount-sw|pages=4
 mount-sw-equatorial|n|screen=mount-sw-equatorial|pages=4
 mount-sw-connected|dn|screen=mount-sw-connected|pages=4
-mount-sw-aligned-1|dn|screen=mount-sw-aligned-1|pages=4
-mount-sw-aligned-2|n|screen=mount-sw-aligned-2|pages=4
-mount-sw-sheet|dn|screen=mount-sw-sheet|pages=4
-mount-sw-sheet-aligned|dn|screen=mount-sw-sheet-aligned|pages=4
-mount-sw-sync|dn|screen=mount-sw-sync|pages=2
-# Widgets (the widget views are compiled into the review build) and the sky at the same time.
-widgets|dn|screen=widgets|pages=4
-widgets-states|dn|screen=widgets-states|pages=6
-widgets-large-type|n|screen=widgets-large-type|pages=6
-widgets-red|n|screen=widgets-red|pages=4
 # Help: the list and the pages that carry the most layout (steps, bullets, tips, the glossary).
 help|dn|screen=help|pages=3
 help-aim-screen|dn|screen=help-aimScreen|pages=3

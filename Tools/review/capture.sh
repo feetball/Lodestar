@@ -64,6 +64,8 @@ capture() {
   done
 
   # Only the app's process id goes to /dev/null: why a launch fails is worth seeing in the log.
+  # The state of the previous launch must not answer for this one (it would say ready, or name another screen).
+  [ -n "${DATA:-}" ] && rm -f "$DATA/Documents/review-state.txt"
   xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarScreenshot $COMMON $args night=$night >/dev/null
   DATA="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data 2>/dev/null)"
   rm -f "$DATA/Documents/review-cmd.txt"

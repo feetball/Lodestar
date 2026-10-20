@@ -28,5 +28,8 @@ struct SettingsView: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
         }
+        #if DEBUG
+        .modifier(ReviewOnlineFirstTime())
+        #endif
     }
 }

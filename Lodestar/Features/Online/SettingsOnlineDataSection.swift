@@ -24,12 +24,9 @@ private struct OnlineFeedRows: View {
 
     init(feed: OnlineFeed) {
         self.feed = feed
-        #if DEBUG
-        // The visual review opens the first-time explanation (`screen=online-first-time`).
-        _asksFirst = State(initialValue: feed == .satellites && ScreenshotMode.current?.screen == .onlineFirstTime)
-        #else
+        // The visual review opens the first-time explanation from the Settings root instead (`ReviewOnlineFirstTime`):
+        // the form builds this row only once it has been scrolled to.
         _asksFirst = State(initialValue: false)
-        #endif
     }
 
     var body: some View {
@@ -133,3 +130,22 @@ private struct OnlineFirstTimeSheet: View {
         .screenBackground(palette)
     }
 }
+
+#if DEBUG
+/// The visual review opens the first-time explanation (`screen=online-first-time`) over the Settings root. The section's
+/// own sheet cannot do it: the form builds the section only once it has been scrolled to.
+struct ReviewOnlineFirstTime: ViewModifier {
+    @Environment(AppModel.self) private var app
+    @State private var shown: OnlineFeed? = ScreenshotMode.current?.screen == .onlineFirstTime ? .satellites : nil
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $shown) { feed in
+                OnlineFirstTimeSheet(feed: feed)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
+            }
+    }
+}
+#endif

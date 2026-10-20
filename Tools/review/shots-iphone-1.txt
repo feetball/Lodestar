@@ -7,6 +7,10 @@ aim-comet|dn|tab=aim target=comet.161P comets=1|
 # The sky chart, which the review of 1.1 never captured: with the comets and asteroids, and with a target.
 sky|dn|tab=sky comets=1|
 sky-target|dn|tab=sky target=special.galacticCenter|
+# Aim without a target: the panel names what lies under the reticle. The default pointing (az 350, alt 38) has nothing to
+# name; az 149, alt 51 is a degree from Saturn at the time and place of capture.sh (the Moon is at az 224, alt 17).
+aim-look|dn|tab=aim|
+aim-look-named|dn|tab=aim pointing=149,51|
 # Events
 events-calendar|dn|screen=events-calendar|pages=4
 event-meteorShower|dn|screen=event-meteorShower|pages=4
