@@ -35,6 +35,7 @@ enum ChipTone {
 /// A compact capsule with an icon and a short label, used for sensor/alignment status.
 struct StatusChip: View {
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let systemImage: String
     let text: String
     var tone: ChipTone = .neutral
@@ -43,7 +44,10 @@ struct StatusChip: View {
         Label(text, systemImage: systemImage)
             .font(.caption.weight(.semibold))
             .labelStyle(.titleAndIcon)
-            .lineLimit(1)
+            // At accessibility sizes a long chip wraps ("Visible from here") instead of being cut off.
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .foregroundStyle(foreground)

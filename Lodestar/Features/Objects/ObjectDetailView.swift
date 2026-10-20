@@ -85,6 +85,7 @@ private struct ObjectDetailContent: View {
 struct ObjectDetailHeader: View {
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let object: CelestialObject
 
@@ -116,10 +117,20 @@ struct ObjectDetailHeader: View {
                 HStack(spacing: 8) { chips }
                 VStack(alignment: .leading, spacing: 8) { chips }
             }
-            HStack(spacing: 10) {
-                aimButton
-                if canBeFavorite {
-                    favoriteButton
+            if dynamicTypeSize.isAccessibilitySize {
+                // The favorite button below the Aim button, so the Aim label has the whole width.
+                VStack(spacing: 10) {
+                    aimButton
+                    if canBeFavorite {
+                        favoriteButton
+                    }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    aimButton
+                    if canBeFavorite {
+                        favoriteButton
+                    }
                 }
             }
         }
@@ -150,7 +161,6 @@ struct ObjectDetailHeader: View {
         } label: {
             // Comet designations are long; with large text the name wraps instead of being cut off.
             Label("Aim at \(SmallBodyText.displayName(object))", systemImage: "scope")
-                .lineLimit(4)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
