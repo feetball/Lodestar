@@ -62,17 +62,19 @@ private struct AimHUDLayout: View {
     }
 
     /// The free space between the chips and the cards, with the level gauge in its upper right corner: right under the
-    /// chips, however many rows they take, and clear of the arrow around the reticle. While the cards leave less room
-    /// than the gauge needs (a mount's tall card, large text), the gauge is left out instead of drawn over them.
+    /// chips, however many rows they take, and clear of the arrow around the reticle. The space takes all the height
+    /// the other children leave, and the gauge is drawn whenever that is as tall as the gauge; while the cards leave
+    /// less (a mount's tall card, large text), it is left out instead of drawn over them.
     private var levelGaugeSlot: some View {
-        ViewThatFits(in: .vertical) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                AimLevelGauge(model: model, isActive: isActive)
+        Color.clear
+            .frame(maxHeight: .infinity)
+            .overlay(alignment: .topTrailing) {
+                // Offered the size the space ended up with, so it fits exactly when there is room.
+                ViewThatFits(in: .vertical) {
+                    AimLevelGauge(model: model, isActive: isActive)
+                    Color.clear
+                }
             }
-            Color.clear
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var wideLayout: some View {

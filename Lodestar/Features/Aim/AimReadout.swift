@@ -159,6 +159,8 @@ struct AimMoveRow: View {
         Label(text, systemImage: systemImage)
             .font(.headline)
             .foregroundStyle(color)
+            // Wraps to the lines it needs, where the display is short of height, instead of being cut to one.
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 44)
             .aimPanel(palette, padding: 6)
     }
