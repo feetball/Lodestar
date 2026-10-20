@@ -16,7 +16,8 @@ enum SettingsFormat {
     /// A position error radius, e.g. "±35 m" or "±2.4 km".
     static func accuracy(metres: Double) -> String {
         guard metres.isFinite, metres >= 0 else { return AppFormat.missing }
-        if metres < 1000 { return "\u{00B1}\(Int(metres.rounded()))\u{00A0}m" }
+        // 999.5 m rounds to 1000, which reads as kilometres.
+        if metres.rounded() < 1000 { return "\u{00B1}\(Int(metres.rounded()))\u{00A0}m" }
         return "\u{00B1}\((metres / 1000).formatted(.number.precision(.fractionLength(1))))\u{00A0}km"
     }
 

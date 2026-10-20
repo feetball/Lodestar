@@ -39,7 +39,8 @@ enum AppFormat {
     static func rightAscension(_ coordinate: EquatorialCoordinate, style: CoordinateStyle) -> String {
         switch style {
         case .sexagesimal: return AngleFormatter.formatRightAscension(hours: coordinate.rightAscensionHours)
-        case .decimal: return AngleFormatter.formatDegrees(coordinate.rightAscension, decimals: 3)
+        // Wraps after rounding, so 359.9996° reads "0.000°", never "360.000°".
+        case .decimal: return AngleFormatter.formatAzimuth(coordinate.rightAscension, decimals: 3)
         }
     }
 
@@ -65,8 +66,14 @@ enum AppFormat {
         guard degrees.isFinite else { return missing }
         let magnitude = abs(degrees)
         if magnitude >= 1 { return AngleFormatter.formatDegrees(magnitude, decimals: magnitude >= 10 ? 0 : 1) }
-        if magnitude * 60 >= 1 { return "\(Int((magnitude * 60).rounded()))′" }
-        return "\(Int((magnitude * 3600).rounded()))″"
+        if magnitude * 60 >= 1 {
+            // 59.5 arcminutes and more round up to the next unit, a whole degree.
+            let minutes = Int((magnitude * 60).rounded())
+            return minutes < 60 ? "\(minutes)′" : AngleFormatter.formatDegrees(1, decimals: 1)
+        }
+        // 59.5 arcseconds and more round up to a whole arcminute.
+        let seconds = Int((magnitude * 3600).rounded())
+        return seconds < 60 ? "\(seconds)″" : "1′"
     }
 
     /// Apparent magnitude, e.g. "mag 3.4" or "mag −1.5".
