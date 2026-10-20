@@ -43,6 +43,13 @@ private struct AimScreen: View {
         let configuration = AimConfiguration(app: app)
         let skyInputs = model.skyInputs(for: configuration)
         content
+            // The `TabView` does not hand the bottom inset of the app's tab bar (`AppTabBar`, set up in `RootView`) on
+            // to its tabs, so the display ended behind the bar. An invisible bar of the same layout, in the same
+            // place, keeps the display above the real one at every text size; the sky still runs under it.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                AppTabBar(selection: .constant(.aim))
+                    .hidden()
+            }
             .screenBackground(palette)
             .sheet(item: $sheet) { sheet in
                 sheetContent(sheet)
