@@ -93,7 +93,7 @@ extension HelpContent {
                 "With two or more stars at different heights, expect to land within about a degree, inside the frame of all but long telephoto lenses.",
                 "**Settings** \u{25B8} **About** \u{25B8} **Sensor Diagnostics** checks the sensors. With the phone upright and the camera facing north, the gravity check should read **PASS**.",
             ]),
-            .tip("A magnetic phone case can throw the compass off. If the chip says **Compass poor**, try the phone without its case, away from metal."),
+            .tip("A magnetic phone case can throw the compass off. If a chip says **Compass poor** or **Magnetic interference**, try the phone without its case, away from metal."),
             .caution("Changing the heading source clears your star alignment."),
         ],
         related: [.alignment, .mounting, .troubleshooting])
