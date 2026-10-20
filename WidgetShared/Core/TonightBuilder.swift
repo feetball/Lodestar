@@ -97,7 +97,8 @@ private struct Workspace {
     }
 
     /// Sorted instants with near-duplicates merged: of two instants less than a minute apart the later one is
-    /// kept (it carries the newer state), except that the first instant, "now", always stays.
+    /// kept (it carries the newer state), except that the first instant, "now", always stays. A change that comes
+    /// less than a minute after "now" moves to a minute after it instead of being lost.
     private func merged(_ instants: [Date]) -> [Date] {
         var kept: [Date] = []
         for instant in instants {
@@ -108,7 +109,11 @@ private struct Workspace {
             if instant.timeIntervalSince(last) >= TonightBuilder.minimumSpacing {
                 kept.append(instant)
             } else if kept.count > 1 {
-                kept[kept.count - 1] = instant
+                // Never closer to the one before than the minimum spacing: an entry moved later, below, may be replaced.
+                let earliest = kept[kept.count - 2].addingTimeInterval(TonightBuilder.minimumSpacing)
+                kept[kept.count - 1] = max(instant, earliest)
+            } else {
+                kept.append(last.addingTimeInterval(TonightBuilder.minimumSpacing))
             }
         }
         return kept
@@ -124,10 +129,11 @@ private struct Workspace {
         return TonightEntry(date: date, content: .night(night))
     }
 
-    /// The event the Android widgets (and the Upcoming card) pick: of the first few events from `date` on, the first
-    /// that can be seen from here, else the first.
+    /// The event the Android widgets (and the Upcoming card) pick: of the first few events after `date`, the first
+    /// that can be seen from here, else the first. An event at `date` itself has happened, so the entry that the
+    /// timeline places at that instant already moves on to the next one.
     private static func event(in events: [TonightNight.Event], at date: Date) -> TonightNight.Event? {
-        let ahead = events.filter { $0.date >= date }
+        let ahead = events.filter { $0.date > date }
         let horizon = date.addingTimeInterval(Double(TonightBuilder.upcomingDays) * 86_400)
         let soon = Array(ahead.filter { $0.date <= horizon }.prefix(TonightBuilder.upcomingCount))
         let candidates = soon.isEmpty ? Array(ahead.prefix(TonightBuilder.upcomingFarCount)) : soon

@@ -15,6 +15,9 @@ struct CameraFrame: @unchecked Sendable {
     let image: CGImage
     /// `nil` while the format's field of view is unknown.
     let geometry: CameraGeometry?
+    /// When the frame was captured, in seconds on the host clock, which is the clock of the motion samples
+    /// (`MotionSample.timestamp`); `nil` if the frame carries no usable time.
+    let capturedAt: Double?
 }
 
 /// Why the capture pipeline could not start.
@@ -54,7 +57,7 @@ enum CameraEngineEvent: Sendable, Equatable {
 ///   `startRunning()` blocks, so session work never runs on the main thread.
 /// - `frameQueue` (serial, as AVFoundation requires): `redFilter`, `appliedIntensity`, `lastFrameTime`,
 ///   `lastGeometry`. `CMSampleBuffer`, `CVPixelBuffer` and `CIFilter` never leave it.
-/// - locks: `nightIntensity`, `frameSink`, `fieldOfViewHistory`, `requestedZoom`.
+/// - locks: `nightIntensity`, `frameSink`, `fieldOfViewHistory`, `requestedZoom`, `hostClockOffset`.
 final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutputSampleBufferDelegate {
     /// Frames are skipped when closer together than this, a little under 1/30 s so a 30 fps camera passes every
     /// frame while a faster one is thinned to about 30 fps.
@@ -93,6 +96,8 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
     /// Oldest first; empty while the field of view is unknown.
     private let fieldOfViewHistory = OSAllocatedUnfairLock<[FieldOfViewChange]>(initialState: [])
     private let requestedZoom = OSAllocatedUnfairLock<Double>(initialState: 1)
+    /// Seconds to add to a frame's presentation time (on the session's clock) for its time on the host clock.
+    private let hostClockOffset = OSAllocatedUnfairLock<Double>(initialState: 0)
 
     // sessionQueue only
     private var camera: AVCaptureDevice?
@@ -135,7 +140,10 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
                 resetFrameState()
                 if !session.isRunning { session.startRunning() }
                 // The format a preset selects is only certain once the session runs: read the optics again.
-                if session.isRunning { settleOptics(of: camera) }
+                if session.isRunning {
+                    settleOptics(of: camera)
+                    measureHostClockOffset()
+                }
                 eventSink.yield(session.isRunning ? .started : .failed(.notRunning))
             } catch {
                 eventSink.yield(.failed((error as? CameraEngineFailure) ?? .configuration))
@@ -256,6 +264,16 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         recordFieldOfView(of: device, isRunning: isRunning)
     }
 
+    /// How far the session's clock, on which the frames are timed, is from the host clock. CoreMotion's timestamps
+    /// (seconds since boot) are on the host clock, which is what lets a frame be matched with the attitude it was
+    /// captured at. On an iPhone's own camera the two clocks are normally the same and the offset is about zero.
+    private func measureHostClockOffset() {
+        let sessionNow = CMClockGetTime(session.synchronizationClock ?? CMClockGetHostTimeClock()).seconds
+        let hostNow = CMClockGetTime(CMClockGetHostTimeClock()).seconds
+        guard sessionNow.isFinite, hostNow.isFinite else { return }
+        hostClockOffset.withLock { $0 = hostNow - sessionNow }
+    }
+
     /// Records the field of view across the long side of the active format at the current zoom.
     private func recordFieldOfView(of device: AVCaptureDevice, isRunning: Bool) {
         let format = device.activeFormat
@@ -347,7 +365,11 @@ final class CameraEngine: NSObject, @unchecked Sendable, AVCaptureVideoDataOutpu
         let frameGeometry = geometry(forFrameSize: image.extent.size,
                                      fieldOfView: fieldOfView(at: presentationTime.isNumeric ? presentationTime.seconds : nil))
         guard let frame = context.createCGImage(image, from: image.extent) else { return }
-        sink.yield(CameraFrame(image: frame, geometry: frameGeometry))
+        var capturedAt: Double?
+        if presentationTime.isNumeric {
+            capturedAt = presentationTime.seconds + hostClockOffset.withLock({ $0 })
+        }
+        sink.yield(CameraFrame(image: frame, geometry: frameGeometry, capturedAt: capturedAt))
     }
 
     private func redMonochrome(_ image: CIImage, intensity: Double) -> CIImage {

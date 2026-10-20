@@ -49,7 +49,8 @@ final class SatelliteGroup: Sendable {
     }
 }
 
-/// A satellite of the pass lists together with the group it came from, which decides how old its data may be.
+/// A satellite of the pass lists together with the group whose freshness limit applies to it (the stations' for the ISS
+/// and Tiangong, else the group it came from).
 struct PassSatellite: Sendable {
     let satellite: Satellite
     let group: ElementSetGroup
@@ -119,12 +120,15 @@ struct SatelliteLibrary: Sendable {
             for satellite in group.satellites {
                 let number = satellite.catalogNumber
                 if let only, !only.contains(number) { continue }
+                // The ISS and Tiangong are in both groups: judge their data by the stricter station limit, whichever
+                // download happens to be the newer.
+                let limitGroup: ElementSetGroup = brightStations.contains(number) ? .stations : group.group
                 if let known = byNumber[number] {
                     if satellite.elements.epoch > known.satellite.elements.epoch {
-                        byNumber[number] = PassSatellite(satellite: satellite, group: group.group)
+                        byNumber[number] = PassSatellite(satellite: satellite, group: limitGroup)
                     }
                 } else {
-                    byNumber[number] = PassSatellite(satellite: satellite, group: group.group)
+                    byNumber[number] = PassSatellite(satellite: satellite, group: limitGroup)
                     order.append(number)
                 }
             }

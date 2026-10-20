@@ -57,6 +57,9 @@ struct WatchTonightView: View {
         if let entry = TonightBuilder.current(in: model.entries, at: date), case .night(let night) = entry.content {
             let lines = TonightLines(night: night, now: date)
             VStack(alignment: .leading, spacing: 12) {
+                if let source = model.placeSource {
+                    placeLine(source)
+                }
                 section(lines.dark, symbol: "moon.stars", valueStyle: TonightStyle.accent).id("dark")
                 moon(lines).id("moon")
                 section(lines.core, symbol: "sparkles", valueStyle: TonightStyle.primaryText).id("core")
@@ -73,6 +76,14 @@ struct WatchTonightView: View {
     }
 
     // MARK: Sections
+
+    /// Which place the screen is for. The complications always use the watch's own location, so when the iPhone sent
+    /// a place the two can differ, and this says why.
+    private func placeLine(_ source: TonightPlaceStore.Source) -> some View {
+        Text(source == .phone ? "Your iPhone\u{2019}s place" : TonightLines.placeName)
+            .font(.caption2)
+            .foregroundStyle(TonightStyle.tertiaryText)
+    }
 
     /// One item: its label line, its main line, the line under it and, where there is one, the last line.
     private func section(_ item: TonightItem, symbol: String, valueStyle: Color) -> some View {
@@ -177,10 +188,13 @@ struct WatchTonightView: View {
                 .font(.title2)
                 .foregroundStyle(TonightStyle.accent)
                 .accessibilityHidden(true)
-            Text(TonightNeedsLocationText.full)
+            Text(TonightNeedsLocationText.full(model.locationIssue))
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(TonightStyle.primaryText)
-            Text("Or allow location for Lodestar on this watch.")
+            // The iPhone app can supply the place whichever way the watch's own location stands.
+            Text(model.locationIssue == .notAsked
+                 ? "Or allow location for Lodestar on this watch."
+                 : "Or open Lodestar on your iPhone.")
                 .font(.caption2)
                 .foregroundStyle(TonightStyle.secondaryText)
         }

@@ -11,7 +11,8 @@ import Foundation
 /// ```
 ///
 /// Safety rules enforced here: a target below `MountSettings.altitudeLimit` (now, and
-/// `MountSettings.horizonLookaheadSeconds` from now) is never sent; a goto while a slew or nudge runs is refused
+/// `MountSettings.horizonLookaheadSeconds` from now) is never sent, and neither is a target within
+/// `MountSettings.sunExclusionDegrees` of the Sun while the Sun is up; a goto while a slew or nudge runs is refused
 /// (`MountError.slewInProgress`, `MountError.busy`) until `abort` has been called, and so is a goto or sync while
 /// the mount's own "slewing" flag is set (a move started on the hand controller); a slew that exceeds
 /// `MountSettings.maximumSlewSeconds` is aborted; a nudge ends by itself after its duration (the next `poll` sends the
@@ -21,6 +22,9 @@ import Foundation
 /// about once a second while the Aim screen shows the mount and `abort` on the user's request.
 public final class MountController {
     private static let stopAttempts = 3
+
+    /// The Sun's geometric altitude (degrees) above which it counts as up for the exclusion zone.
+    private static let sunUpAltitude = -1.0
 
     private let driver: MountDriver
     private let clock: MountClock
@@ -174,8 +178,9 @@ public final class MountController {
     ///
     /// - Throws: `MountError.notConnected`, `slewInProgress` (call `abort` first), `busy` (nudging), `invalidInput`,
     ///   `notSupported`, `belowHorizonLimit` (checked with the observer's sky now and
-    ///   `MountSettings.horizonLookaheadSeconds` from now), and whatever the mount answers (`notAligned`,
-    ///   `mountHorizonLimit`, `parked`, …).
+    ///   `MountSettings.horizonLookaheadSeconds` from now), `nearSun` (the Sun is up and the target is within
+    ///   `MountSettings.sunExclusionDegrees` of it, now or `horizonLookaheadSeconds` from now), and whatever the mount
+    ///   answers (`notAligned`, `mountHorizonLimit`, `parked`, …).
     public func goto(_ target: EquatorialCoordinate, properMotion: ProperMotion? = nil) throws {
         let found = try requireConnected()
         try requireFinite(target)
@@ -188,6 +193,7 @@ public final class MountController {
         if !found.canSlew { throw MountError.notSupported(feature: .slew) }
         let now = clock.now()
         try checkAltitude(target, properMotion, now)
+        try checkSun(target, properMotion, now)
         let sent = driver.epoch.fromJ2000(target, frame: SkyFrame(date: now, observer: observer), properMotion: properMotion)
         do {
             try driver.slew(to: sent)
@@ -404,7 +410,13 @@ public final class MountController {
         failures += 1
         lastError = error
         if failures < settings.maximumConsecutiveFailures { return }
-        if phase == .slewing { outcome = .failed(error: MountError.connectionLost) }
+        // A nudge keeps an axis turning until the mount is told to stop, and the poll that would have ended it will not
+        // come again. The link may be gone, so this is one best-effort attempt that never throws.
+        if phase == .nudging, let direction = nudgeDirection { stopNudgeQuietly(direction) }
+        if phase == .slewing {
+            stopQuietly()
+            outcome = .failed(error: MountError.connectionLost)
+        }
         phase = .disconnected
         lastError = MountError.connectionLost
         nudgeDirection = nil
@@ -438,6 +450,25 @@ public final class MountController {
         }
     }
 
+    /// Refuses a target that is closer to the Sun than `MountSettings.sunExclusionDegrees` while the Sun is up. The check
+    /// looks at the sky now and `MountSettings.horizonLookaheadSeconds` from now (the Sun may rise during the slew), and
+    /// compares positions, not identities: Venus near inferior conjunction, the Moon at new moon or a comet in the glare
+    /// are as dangerous as the Sun itself. Both places are geometric, topocentric and in the horizontal frame, so no
+    /// frame conversion can put them out of step. The Sun counts as up from -1 degrees, which covers its disc and the
+    /// refraction at the horizon.
+    private func checkSun(_ target: EquatorialCoordinate, _ properMotion: ProperMotion?, _ now: Date) throws {
+        let limit = settings.sunExclusionDegrees
+        let offsets = settings.horizonLookaheadSeconds > 0 ? [0.0, settings.horizonLookaheadSeconds] : [0.0]
+        for offset in offsets {
+            let frame = SkyFrame(date: now.addingTimeInterval(offset), observer: observer)
+            let sun = frame.horizontal(of: .sun, refraction: false)
+            if sun.altitude <= MountController.sunUpAltitude { continue }
+            let place = frame.horizontal(j2000: target, properMotion: properMotion, refraction: false)
+            let distance = place.angularSeparation(to: sun)
+            if distance < limit { throw MountError.nearSun(separationDegrees: distance, limitDegrees: limit) }
+        }
+    }
+
     private func storePosition(_ reading: EquatorialCoordinate, now: Date) {
         mountPosition = reading
         position = driver.epoch.toJ2000(reading, frame: SkyFrame(date: now, observer: observer))
@@ -461,6 +492,15 @@ public final class MountController {
             try driver.abort()
         } catch {
             // Nothing more can be done; the caller reports the original failure.
+        }
+    }
+
+    /// Tells the mount to end the nudge in `direction` when the session is being given up; a failure changes nothing.
+    private func stopNudgeQuietly(_ direction: MountNudgeDirection) {
+        do {
+            try driver.stopNudge(direction: direction)
+        } catch {
+            // The link is probably gone; the session ends with `connectionLost` either way.
         }
     }
 

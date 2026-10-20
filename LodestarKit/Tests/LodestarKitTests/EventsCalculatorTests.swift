@@ -277,6 +277,35 @@ final class EventsCalculatorTests: XCTestCase {
         XCTAssertNotNil(withChicago?.bestWindow)
     }
 
+    func testNightOfAnEventAroundNoonOnDaylightSavingChangeDays() throws {
+        // A night runs from local noon to local noon, so on a 23- or 25-hour day the event just after noon (spring) or just
+        // before noon (autumn) belongs to the night of its own side of noon, not to the one an hour away that shifting by
+        // 12 absolute hours lands in. A radiant that stays high all night makes the window the whole astronomical night.
+        let zone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        let observer = Support.newYork.observer
+        let options = EventOptions(timeZone: zone)
+        let radiant = EquatorialCoordinate(rightAscension: 0, declination: 85)
+        // The event, and an instant on the local day on which its night starts.
+        let cases = [
+            ("2026-03-08T16:30:00Z", "2026-03-08T16:30:00Z"),  // 12:30 EDT: the night of 8 March, 30 minutes after noon
+            ("2026-03-08T15:30:00Z", "2026-03-07T20:00:00Z"),  // 11:30 EDT: the night of 7 March
+            ("2026-11-01T16:30:00Z", "2026-10-31T20:00:00Z"),  // 11:30 EST: the night of 31 October, 30 minutes before its end
+            ("2026-11-01T17:30:00Z", "2026-11-01T17:30:00Z"),  // 12:30 EST: the night of 1 November
+        ]
+        for (eventText, dayText) in cases {
+            let date = Support.utc(eventText)
+            let peak = MeteorShowerPeak(shower: MeteorShower.all[0], activityStart: date, activityEnd: date,
+                                        moonIlluminatedFraction: 0, radiant: radiant)
+            let event = AstronomicalEvent(date: date, details: .meteorShower(peak), visibility: nil)
+            let night = TwilightCalculator.night(startingOn: Support.utc(dayText), observer: observer, timeZone: zone)
+            let dark = try XCTUnwrap(night.astronomicalNight, eventText)
+            let visibility = try XCTUnwrap(EventCalculator.visibility(of: event, observer: observer, options: options), eventText)
+            let window = try XCTUnwrap(visibility.bestWindow, eventText)
+            XCTAssertTrue(abs(Support.seconds(window.start, dark.start)) < 1 && abs(Support.seconds(window.end, dark.end)) < 1,
+                          "\(eventText): window \(window) is not the night of \(dayText), \(dark)")
+        }
+    }
+
     func testPolarObserversAndTheSouthernHemisphere() throws {
         let options = EventOptions(kinds: [.meteorShower, .opposition, .fullMoonSpecial])
         // Tromsø (69.65N) in June has no astronomical night: the Daytime Arietids (7 June) have no window and nothing breaks.

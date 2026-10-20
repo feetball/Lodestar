@@ -107,7 +107,7 @@ struct SatellitePassRow: View {
                         .monospacedDigit()
                         .foregroundStyle(palette.secondaryText)
                 }
-                Text("\(SatelliteText.span(item, in: timeZone)) \u{00B7} \(SatelliteText.peak(item.pass.culmination))"
+                Text("\(SatelliteText.span(item, in: timeZone)) \u{00B7} \(SatelliteText.peak(item.peak))"
                      + (isFresh ? "" : " \u{00B7} \(SatelliteText.staleTag)"))
                     .font(.subheadline)
                     .monospacedDigit()

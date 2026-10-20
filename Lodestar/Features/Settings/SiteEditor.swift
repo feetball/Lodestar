@@ -113,7 +113,7 @@ struct SiteEditor: View {
 
     private var nameSection: some View {
         SettingsSection(title: "Name") {
-            TextField("Site name", text: $draft.name)
+            TextField("Site name", text: $draft.name, prompt: Text("Site name").foregroundStyle(palette.tertiaryText))
                 .textInputAutocapitalization(.words)
                 .submitLabel(.done)
             if let failureMessage {

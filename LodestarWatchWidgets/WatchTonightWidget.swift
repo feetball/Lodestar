@@ -3,7 +3,8 @@ import WidgetKit
 
 /// Tonight on the watch face: the Moon's phase (circular and corner), the dark window with the Moon and the next
 /// event (rectangular, also in the Smart Stack) or just the dark window (inline). Worked out on the watch for where
-/// it is; the system shares the Lodestar watch app's location permission.
+/// it is; the system shares the Lodestar watch app's location permission. It is always the watch's own location: the
+/// place the iPhone sends reaches the watch app only (there is no App Group), so the two can differ.
 struct WatchTonightWidget: Widget {
     static let kind = "net.kuecker.Lodestar.watch.tonight"
 
@@ -16,7 +17,7 @@ struct WatchTonightWidget: Widget {
                 }
         }
         .configurationDisplayName("Tonight")
-        .description("When it gets dark, the Moon and the next event, for where you are.")
+        .description("When it gets dark, the Moon and the next event, for where this watch is.")
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline, .accessoryCorner])
     }
 }

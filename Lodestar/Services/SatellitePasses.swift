@@ -23,9 +23,13 @@ struct SatellitePassItem: Identifiable, Hashable, Sendable {
     let satellite: Satellite
     let group: ElementSetGroup
     let pass: SatellitePass
+    /// The highest point of the pass while it can be seen. The pass's own culmination can lie in Earth's shadow, after
+    /// the visible part has ended (`SatellitePasses.visiblePeak`).
+    let peak: SatellitePassPoint
 
-    /// Tells passes apart: the satellite and the rise time.
-    var id: String { "\(satellite.catalogNumber)@\(Int64(pass.rise.date.timeIntervalSince1970 * 1000))" }
+    /// Tells passes apart: the satellite and the rise time to the minute (two searches find the same rise within a few
+    /// milliseconds, and the passes of one satellite are far more than a minute apart).
+    var id: String { "\(satellite.catalogNumber)@\(Int64((pass.rise.date.timeIntervalSince1970 / 60).rounded()))" }
 
     /// Whether this is the International Space Station.
     var isISS: Bool { satellite.catalogNumber == SatelliteLibrary.issCatalogNumber }
@@ -52,19 +56,47 @@ enum SatellitePasses {
     /// The Passes screen looks this many days ahead.
     static let horizonDays = 3
 
-    /// Every visible pass (sunlit satellite, dark sky, above 10°) of the library's ISS and bright satellites in the next
-    /// `horizonDays` days from `start`, by the time it becomes visible. Takes about a second on a phone: run it off the
-    /// main actor.
+    /// The search starts this long before `start`, so that a pass already under way at `start` is found whole: the
+    /// finder cuts a pass at the start of its window (rise, peak and visible span of what is left). Longer than any
+    /// pass of a low-orbit satellite.
+    private static let lead: TimeInterval = 3_600
+
+    /// Every visible pass (sunlit satellite, dark sky, above 10°) of the library's ISS and bright satellites that is
+    /// not over at `start`, in the next `horizonDays` days, by the time it becomes visible. Takes about a second on a
+    /// phone: run it off the main actor.
     static func compute(library: SatelliteLibrary, observer: Observer, start: Date) -> [SatellitePassItem] {
         let finder = SatellitePassFinder(observer: observer,
-                                         interval: DateInterval(start: start, duration: Double(horizonDays) * 86_400))
+                                         interval: DateInterval(start: start.addingTimeInterval(-lead),
+                                                                duration: Double(horizonDays) * 86_400 + lead))
         var items: [SatellitePassItem] = []
         for entry in library.passSatellites {
             for pass in finder.passes(of: entry.satellite) where pass.isVisible {
-                items.append(SatellitePassItem(satellite: entry.satellite, group: entry.group, pass: pass))
+                // The passes that ended before `start` were searched for only to leave the others whole.
+                guard let span = pass.visibleSpan, span.end > start else { continue }
+                let peak = visiblePeak(of: pass, satellite: entry.satellite, observer: observer)
+                items.append(SatellitePassItem(satellite: entry.satellite, group: entry.group, pass: pass, peak: peak))
             }
         }
         return items.sorted { $0.start < $1.start }
+    }
+
+    /// The highest point of `pass` while it can be seen. The pass's culmination can lie outside the visible part (the
+    /// satellite enters Earth's shadow before it gets there). The altitude rises up to the culmination and falls after
+    /// it, so the highest point of a visible part that does not hold the culmination is its end nearer to it.
+    static func visiblePeak(of pass: SatellitePass, satellite: Satellite, observer: Observer) -> SatellitePassPoint {
+        let culmination = pass.culmination
+        var best: SatellitePassPoint?
+        for part in pass.visibleIntervals {
+            if part.start <= culmination.date && culmination.date <= part.end { return culmination }
+            let date = culmination.date < part.start ? part.start : part.end
+            guard let look = satellite.look(at: date, observer: observer) else { continue }
+            let point = SatellitePassPoint(date: look.date, azimuth: look.azimuth, altitude: look.altitude,
+                                           rangeKilometers: look.rangeKilometers, isSunlit: look.isSunlit,
+                                           magnitude: look.magnitude)
+            if let current = best, current.altitude >= point.altitude { continue }
+            best = point
+        }
+        return best ?? culmination
     }
 
     /// The passes for a `filter` of the Passes screen, in the order given.

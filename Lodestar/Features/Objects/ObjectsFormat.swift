@@ -73,9 +73,15 @@ enum ObjectsFormat {
 
     /// When an object below the horizon next rises, such as "Rises 21:34" or "Rises tomorrow 02:10"; with a recorded
     /// skyline "Clears skyline 21:34". `nil` when no rising is known.
+    ///
+    /// Only a star or a deep-sky object that stays down is said to never rise; the Sun, the Moon and the planets move,
+    /// so for them it is only that no rising falls within the search window.
     static func risingText(for position: ObjectSkyPosition, in timeZone: TimeZone) -> String? {
         if position.neverRises {
             return position.usesSkyline ? "Never clears the skyline" : "Never rises here"
+        }
+        if position.noRiseInWindow {
+            return position.usesSkyline ? "Won't clear within a day" : "Won't rise within a day"
         }
         guard let rise = position.nextRise else { return nil }
         var calendar = Calendar(identifier: .gregorian)

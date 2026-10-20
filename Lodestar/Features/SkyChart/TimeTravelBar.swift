@@ -139,8 +139,10 @@ struct SkyChartTimeSlider: View {
         .accessibilityValue(accessibilityValue)
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: hours = min(hours + Self.accessibilityStep, range.upperBound)
-            case .decrement: hours = max(hours - Self.accessibilityStep, range.lowerBound)
+            // Step from the real offset, which the date sheet can take far outside the slider's range; the clock keeps
+            // it within its own limit.
+            case .increment: hours += Self.accessibilityStep
+            case .decrement: hours -= Self.accessibilityStep
             @unknown default: break
             }
         }

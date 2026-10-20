@@ -116,9 +116,11 @@ private struct MountNudgeButton: View {
         .onDisappear { service.endNudge() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Move \(name)")
-        .accessibilityHint("Double tap for a short move.")
+        .accessibilityHint(isEnabled ? "Double tap for a short move." : "Not available while the mount is slewing.")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { if isEnabled { service.nudgeOnce(direction) } }
+        // VoiceOver announces a disabled element as dimmed; the opacity above is only a cue for the eyes.
+        .disabled(!isEnabled)
     }
 
     private var letter: String {

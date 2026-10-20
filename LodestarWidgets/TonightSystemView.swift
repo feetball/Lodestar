@@ -23,8 +23,8 @@ struct TonightSystemView: View {
 
     var body: some View {
         switch entry.content {
-        case .needsLocation:
-            needsLocation
+        case .needsLocation(let issue):
+            needsLocation(issue)
         case .night(let night):
             let lines = TonightLines(night: night, now: entry.date)
             Group {
@@ -166,13 +166,13 @@ struct TonightSystemView: View {
 
     // MARK: Without a place
 
-    private var needsLocation: some View {
+    private func needsLocation(_ issue: TonightLocationIssue) -> some View {
         VStack(spacing: 6) {
             Image(systemName: "location.slash")
                 .font(.title2)
                 .foregroundStyle(TonightStyle.accent)
                 .widgetAccentable()
-            Text(TonightNeedsLocationText.full)
+            Text(TonightNeedsLocationText.full(issue))
                 .font(.footnote.weight(.bold))
                 .foregroundStyle(TonightStyle.primaryText)
                 .multilineTextAlignment(.center)
@@ -180,6 +180,6 @@ struct TonightSystemView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(TonightNeedsLocationText.spoken)
+        .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
     }
 }

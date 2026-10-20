@@ -18,7 +18,7 @@ struct TonightScreen: View {
     let context: ObserverContext
 
     @State private var choice = TonightNightChoice.tonight
-    @State private var report: TonightReport?
+    @State private var computedReport: TonightReport?
     @State private var isShowingDateSheet = false
 
     var body: some View {
@@ -58,11 +58,23 @@ struct TonightScreen: View {
         .task(id: taskKey) {
             await keepReportFresh(for: taskKey)
         }
+        // A picked date is an instant that was local noon in the old zone; in another zone it is another day.
+        .onChange(of: context.timeZone.identifier) {
+            choice = .tonight
+        }
     }
 
     // MARK: Parts
 
     private var calendar: Calendar { context.calendar }
+
+    /// The report, once it is for the place on screen. After the observing place changes the old cards would otherwise
+    /// stay up under the new place's name until the new computation arrives.
+    private var report: TonightReport? {
+        guard let computedReport, computedReport.summary.observer == context.observer,
+              computedReport.timeZone == context.timeZone else { return nil }
+        return computedReport
+    }
 
     /// Local noon of the date of the night under way, before the first report has arrived too.
     private var tonightStart: Date {
@@ -141,8 +153,8 @@ struct TonightScreen: View {
 
     // MARK: Computing
 
-    /// Works the night out off the main thread. For "tonight" it keeps going: once the night is over the next
-    /// one becomes tonight.
+    /// Works the night out off the main thread and keeps going: once the night under way is over the next one becomes
+    /// tonight, which moves "tonight" itself and the label of any other chosen night ("Tomorrow night") with it.
     private func keepReportFresh(for key: TonightTaskKey) async {
         repeat {
             let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog)
@@ -150,9 +162,8 @@ struct TonightScreen: View {
                 TonightCalculator.report(for: input)
             }.value
             guard !Task.isCancelled else { return }
-            report = computed
-            guard key.night.choice == .tonight else { return }
-            await waitUntil(computed.expiry)
+            computedReport = computed
+            await waitUntil(computed.tonightExpiry)
         } while !Task.isCancelled
     }
 

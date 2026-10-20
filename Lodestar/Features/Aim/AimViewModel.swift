@@ -57,7 +57,6 @@ final class AimViewModel {
         virtualFieldOfView = range.contains(stored) ? stored : AimProjectionFactory.defaultVirtualFieldOfView
         let storedZoom = UserDefaults.standard.double(forKey: Self.cameraZoomKey)
         requestedCameraZoom = (1...CameraEngine.maximumZoom).contains(storedZoom) ? storedZoom : 1
-        app.camera.setZoom(requestedCameraZoom)
     }
 
     // MARK: Derived state
@@ -80,6 +79,12 @@ final class AimViewModel {
     /// picture is not wanted or not running.
     var cameraGeometry: CameraGeometry? {
         configuration.wantsCameraPreview && app.camera.isRunning ? app.camera.geometry : nil
+    }
+
+    /// When the camera picture behind the sky was captured, in seconds on the sensors' clock; `nil` without one. The
+    /// sky is drawn with the attitude of that moment (`AimFrameEngine.frame(capturedAt:)`).
+    var cameraFrameTime: Double? {
+        cameraGeometry == nil ? nil : app.camera.frameCapturedAt
     }
 
     /// The field of view along the screen's long side in degrees: the camera's while its picture is behind the sky,
@@ -122,8 +127,11 @@ final class AimViewModel {
     /// Rebuilds the sky for `inputs` now and then every few seconds until cancelled. Restart it (`.task(id:)`)
     /// whenever the inputs change; a build still running for older inputs is discarded.
     func keepSkyCurrent(_ inputs: AimSkyInputs?) async {
-        guard let inputs, let catalog = app.catalog.catalog else { return }
+        guard let inputs else { return }
         while !Task.isCancelled {
+            // Read again every round: the catalog is replaced when downloaded comets and asteroids arrive, which does
+            // not restart this task. (It is never unloaded, so there is one whenever the inputs exist.)
+            guard let catalog = app.catalog.catalog else { return }
             let date = app.clock.now
             let content = await Task.detached(priority: .userInitiated) {
                 AimSkyContent.build(catalog: catalog, inputs: inputs, date: date)
@@ -341,6 +349,13 @@ final class AimViewModel {
     private func setVirtualFieldOfView(_ degrees: Double) {
         let range = AimProjectionFactory.virtualFieldOfViewRange
         virtualFieldOfView = AstroMath.clamp(degrees, range.lowerBound, range.upperBound)
+    }
+
+    /// Gives the shared camera this screen's zoom while the Aim tab is showing, and its full field of view otherwise,
+    /// so that the camera's other user (the skyline recorder) does not inherit a zoom it cannot see the reason for.
+    /// The camera keeps the zoom while it is stopped and applies it when it starts.
+    func useCameraZoom(isShowing: Bool) {
+        app.camera.setZoom(isShowing ? requestedCameraZoom : 1)
     }
 
     /// Asks for a camera zoom within what the camera supports, so the shown, saved and applied zooms agree.

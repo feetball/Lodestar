@@ -54,6 +54,17 @@ final class TonightLocator {
         }
     }
 
+    /// What to tell the user when there is no place: to allow location where they have not been asked yet, to change it
+    /// in Settings where they said no (or location is restricted).
+    var locationIssue: TonightLocationIssue {
+        switch manager.authorizationStatus {
+        case .denied, .restricted:
+            return .deniedOrRestricted
+        default:
+            return .notAsked
+        }
+    }
+
     /// Shows the permission prompt, but only if the user has not been asked yet. For apps, not widgets.
     func requestAuthorization() {
         guard manager.authorizationStatus == .notDetermined else { return }

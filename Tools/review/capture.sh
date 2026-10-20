@@ -63,7 +63,8 @@ capture() {
     esac
   done
 
-  xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarScreenshot $COMMON $args night=$night >/dev/null 2>&1
+  # Only the app's process id goes to /dev/null: why a launch fails is worth seeing in the log.
+  xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarScreenshot $COMMON $args night=$night >/dev/null
   DATA="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data 2>/dev/null)"
   rm -f "$DATA/Documents/review-cmd.txt"
 
@@ -130,4 +131,12 @@ while IFS='|' read -r name modes args options; do
 done < "$SHOTS"
 
 xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
-echo "done: $(ls "$OUT" | wc -l | xargs) pictures, $FAILED problem(s)"
+COUNT="$(ls "$OUT" | wc -l | xargs)"
+echo "done: $COUNT pictures, $FAILED problem(s)"
+# The pictures that were taken are still uploaded (the workflow's upload step runs whatever happens here), but the job
+# must not look green when nothing came out or a screen was not ready.
+if [ "$COUNT" -eq 0 ]; then
+  echo "error: nothing was captured" >&2
+  exit 1
+fi
+[ "$FAILED" -eq 0 ] || exit 1

@@ -303,7 +303,7 @@ struct HorizonRecordView: View {
     @ViewBuilder private var incompleteChoices: some View {
         Button("Keep Sweeping", role: .cancel) {}
         Button(site.horizon != nil ? "Keep the Old Skyline for the Rest" : "Leave the Rest Open") {
-            save(model.finish(fill: .keepBase))
+            save(model.finish(fill: .keepBase), keepsOldSkyline: site.horizon != nil)
         }
         Button("Join the Ends With Straight Lines") {
             save(model.finish(fill: .interpolate))
@@ -319,14 +319,28 @@ struct HorizonRecordView: View {
         return "\(recorded) Those stretches can stay open, as a clear horizon, or be joined by straight lines."
     }
 
-    /// Stores the skyline with the site (a flat one means an open horizon) and closes the screen.
-    private func save(_ recording: HorizonRecorder.Recording) {
+    /// Stores the skyline with the site (a flat one means an open horizon) and closes the screen. `keepsOldSkyline`
+    /// is set when the stretches this sweep did not reach keep the site's old skyline.
+    private func save(_ recording: HorizonRecorder.Recording, keepsOldSkyline: Bool = false) {
         let store = app.settingsStore
         // The stored site may have changed while recording (the editor only keeps a draft), so build on that one.
         if var saved = store.settings.savedSites.first(where: { $0.id == site.id }) {
+            // The coverage shown is that of the whole skyline: where the old one stays, what it covered counts too
+            // (and when that is not known, neither is the total). It is read before the skyline is replaced.
+            let swept = model.recordedMask
+            let sweep = HorizonCoverageMemory.Entry(coverage: recording.coverage, mask: swept)
+            var remembered: HorizonCoverageMemory.Entry? = sweep
+            if keepsOldSkyline, saved.horizon != nil {
+                remembered = HorizonCoverageMemory.merged(sweep: swept, over: saved)
+            }
             saved.horizon = recording.profile.isFlat ? nil : recording.profile
             store.updateSite(saved)
-            HorizonCoverageMemory.store(siteID: site.id, horizon: saved.horizon, coverage: recording.coverage)
+            if let remembered {
+                HorizonCoverageMemory.store(siteID: site.id, horizon: saved.horizon, coverage: remembered.coverage,
+                                            mask: remembered.mask)
+            } else {
+                HorizonCoverageMemory.forget(siteID: site.id)
+            }
         }
         dismiss()
     }

@@ -145,6 +145,18 @@ final class StreakRiskTests: XCTestCase {
         XCTAssertEqual(restriction.high, 0.25, accuracy: 1e-12)
     }
 
+    func testTheDirectionBoundOfThePrefilterAllowsAPassOverTheObserver() {
+        // Out of reach: the direction turns by at most the angle the distance covered subtends.
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 60.0, range: 960.0), asin(0.5), accuracy: 1e-12)
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 120.0, range: 1920.0), asin(0.5), accuracy: 1e-12)
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 120.0, range: 961.0), asin(960.0 / 961.0), accuracy: 1e-12)
+        // A satellite that can cover its range (960 km in 120 s at 8 km/s) may fly past the observer and end up on the
+        // other side: it was capped at 90 degrees, which rejected frames it reaches after passing overhead.
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 120.0, range: 960.0), Double.pi, accuracy: 0.0)
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 120.0, range: 700.0), Double.pi, accuracy: 0.0)
+        XCTAssertEqual(StreakEvaluator.maximumTurn(speed: 8.0, window: 120.0, range: 150.0), Double.pi, accuracy: 0.0)
+    }
+
     // MARK: Assessments
 
     private let epoch = SatelliteTestSupport.iso("2026-10-18T00:00:00Z")

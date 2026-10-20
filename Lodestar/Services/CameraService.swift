@@ -64,6 +64,9 @@ final class CameraService {
     private(set) var frame: CGImage?
     /// The optics of `frame`, set together with it, once the first frame has arrived.
     private(set) var geometry: CameraGeometry?
+    /// When `frame` was captured, in seconds on the clock of the motion samples (`MotionSample.timestamp`), set
+    /// together with it; `nil` without a frame or a usable time. Not observed: the sky overlay reads it as it draws.
+    @ObservationIgnored private(set) var frameCapturedAt: Double?
     /// The strongest zoom the camera supports, at most `CameraEngine.maximumZoom`; that maximum until the camera
     /// has started once.
     private(set) var maximumZoom = CameraEngine.maximumZoom
@@ -132,6 +135,7 @@ final class CameraService {
         automaticRestarts = 0
         isRunning = false
         frame = nil
+        frameCapturedAt = nil
         geometry = nil
         // A message about an interruption or failure is about a run that is over; access problems stay.
         if authorization != .unavailable { errorDescription = nil }
@@ -180,6 +184,7 @@ final class CameraService {
                 guard let self, !Task.isCancelled else { return }
                 self.automaticRestarts = 0
                 self.frame = next.image
+                self.frameCapturedAt = next.capturedAt
                 if self.geometry != next.geometry { self.geometry = next.geometry }
             }
         }
@@ -254,6 +259,7 @@ final class CameraService {
     private func markNotDelivering() {
         isRunning = false
         frame = nil
+        frameCapturedAt = nil
     }
 
     // MARK: Text and values

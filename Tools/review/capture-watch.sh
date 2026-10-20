@@ -14,6 +14,7 @@ BUNDLE=net.kuecker.Lodestar.watchkitapp
 COMMON="date=2026-10-19T05:00:00Z place=36.0544,-112.1401,2130,America/Phoenix"
 
 mkdir -p "$OUT"
+FAILED=0
 
 shoot() {
   xcrun simctl io "$UDID" screenshot --type=png "$1" >/dev/null 2>&1
@@ -40,11 +41,22 @@ while IFS='|' read -r name args; do
   name="$(echo "$name" | xargs)"
   case "$name" in ''|'#'*) continue ;; esac
   args="$(echo "$args" | xargs)"
-  xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarReview $COMMON $args >/dev/null 2>&1 \
-    || echo "  warning: the watch app did not launch for $name"
+  # Only the app's process id goes to /dev/null: why a launch fails is worth seeing in the log.
+  if ! xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarReview $COMMON $args >/dev/null; then
+    echo "  warning: the watch app did not launch for $name"
+    FAILED=$((FAILED + 1))
+  fi
   settle "$OUT/$name.png"
   echo "captured $name"
 done < "$SHOTS"
 
 xcrun simctl terminate "$UDID" "$BUNDLE" >/dev/null 2>&1 || true
-echo "done: $(ls "$OUT" | wc -l | xargs) pictures"
+COUNT="$(ls "$OUT" | wc -l | xargs)"
+echo "done: $COUNT pictures, $FAILED problem(s)"
+# The pictures that were taken are still uploaded (the workflow's upload step runs whatever happens here), but the job
+# must not look green when nothing came out or the app did not launch.
+if [ "$COUNT" -eq 0 ]; then
+  echo "error: nothing was captured" >&2
+  exit 1
+fi
+[ "$FAILED" -eq 0 ] || exit 1

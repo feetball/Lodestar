@@ -1,11 +1,38 @@
 import Foundation
 import LodestarKit
 
-/// The words for the "Open Lodestar" state, which has no night to describe.
+/// The words for the state without a place, which has no night to describe. Where the user has not been asked yet the
+/// app can ask; where they said no, only Settings can help, so opening the app would be no use.
 enum TonightNeedsLocationText {
-    static let full = "Open Lodestar to set your location"
-    static let short = "Open Lodestar for location"
-    static let spoken = "Lodestar. Open the app to set your location."
+    static func full(_ issue: TonightLocationIssue) -> String {
+        switch issue {
+        case .notAsked: return "Open Lodestar to allow location"
+        case .deniedOrRestricted: return "Allow location for Lodestar in Settings"
+        }
+    }
+
+    /// For where there is little room (the inline slot).
+    static func short(_ issue: TonightLocationIssue) -> String {
+        switch issue {
+        case .notAsked: return "Open Lodestar for location"
+        case .deniedOrRestricted: return "Allow location in Settings"
+        }
+    }
+
+    /// For the corner complication's curved label.
+    static func corner(_ issue: TonightLocationIssue) -> String {
+        switch issue {
+        case .notAsked: return "Set location"
+        case .deniedOrRestricted: return "Location off"
+        }
+    }
+
+    static func spoken(_ issue: TonightLocationIssue) -> String {
+        switch issue {
+        case .notAsked: return "Lodestar. Open the app to allow location."
+        case .deniedOrRestricted: return "Lodestar. Allow location for Lodestar in Settings."
+        }
+    }
 }
 
 /// One thing a widget shows: the dark windows, the Moon, the Milky Way core or the next event. The same fields, and

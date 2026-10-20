@@ -280,6 +280,20 @@ final class MountControllerCommandTests: XCTestCase {
                        ["SiteLatitude=40.015", "SiteLongitude=-105.27", "SiteElevation=1650.0", "UTCDate=2026-10-18T04:00:00.000Z"])
     }
 
+    func testAlpacaSiteElevationStaysWithinWhatAscomAccepts() throws {
+        let rig = Support.rig("alpaca-topocentric")
+        try rig.controller.connect()
+        // The Dead Sea shore is inside the engine's range for elevations but below ASCOM's lower limit of -300 m.
+        try rig.controller.setSiteAndTime(location: GeographicLocation(latitude: 31.5, longitude: 35.5, elevation: -430.0), date: Support.start)
+        let low = try XCTUnwrap(rig.alpacaSimulator?.siteValues)
+        XCTAssertTrue(low.contains("SiteElevation=-300.0"), "\(low)")
+        XCTAssertTrue(low.contains("UTCDate=2026-10-18T04:00:00.000Z"), "\(low)")
+        let high = Support.rig("alpaca-topocentric")
+        try high.controller.connect()
+        try high.controller.setSiteAndTime(location: GeographicLocation(latitude: 28.0, longitude: 86.9, elevation: 11_000.0), date: Support.start)
+        XCTAssertTrue(try XCTUnwrap(high.alpacaSimulator?.siteValues).contains("SiteElevation=10000.0"))
+    }
+
     func testDisconnectStopsANudgeAndClosesTheSession() throws {
         let rig = Support.rig("lx200-onstep")
         try rig.controller.connect()

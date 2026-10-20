@@ -4,12 +4,14 @@ import SwiftUI
 /// photography tools, and About.
 struct SettingsView: View {
     @Environment(\.palette) private var palette
+    /// What the Location section asks to present. Its sheets hang on the form, which is always on screen.
+    @State private var locationPresentation = SettingsLocationPresentation()
 
     var body: some View {
         NavigationStack {
             Form {
                 SettingsHelpSection()
-                SettingsLocationSection()
+                SettingsLocationSection(presentation: $locationPresentation)
                 SettingsMountSection()
                 SettingsMountControlSection()
                 SettingsCameraSection()
@@ -21,6 +23,7 @@ struct SettingsView: View {
                 SettingsToolsSection()
                 SettingsAboutSection()
             }
+            .settingsLocationSheets($locationPresentation)
             .themedList(palette)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")

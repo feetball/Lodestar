@@ -38,12 +38,12 @@ struct SatelliteAimSource: Identifiable, Sendable {
         SatelliteAimSource(title: item.name, observer: observer, mode: .follow(item.satellite, pass: item))
     }
 
-    /// A fixed point of the sky: where the pass of `item` reaches its highest point.
+    /// A fixed point of the sky: where the pass of `item` reaches its highest point while the satellite can be seen.
     static func peak(_ item: SatellitePassItem, observer: Observer) -> SatelliteAimSource {
-        let culmination = item.pass.culmination
-        let look = item.satellite.look(at: culmination.date, observer: observer)
+        let point = item.peak
+        let look = item.satellite.look(at: point.date, observer: observer)
         return SatelliteAimSource(title: item.name, observer: observer,
-                                  mode: .peak(culmination.date, look?.apparentHorizontal ?? culmination.horizontal))
+                                  mode: .peak(point.date, look?.apparentHorizontal ?? point.horizontal))
     }
 
     var isPeak: Bool {

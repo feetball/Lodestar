@@ -8,7 +8,10 @@ import Foundation
 /// `r = q + e·χ²·C(z)` and the perifocal position is `x = q − χ²·C(z)`, `y = √(q(1 + e))·χ·(1 − z·S(z))`. One formula
 /// covers ellipses, parabolas and hyperbolas without a special case near `e = 1`. The left-hand side increases
 /// monotonically with `χ` (its derivative is `r ≥ q`) and `|χ| ≤ k|Δt|/q`, so a safeguarded Newton iteration
-/// (bisection whenever a step leaves the bracket) always converges, typically in four to six steps.
+/// (bisection whenever a step leaves the bracket or does not at least halve the step before the last one) always
+/// converges, typically in four to six steps and in well under a hundred even for a hyperbola that is far from
+/// perihelion with a huge `(e − 1)/q`, where the start value is far too high and plain Newton steps would be tiny.
+/// A result whose residual is still large after the iteration is not returned.
 ///
 /// Elliptic orbits are reduced to |Δt| ≤ half a period first, so any date works; for parabolic and hyperbolic orbits
 /// the date must be within `maximumUnboundSpanDays` of perihelion (the body is then far beyond Neptune anyway).
@@ -20,8 +23,11 @@ public enum OrbitPropagator {
     /// The largest |t − perihelion| in days for which a parabolic or hyperbolic orbit is evaluated (about 137 years).
     public static let maximumUnboundSpanDays = 50_000.0
 
-    private static let maximumIterations = 100
+    private static let maximumIterations = 200
     private static let relativeTolerance = 1e-14
+    /// The largest residual of Kepler's equation, relative to `k·|Δt|`, of a solution that is accepted; a converged one
+    /// is within about 1e-12 of zero, an iteration that ran out of steps is orders of magnitude off.
+    private static let residualTolerance = 1e-9
 
     /// Rotation from the J2000 mean ecliptic to the J2000 mean equator (the one the planetary theory uses).
     private static let eclipticToEquatorialJ2000 = Matrix3.rotationX(AstroMath.radians(Obliquity.j2000))
@@ -104,8 +110,8 @@ public enum OrbitPropagator {
     }
 
     /// The orbital-plane position `days` after perihelion for a conic with perihelion distance `q` and eccentricity `e`,
-    /// or `nil` if an input is not finite, `q <= 0`, `e < 0`, or `days` is beyond `maximumUnboundSpanDays` for an
-    /// unbound orbit.
+    /// or `nil` if an input is not finite, `q <= 0`, `e < 0`, `days` is beyond `maximumUnboundSpanDays` for an
+    /// unbound orbit, or the iteration did not converge.
     static func perifocal(q: Double, e: Double, days: Double) -> Perifocal? {
         guard q > 0, e >= 0, days.isFinite else { return nil }
         let k = gaussianGravitationalConstant
@@ -126,6 +132,9 @@ public enum OrbitPropagator {
         var high = tau / q
         var chi = initialGuess(q: q, e: e, tau: tau)
         if !(chi > low && chi < high) { chi = 0.5 * high }
+        // The last two steps, for the safeguard below; the first may be as long as the bracket.
+        var previousStep = high - low
+        var lastStep = previousStep
         for _ in 0..<maximumIterations {
             let z = alpha * chi * chi
             let residual = e * chi * chi * chi * stumpffS(z) + q * chi - tau
@@ -133,15 +142,26 @@ public enum OrbitPropagator {
             if residual > 0 { high = chi } else { low = chi }
             let derivative = e * chi * chi * stumpffC(z) + q
             var next = chi - residual / derivative
-            if !(next > low && next < high) { next = 0.5 * (low + high) }
+            // Bisect when the Newton step leaves the bracket or is longer than half the step before the last one (as
+            // `rtsafe` in Numerical Recipes does). Far above the root of a hyperbola the residual grows like exp(√−z),
+            // Newton only lowers √−z by about 1 per step and the bracket does not tighten, so it would need hundreds.
+            if !(next > low && next < high) || abs(next - chi) > 0.5 * previousStep {
+                next = 0.5 * (low + high)
+            }
             let step = abs(next - chi)
+            previousStep = lastStep
+            lastStep = step
             chi = next
             if step <= relativeTolerance * chi { break }
         }
         let z = alpha * chi * chi
         let c = stumpffC(z)
+        let s = stumpffS(z)
+        // An iteration that ran out of steps is far from a root: refuse it instead of returning its position.
+        let finalResidual = e * chi * chi * chi * s + q * chi - tau
+        guard abs(finalResidual) <= residualTolerance * tau else { return nil }
         let x = q - chi * chi * c
-        let y = (q * (1 + e)).squareRoot() * chi * (1 - z * stumpffS(z))
+        let y = (q * (1 + e)).squareRoot() * chi * (1 - z * s)
         let r = e * chi * chi * c + q
         let signedY = elapsed < 0 ? -y : y
         guard x.isFinite, signedY.isFinite, r.isFinite else { return nil }

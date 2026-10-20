@@ -52,12 +52,95 @@ final class MountControllerFaultTests: XCTestCase {
             let rig = Support.rig(name)
             try rig.controller.connect()
             try rig.controller.goto(Support.andromeda)
+            let stopsBefore = rig.mount.stopsReceived
             silence(rig, times: 100)
             rig.controller.poll()
             rig.controller.poll()
             let status = rig.controller.poll()
             XCTAssertEqual(status.phase, .disconnected, name)
             XCTAssertEqual(status.outcome, .failed(error: .connectionLost), name)
+            // Giving up on the mount tells it to stop first.
+            XCTAssertGreaterThan(rig.mount.stopsReceived, stopsBefore, name)
+        }
+    }
+
+    func testALinkThatDiesDuringANudgeStopsTheNudgeBeforeTheSessionEnds() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, settings: MountSettings(maximumNudgeSeconds: 30.0))
+            try rig.controller.connect()
+            try rig.controller.nudge(.north, rate: .find, durationSeconds: 30.0)
+            XCTAssertTrue(rig.mount.isNudging, name)
+            silence(rig, times: 100)
+            rig.controller.poll()
+            XCTAssertEqual(rig.controller.status.phase, .nudging, name)
+            XCTAssertTrue(rig.mount.isNudging, name)
+            rig.controller.poll()
+            let status = rig.controller.poll()
+            XCTAssertEqual(status.phase, .disconnected, name)
+            XCTAssertEqual(status.lastError, .connectionLost, name)
+            XCTAssertFalse(rig.mount.isNudging, name)
+        }
+    }
+
+    func testAFailedStopDoesNotStopTheSessionFromEnding() throws {
+        let rig = Support.rig("alpaca-topocentric", settings: MountSettings(maximumNudgeSeconds: 30.0))
+        try rig.controller.connect()
+        try rig.controller.nudge(.north, rate: .find, durationSeconds: 30.0)
+        silence(rig, times: 100)
+        rig.alpacaSimulator?.inject("moveaxis", .timeout, times: 10)
+        rig.controller.poll()
+        rig.controller.poll()
+        let status = rig.controller.poll()
+        XCTAssertEqual(status.phase, .disconnected)
+        XCTAssertEqual(status.lastError, .connectionLost)
+    }
+
+    func testAnAlpacaMoveWhoseReplyWasLostIsStillStopped() throws {
+        let clock = ManualMountClock(start: Support.start)
+        let mount = MountSimulatorModel(clock: clock, start: Support.parkPosition)
+        let simulator = AlpacaSimulator(clock: clock, mount: mount, canPulseGuide: false)
+        let transport = LostReplyTransport(simulator, method: "moveaxis")
+        let controller = MountController(driver: AlpacaDriver(transport: transport), observer: Support.boulder, settings: .standard,
+                                         clock: clock)
+        try controller.connect()
+        let error = try XCTUnwrap(mountError { try controller.nudge(.east, rate: .find, durationSeconds: 5.0) })
+        XCTAssertTrue(error.isTimeout)
+        XCTAssertEqual(transport.lostReplies, 1)
+        XCTAssertEqual(controller.status.phase, .idle)
+        // The mount did carry out the request. The cleanup that follows the failure must send the stop as well.
+        XCTAssertEqual(simulator.methodLog.filter { $0 == "moveaxis" }.count, 2)
+        XCTAssertFalse(mount.isNudging)
+    }
+
+    func testAnAlpacaMoveTheMountRefusedIsNotStoppedAgain() throws {
+        let rig = Support.rig("alpaca-topocentric")
+        try rig.controller.connect()
+        rig.alpacaSimulator?.inject("moveaxis", .error(number: 1025, message: "bad rate"))
+        let error = try XCTUnwrap(mountError { try rig.controller.nudge(.east, rate: .find, durationSeconds: 5.0) })
+        XCTAssertTrue(error.isRejected)
+        // The mount said no, so nothing moves and there is nothing to stop.
+        XCTAssertEqual(rig.alpacaSimulator?.methodLog.filter { $0 == "moveaxis" }.count, 1)
+        XCTAssertFalse(rig.mount.isNudging)
+    }
+
+    /// An Alpaca link that delivers a request to the server but loses the first reply to the method, as a slow Wi-Fi does.
+    private final class LostReplyTransport: AlpacaTransport {
+        private let inner: AlpacaTransport
+        private let method: String
+        private(set) var lostReplies = 0
+
+        init(_ inner: AlpacaTransport, method: String) {
+            self.inner = inner
+            self.method = method
+        }
+
+        func send(_ request: AlpacaHTTPRequest, timeoutSeconds: Double) throws -> AlpacaHTTPResponse {
+            let response = try inner.send(request, timeoutSeconds: timeoutSeconds)
+            if lostReplies == 0 && request.path.hasSuffix("/" + method) {
+                lostReplies += 1
+                throw MountError.timeout(operation: "simulated")
+            }
+            return response
         }
     }
 

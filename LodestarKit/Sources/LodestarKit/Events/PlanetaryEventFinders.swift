@@ -173,10 +173,19 @@ public struct EarthApsis: Sendable, Hashable {
 
 /// Finds the Earth's perihelion and aphelion as the extremes of the Earth–Sun distance (the Earth–Moon barycentre of the
 /// VSOP87 series, as in the published tables; it differs from the Earth's centre by at most 0.00003 AU).
+///
+/// Each apsis is searched within a week of the mean instant of Meeus, *Astronomical Algorithms*, ch. 38 (a whole `k` is a
+/// perihelion, `k + 0.5` an aphelion). The anomalistic year is longer than the calendar year, so the apsides drift through
+/// the calendar by about 1.75 days a century; counting `k` instead of calendar days keeps them inside the window from the
+/// year 1 to the year 4001. The planets and the Moon move the true apsis by at most about two days from the mean one.
 public enum EarthApsisFinder {
     private static let halfWindow = 7.0
     private static let halfDifference = 0.5
     private static let tolerance = 1e-6
+    /// The mean perihelion at `k = 0` (JDE, 2000 January 3).
+    private static let meanPerihelionEpoch = 2_451_547.507
+    /// Days from one mean perihelion to the next.
+    private static let anomalisticYearDays = 365.259_635_8
 
     /// The apsides from `from` to `to` (both inclusive), as events without visibility, in time order.
     public static func events(from: Date, to: Date) -> [AstronomicalEvent] {
@@ -184,14 +193,14 @@ public enum EarthApsisFinder {
         let fromUT = EventSearch.ut(from)
         let toUT = EventSearch.ut(EventSearch.limitedEnd(from: from, to: to))
         func distance(_ ut: Double) -> Double { Ephemeris.geocentricJ2000(of: .sun, at: JulianDate(ut: ut)).length }
-        let firstYear = Int(JulianDate.decimalYear(julianDay: fromUT).rounded(.down)) - 1
-        let lastYear = Int(JulianDate.decimalYear(julianDay: toUT).rounded(.down)) + 1
+        let firstK = Int(((fromUT - meanPerihelionEpoch) / anomalisticYearDays).rounded(.down)) - 1
+        let lastK = Int(((toUT - meanPerihelionEpoch) / anomalisticYearDays).rounded(.up)) + 1
         var found = [AstronomicalEvent]()
-        for year in firstYear...lastYear {
+        for k in firstK...lastK {
             for kind in EarthApsisKind.allCases {
-                let centre = kind == .perihelion
-                    ? JulianDate.julianDay(year: year, month: 1, day: 3)
-                    : JulianDate.julianDay(year: year, month: 7, day: 4)
+                let phase = kind == .perihelion ? 0.0 : 0.5
+                // The mean instant is in dynamical time (TT); the search runs in UT.
+                let centre = JulianDate(tt: meanPerihelionEpoch + anomalisticYearDays * (Double(k) + phase)).ut
                 guard let root = EventSearch.root(of: { distance($0 + halfDifference) - distance($0 - halfDifference) },
                                                   lower: centre - halfWindow, upper: centre + halfWindow,
                                                   tolerance: tolerance) else { continue }

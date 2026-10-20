@@ -53,8 +53,11 @@ public enum CometElementsParser {
         }
         let month = try integerField(columns, 20, 21, .perihelionMonth)
         if month < 1 || month > 12 { throw SmallBodyParseError.fieldOutOfRange(.perihelionMonth, value: Double(month)) }
-        let day = try decimalField(columns, 23, 29, .perihelionDay, 0.0, 32.0)
-        if day >= 32.0 { throw SmallBodyParseError.fieldOutOfRange(.perihelionDay, value: day) }
+        // The day starts at 1.0 and stays below the first of the next month, so an impossible date cannot roll over.
+        let day = try decimalField(columns, 23, 29, .perihelionDay, 1.0, 32.0)
+        if day >= Double(RecordFields.daysInMonth(year, month) + 1) {
+            throw SmallBodyParseError.fieldOutOfRange(.perihelionDay, value: day)
+        }
         let perihelionTime = RecordFields.julianDay(year: year, month: month, day: 1) + (day - 1.0)
 
         // Orbit.

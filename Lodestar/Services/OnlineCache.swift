@@ -140,6 +140,7 @@ final class OnlineStore: @unchecked Sendable {
     private static func enabledKey(_ feed: OnlineFeed) -> String { "lodestar.online.enabled.\(feed.rawValue)" }
     private static func attemptKey(_ resource: OnlineResource) -> String { "lodestar.online.attempt.\(resource.key)" }
     private static func failedKey(_ resource: OnlineResource) -> String { "lodestar.online.attemptFailed.\(resource.key)" }
+    private static func retryWaitKey(_ resource: OnlineResource) -> String { "lodestar.online.retryWait.\(resource.key)" }
     private static let explainedKey = "lodestar.online.explained"
 
     func isEnabled(_ feed: OnlineFeed) -> Bool { defaults.bool(forKey: Self.enabledKey(feed)) }
@@ -172,5 +173,19 @@ final class OnlineStore: @unchecked Sendable {
 
     func setLastAttemptFailed(_ resource: OnlineResource, _ failed: Bool) {
         defaults.set(failed, forKey: Self.failedKey(resource))
+    }
+
+    /// How long to wait after that failed request, in seconds; `nil` when it was not recorded (also for a failure
+    /// stored by an older version of the app), and then the resource's `retryInterval` applies.
+    func retryWait(_ resource: OnlineResource) -> TimeInterval? {
+        defaults.object(forKey: Self.retryWaitKey(resource)) as? Double
+    }
+
+    func setRetryWait(_ resource: OnlineResource, _ seconds: TimeInterval?) {
+        if let seconds {
+            defaults.set(seconds, forKey: Self.retryWaitKey(resource))
+        } else {
+            defaults.removeObject(forKey: Self.retryWaitKey(resource))
+        }
     }
 }

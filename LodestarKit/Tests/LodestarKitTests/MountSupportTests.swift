@@ -43,6 +43,7 @@ final class MountSupportTests: XCTestCase {
         XCTAssertEqual(standard.horizonLookaheadSeconds, 60.0, accuracy: 0.0)
         XCTAssertEqual(standard.maximumSlewSeconds, 300.0, accuracy: 0.0)
         XCTAssertEqual(standard.maximumConsecutiveFailures, 3)
+        XCTAssertEqual(standard.sunExclusionDegrees, 15.0, accuracy: 0.0)
         let wild = MountSettings(
             altitudeLimit: 500.0, horizonLookaheadSeconds: -5.0, maximumSlewSeconds: 1.0e9, slewStartGraceSeconds: Double.nan,
             arrivalToleranceDegrees: 0.0, pollIntervalSeconds: 0.0, maximumConsecutiveFailures: 0, maximumNudgeSeconds: 1.0e9,
@@ -58,6 +59,12 @@ final class MountSupportTests: XCTestCase {
         XCTAssertEqual(wild.maximumSyncOffsetDegrees, 180.0, accuracy: 0.0)
         XCTAssertEqual(MountSettings(altitudeLimit: -50.0).altitudeLimit, -10.0, accuracy: 0.0)
         XCTAssertEqual(MountSettings(maximumConsecutiveFailures: 99).maximumConsecutiveFailures, 10)
+        // The exclusion around the Sun can be changed but not switched off.
+        XCTAssertEqual(MountSettings(sunExclusionDegrees: 0.0).sunExclusionDegrees, 5.0, accuracy: 0.0)
+        XCTAssertEqual(MountSettings(sunExclusionDegrees: -10.0).sunExclusionDegrees, 5.0, accuracy: 0.0)
+        XCTAssertEqual(MountSettings(sunExclusionDegrees: 500.0).sunExclusionDegrees, 45.0, accuracy: 0.0)
+        XCTAssertEqual(MountSettings(sunExclusionDegrees: Double.nan).sunExclusionDegrees, 15.0, accuracy: 0.0)
+        XCTAssertEqual(MountSettings(sunExclusionDegrees: 20.0).sunExclusionDegrees, 20.0, accuracy: 0.0)
     }
 
     func testDriverConfigurationsAreClamped() {
@@ -78,8 +85,9 @@ final class MountSupportTests: XCTestCase {
 
     func testErrorsExplainThemselves() {
         let errors: [MountError] = [
-            .notConnected, .busy, .slewInProgress, .belowHorizonLimit(altitude: -3.26, limit: 0.0), .mountHorizonLimit,
-            .mountOverheadLimit, .outsideMountLimits, .notAligned, .parked, .standby, .notTracking, .notSupported(feature: .sync),
+            .notConnected, .busy, .slewInProgress, .belowHorizonLimit(altitude: -3.26, limit: 0.0),
+            .nearSun(separationDegrees: 8.24, limitDegrees: 15.0), .mountHorizonLimit, .mountOverheadLimit, .outsideMountLimits,
+            .notAligned, .parked, .standby, .notTracking, .notSupported(feature: .sync),
             .hardwareFault(detail: ""), .hardwareFault(detail: "motor 2"), .rejected(detail: ""), .rejected(detail: "tracking"),
             .timeout(operation: "read position"), .slewTimeout(seconds: 300.0), .slewStopped(remainingDegrees: 12.34),
             .syncOffsetTooLarge(offsetDegrees: 45.0, limitDegrees: 30.0), .connectionLost, .transport(detail: "reset"),
@@ -96,6 +104,9 @@ final class MountSupportTests: XCTestCase {
         XCTAssertEqual(MountError.busy.userMessage, "The mount is busy. Try again in a moment.")
         XCTAssertEqual(MountError.belowHorizonLimit(altitude: -3.26, limit: 0.0).userMessage,
                        "The target is at -3.3°, below your altitude limit of 0.0°. Lodestar won't slew there.")
+        XCTAssertEqual(MountError.nearSun(separationDegrees: 8.24, limitDegrees: 15.0).userMessage,
+                       "The target is 8.2° from the Sun, closer than the 15° safety limit. Lodestar won't slew there.")
+        XCTAssertFalse(MountError.nearSun(separationDegrees: 8.24, limitDegrees: 15.0).isCommunicationFailure)
         XCTAssertEqual(MountError.notSupported(feature: .sync).userMessage, "This mount doesn't support syncing to a position.")
         XCTAssertEqual(MountError.slewStopped(remainingDegrees: 12.34).userMessage, "The mount stopped 12.3° short of the target.")
         XCTAssertEqual(MountError.slewTimeout(seconds: 300.0).userMessage, "The slew did not finish within 300 s, so it was stopped.")

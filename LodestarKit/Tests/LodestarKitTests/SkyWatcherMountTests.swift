@@ -880,6 +880,43 @@ final class SkyWatcherMountTests: XCTestCase {
         XCTAssertEqual(rig.controller.poll().isTracking, true)
     }
 
+    func testANudgeIntoTheAzimuthLimitEndsInsteadOfUnwinding() throws {
+        let rig = Support.rig(mode: altAz, settings: MountSettings(maximumNudgeSeconds: 30.0))
+        try rig.controller.connect()
+        // Three degrees short of the cable limit of 270°, in the west and 40° up: a nudge to the west turns the azimuth axis on.
+        rig.simulator.placeAxes(axis1Degrees: 267.0, axis2Degrees: 40.0)
+        try rig.controller.nudge(.west, rate: .slew, durationSeconds: 20.0)
+        var highest = rig.simulator.axis1Degrees
+        for _ in 0 ..< 30 {
+            rig.clock.advance(seconds: 0.5)
+            rig.controller.poll()
+            highest = max(highest, rig.simulator.axis1Degrees)
+        }
+        // The axis went towards the limit and stopped there; it did not run back the other way round at full speed.
+        XCTAssertTrue(highest > 268.0 && highest < 271.0, "\(highest)")
+        XCTAssertTrue(rig.simulator.axis1Degrees > 268.0, "\(rig.simulator.axis1Degrees)")
+        XCTAssertFalse(rig.simulator.isMoving)
+    }
+
+    func testLosingTheLinkDuringANudgeStopsTheAxes() throws {
+        let rig = Support.rig(mode: altAz, errors: SkyWatcherPointingErrors(axis1Index: 1.0), settings: MountSettings(maximumNudgeSeconds: 30.0))
+        try rig.controller.connect()
+        try aligned(rig, altAzimuthAlignmentStars)
+        try goto(rig, Support.deneb)
+        try rig.controller.nudge(.east, rate: .find, durationSeconds: 30.0)
+        rig.clock.advance(seconds: 1.0)
+        XCTAssertTrue(rig.simulator.isMoving)
+        rig.simulator.inject("j1", .silence, times: 100)
+        rig.controller.poll()
+        rig.controller.poll()
+        let ended = rig.controller.poll()
+        XCTAssertEqual(ended.phase, .disconnected)
+        XCTAssertEqual(ended.lastError, .connectionLost)
+        // The nudge was running when the session ended: the axes were told to stop, tracking or not.
+        rig.clock.advance(seconds: 2.0)
+        XCTAssertFalse(rig.simulator.isMoving)
+    }
+
     func testNudgeRatesFollowTheSiderealMultiples() throws {
         let rig = try connected(equatorial, SkyWatcherPointingErrors(axis1Index: 1.0))
         try aligned(rig, equatorialAlignmentStars)

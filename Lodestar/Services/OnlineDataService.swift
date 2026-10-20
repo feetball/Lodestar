@@ -90,6 +90,9 @@ final class OnlineDataService {
         } else {
             clearMemory(feed)
             let cache = refresher.cache
+            // Delete at once, so that the files are gone even if the app is suspended before the queue has drained;
+            // the queued delete covers a download that is still running and finishes after this.
+            for resource in feed.resources { cache.delete(resource.key) }
             enqueue { service in
                 for resource in feed.resources { cache.delete(resource.key) }
                 service.loaded.remove(feed)
@@ -212,16 +215,17 @@ final class OnlineDataService {
     private func publishStatus(_ feed: OnlineFeed) async {
         var updates: [Date] = []
         var next = Date.distantPast
+        let now = Date()
         for resource in feed.resources {
             let state = await refresher.state(resource)
             if let saved = state.meta?.savedAt { updates.append(saved) }
-            next = max(next, OnlineSchedule.earliestRequest(resource, state: state, key: forecastKey(resource),
+            next = max(next, OnlineSchedule.earliestRequest(resource, state: state, now: now, key: forecastKey(resource),
                                                             expiresJitter: expiresJitter))
         }
         let oldest = updates.min()
         update(feed) {
             $0.lastUpdate = oldest
-            $0.nextRequest = next > Date() ? next : nil
+            $0.nextRequest = next > now ? next : nil
         }
     }
 

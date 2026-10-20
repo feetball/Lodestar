@@ -81,7 +81,9 @@ struct StableLocationFilter: Sendable {
 final class LocationService {
     private(set) var authorization: CLAuthorizationStatus = .notDetermined
     private(set) var isReducedAccuracy = false
-    /// The latest raw fix.
+    /// The latest raw fix, kept only while location updates run. It is dropped when they stop (a saved site became the
+    /// source, the app went to the background, access was lost), so that where the device used to be is never offered
+    /// as where it is.
     private(set) var fix: LocationFix?
     /// The observer location for sky computations: set on the first fix, then replaced only when the device moved
     /// more than 250 m or its accuracy improved substantially. The elevation is the fix's when its vertical
@@ -140,12 +142,18 @@ final class LocationService {
     /// Stops location updates. Idempotent.
     func stop() {
         wantsUpdates = false
-        guard isUpdating else { return }
-        manager.stopUpdatingLocation()
-        isUpdating = false
+        stopUpdates()
     }
 
     // MARK: Private
+
+    /// Stops the manager if it runs and drops the fix, which is no longer current. Idempotent.
+    private func stopUpdates() {
+        guard isUpdating else { return }
+        manager.stopUpdatingLocation()
+        isUpdating = false
+        if fix != nil { fix = nil }
+    }
 
     /// Reads the authorization from the manager and starts or stops updates accordingly. Properties are written
     /// only when they change, because this runs every time the app asks for location.
@@ -162,9 +170,8 @@ final class LocationService {
                 manager.startUpdatingLocation()
                 isUpdating = true
             }
-        } else if isUpdating {
-            manager.stopUpdatingLocation()
-            isUpdating = false
+        } else {
+            stopUpdates()
         }
     }
 
@@ -174,6 +181,8 @@ final class LocationService {
     }
 
     private func receive(_ newFix: LocationFix) {
+        // A fix that was already on its way to the main actor when updates stopped is not current any more.
+        guard isUpdating else { return }
         // Hops to the main actor are not strictly ordered; never go back in time.
         if let current = fix, newFix.timestamp < current.timestamp { return }
         fix = newFix

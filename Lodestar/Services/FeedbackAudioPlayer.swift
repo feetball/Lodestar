@@ -19,7 +19,11 @@ final class FeedbackAudioPlayer {
 
     private var engine = AVAudioEngine()
     private var node = AVAudioPlayerNode()
+    /// Whether the engine runs with the session active, as far as this player knows; cleared when the system stops it.
     private var isSessionActive = false
+    /// Whether this player activated the audio session and has not released it yet. Unlike `isSessionActive` it
+    /// survives the system stopping the engine (a route change leaves the session active), so `stop()` can release it.
+    private var holdsSession = false
     private var retryNotBefore: ContinuousClock.Instant?
 
     /// Renders the sounds; `nil` if the audio format or a buffer cannot be created.
@@ -58,11 +62,12 @@ final class FeedbackAudioPlayer {
 
     /// Stops the engine and releases the audio session. Idempotent.
     func stop() {
-        guard isSessionActive else { return }
+        guard isSessionActive || holdsSession else { return }
         node.stop()
         engine.stop()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         isSessionActive = false
+        holdsSession = false
     }
 
     // MARK: Private
@@ -97,6 +102,7 @@ final class FeedbackAudioPlayer {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.ambient)
             try session.setActive(true)
+            holdsSession = true
             try engine.start()
             node.play()
             isSessionActive = true
@@ -121,14 +127,17 @@ final class FeedbackAudioPlayer {
         }
     }
 
-    /// The system stopped the engine (interruption or route change); the next sound restarts it.
+    /// The system stopped the engine (interruption or route change); the next sound restarts it. Sounds still queued
+    /// are dropped, so they are not played late when it does. The session may still be active: `stop()` releases it.
     private func systemStoppedEngine() {
         isSessionActive = false
+        node.stop()
     }
 
-    /// All audio objects became invalid; build them again and start on demand.
+    /// All audio objects became invalid; build them again and start on demand. The session starts over inactive.
     private func mediaServicesWereReset() {
         isSessionActive = false
+        holdsSession = false
         buildGraph()
     }
 }

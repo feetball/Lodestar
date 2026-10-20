@@ -26,6 +26,11 @@ enum TonightCalculator {
         let tonightStart = localNoon(of: tonight, calendar: calendar)
         let nights = calendar.dateComponents([.day], from: calendar.startOfDay(for: tonightStart),
                                              to: calendar.startOfDay(for: summary.night.start)).day ?? 0
+        // Tonight ends at the sunrise that ends the night under way (the end of the night when the Sun does not rise).
+        let tonightTwilight = input.key.choice == .tonight
+            ? summary.twilight
+            : TwilightCalculator.night(startingOn: tonight, observer: context.observer, timeZone: context.timeZone)
+        let tonightExpiry = tonightTwilight.sunrise ?? tonightTwilight.interval.end
         // Comets and asteroids are not deep-sky objects: they get their own card, and the clearly good ones join the
         // targets.
         let smallBodies = input.catalog.map { SmallBodyTonightPlanner.plan(catalog: $0, summary: summary, skyline: skyline) }
@@ -34,7 +39,8 @@ enum TonightCalculator {
             timeline: TonightTimelineModel(summary: summary, timeZone: context.timeZone),
             targets: targets(for: summary, catalog: input.catalog, skyline: skyline,
                              movingTargets: smallBodies?.targets ?? []),
-            tonightStart: tonightStart, nightsFromTonight: nights, appliesSkyline: skyline != nil,
+            tonightStart: tonightStart, nightsFromTonight: nights, tonightExpiry: tonightExpiry,
+            appliesSkyline: skyline != nil,
             smallBodies: smallBodies?.bright)
     }
 

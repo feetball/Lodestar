@@ -156,8 +156,17 @@ public final class AlpacaDriver: MountDriver {
         case .north: positive = configuration.secondaryPositiveIsNorth
         case .south: positive = !configuration.secondaryPositiveIsNorth
         }
-        _ = try perform(requests.moveAxis(nudgeAxis, degreesPerSecond: positive ? magnitude : -magnitude))
-        if !movingAxes.contains(nudgeAxis) { movingAxes.append(nudgeAxis) }
+        // The mount may have executed the request although its reply was lost, so the axis counts as moving from the moment
+        // the request is sent and `stopNudge` always sends rate 0 for it. Only a refusal by the mount (not a failure of the
+        // link) says for sure that nothing moves.
+        let wasMoving = movingAxes.contains(nudgeAxis)
+        if !wasMoving { movingAxes.append(nudgeAxis) }
+        do {
+            _ = try perform(requests.moveAxis(nudgeAxis, degreesPerSecond: positive ? magnitude : -magnitude))
+        } catch let error as MountError {
+            if !wasMoving && !error.isCommunicationFailure { movingAxes.removeAll { $0 == nudgeAxis } }
+            throw error
+        }
     }
 
     public func stopNudge(direction: MountNudgeDirection) throws {
@@ -171,7 +180,9 @@ public final class AlpacaDriver: MountDriver {
         let dateRequest = try requests.setUTCDate(date)
         _ = try perform(requests.setSiteLatitude(location.latitude))
         _ = try perform(requests.setSiteLongitude(location.longitude))
-        _ = try perform(requests.setSiteElevation(location.elevation))
+        // ASCOM limits SiteElevation to -300...10000 m, narrower than the engine's -1000...12000 m (the Dead Sea is at about
+        // -430 m), and a device answers InvalidValue to anything outside.
+        _ = try perform(requests.setSiteElevation(min(max(location.elevation, -300.0), 10_000.0)))
         _ = try perform(dateRequest)
     }
 

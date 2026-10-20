@@ -141,7 +141,8 @@ struct OnboardingPermissionsPage: View {
             title: "Where are you?",
             introduction: "Lodestar needs your position to work out where things are in your sky. It asks only while "
                 + "the app is open, an approximate position is enough, and it is never tracked. It stays on "
-                + "your iPhone; only the optional cloud forecast sends it, rounded to about 10 km.") {
+                + "your iPhone, except that the optional cloud forecast gets it rounded to about 10 km, and "
+                + "Apple's geocoder gets a site you save, rounded to about 1 km, to find its time zone.") {
             HStack {
                 status
                 Spacer(minLength: 0)

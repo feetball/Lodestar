@@ -220,6 +220,81 @@ final class MountControllerTests: XCTestCase {
         XCTAssertEqual(noLookahead.controller.status.phase, .slewing)
     }
 
+    /// The J2000 place `offset` degrees straight above the Sun, as seen by the rig's observer at the clock's time (so exactly
+    /// `offset` degrees from the Sun).
+    private func target(nearTheSunOf rig: MountRig, degreesAbove offset: Double) -> EquatorialCoordinate {
+        let frame = rig.frame()
+        let sun = frame.horizontal(of: .sun, refraction: false)
+        return frame.j2000(fromHorizontal: HorizontalCoordinate(azimuth: sun.azimuth, altitude: sun.altitude + offset), refracted: false)
+    }
+
+    func testGotoNearTheDaytimeSunIsRefusedWithoutTouchingTheMount() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: Support.midday)
+            try rig.controller.connect()
+            let sun = rig.frame().horizontal(of: .sun, refraction: false)
+            XCTAssertTrue((30.0 ... 50.0).contains(sun.altitude), "\(name): the Sun should be high: \(sun.altitude)")
+            // Eight degrees above the Sun: well above the horizon, so only the Sun guard can refuse it.
+            let nearby = target(nearTheSunOf: rig, degreesAbove: 8.0)
+            guard case let .nearSun(separation, limit)? = mountError({ try rig.controller.goto(nearby) }) else {
+                XCTFail(name)
+                continue
+            }
+            XCTAssertEqual(separation, 8.0, accuracy: 0.1, name)
+            XCTAssertEqual(limit, 15.0, accuracy: 0.0, name)
+            XCTAssertEqual(rig.mount.slewsStarted, 0, name)
+            XCTAssertEqual(rig.controller.status.phase, .idle, name)
+            XCTAssertNil(rig.controller.status.target, name)
+        }
+    }
+
+    func testGotoAwayFromTheDaytimeSunIsAllowedAndTheExclusionIsConfigurable() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: Support.midday)
+            try rig.controller.connect()
+            // The opposite side of the sky, 45 degrees up.
+            let frame = rig.frame()
+            let sun = frame.horizontal(of: .sun, refraction: false)
+            let faraway = frame.j2000(fromHorizontal: HorizontalCoordinate(azimuth: sun.azimuth + 180.0, altitude: 45.0), refracted: false)
+            try rig.controller.goto(faraway)
+            XCTAssertEqual(rig.controller.status.phase, .slewing, name)
+            XCTAssertEqual(rig.mount.slewsStarted, 1, name)
+        }
+        // 20 degrees from the Sun is outside the standard 15 degrees, but inside a 25 degree exclusion.
+        let wide = Support.rig("lx200-onstep", begin: Support.midday)
+        try wide.controller.connect()
+        let twenty = target(nearTheSunOf: wide, degreesAbove: 20.0)
+        try wide.controller.goto(twenty)
+        XCTAssertEqual(wide.controller.status.phase, .slewing)
+        let strict = Support.rig("lx200-onstep", settings: MountSettings(sunExclusionDegrees: 25.0), begin: Support.midday)
+        try strict.controller.connect()
+        guard case let .nearSun(_, limit)? = mountError({ try strict.controller.goto(twenty) }) else {
+            return XCTFail("expected a refusal")
+        }
+        XCTAssertEqual(limit, 25.0, accuracy: 0.0)
+        XCTAssertEqual(strict.mount.slewsStarted, 0)
+    }
+
+    func testGotoNearTheSunIsAllowedOnceItHasSet() throws {
+        // A few minutes after sunset at Boulder, the Sun is about four degrees below the horizon.
+        var evening = Support.midday
+        for _ in 0 ..< 1_000 {
+            let altitude = SkyFrame(date: evening, observer: Support.boulder).horizontal(of: .sun, refraction: false).altitude
+            if altitude < -4.0 { break }
+            evening = evening.addingTimeInterval(60.0)
+        }
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: evening)
+            try rig.controller.connect()
+            let sun = rig.frame().horizontal(of: .sun, refraction: false)
+            XCTAssertTrue((-8.0 ... -3.0).contains(sun.altitude), "\(name): the Sun should have just set: \(sun.altitude)")
+            // Nine degrees from the Sun and about five degrees above the horizon.
+            let nearby = target(nearTheSunOf: rig, degreesAbove: 9.0)
+            try rig.controller.goto(nearby)
+            XCTAssertEqual(rig.controller.status.phase, .slewing, name)
+        }
+    }
+
     func testInvalidTargetsAreRefused() throws {
         let rig = Support.rig("lx200-onstep")
         try rig.controller.connect()

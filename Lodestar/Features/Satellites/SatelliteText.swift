@@ -32,7 +32,7 @@ enum SatelliteText {
         "\(AppFormat.time(item.start, in: timeZone)) \u{2013} \(AppFormat.time(item.end, in: timeZone))"
     }
 
-    /// "peak 67° NE": the culmination's altitude and compass point.
+    /// "peak 67° NE": the altitude and compass point of the highest visible point of a pass (`SatellitePassItem.peak`).
     static func peak(_ point: SatellitePassPoint) -> String {
         "peak \(AngleFormatter.formatDegrees(point.altitude, decimals: 0)) "
             + AngleFormatter.compassPoint(azimuth: point.azimuth).abbreviation

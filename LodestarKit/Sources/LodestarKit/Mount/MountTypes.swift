@@ -58,6 +58,9 @@ public enum MountError: Error, Hashable, Sendable, LocalizedError {
     case slewInProgress
     /// Lodestar's own safety check: the target is below the configured altitude limit.
     case belowHorizonLimit(altitude: Double, limit: Double)
+    /// Lodestar's own safety check: the Sun is up and the target is `separationDegrees` from it, closer than the
+    /// `limitDegrees` exclusion zone. A telescope pointed there can burn the eye or the camera.
+    case nearSun(separationDegrees: Double, limitDegrees: Double)
     /// The mount refused the target because it is below the mount's own horizon limit.
     case mountHorizonLimit
     /// The mount refused the target because it is above the mount's overhead limit.
@@ -108,6 +111,9 @@ public enum MountError: Error, Hashable, Sendable, LocalizedError {
         case let .belowHorizonLimit(altitude, limit):
             "The target is at \(String(format: "%.1f", altitude))°, below your altitude limit of "
                 + "\(String(format: "%.1f", limit))°. Lodestar won't slew there."
+        case let .nearSun(separationDegrees, limitDegrees):
+            "The target is \(String(format: "%.1f", separationDegrees))° from the Sun, closer than the "
+                + "\(String(format: "%.0f", limitDegrees))° safety limit. Lodestar won't slew there."
         case .mountHorizonLimit: "The target is below the mount's horizon limit."
         case .mountOverheadLimit: "The target is above the mount's overhead limit."
         case .outsideMountLimits: "The target is outside the mount's movement limits."
@@ -330,6 +336,9 @@ public struct MountSettings: Hashable, Sendable {
     public let maximumNudgeSeconds: Double
     /// A sync that would move the mount by more than this many degrees is refused (180 allows everything).
     public let maximumSyncOffsetDegrees: Double
+    /// While the Sun is up, targets closer to it than this many degrees are refused. It can be made smaller or larger
+    /// within 5...45 degrees but not switched off.
+    public let sunExclusionDegrees: Double
 
     /// The default settings.
     public static let standard = MountSettings()
@@ -337,7 +346,8 @@ public struct MountSettings: Hashable, Sendable {
     /// Creates settings; values are clamped to their allowed ranges (see the documentation of each property).
     public init(altitudeLimit: Double = 0, horizonLookaheadSeconds: Double = 60, maximumSlewSeconds: Double = 300,
                 slewStartGraceSeconds: Double = 5, arrivalToleranceDegrees: Double = 0.25, pollIntervalSeconds: Double = 1,
-                maximumConsecutiveFailures: Int = 3, maximumNudgeSeconds: Double = 10, maximumSyncOffsetDegrees: Double = 180) {
+                maximumConsecutiveFailures: Int = 3, maximumNudgeSeconds: Double = 10, maximumSyncOffsetDegrees: Double = 180,
+                sunExclusionDegrees: Double = 15) {
         self.altitudeLimit = MountSettings.sane(altitudeLimit, 0, -10, 60)
         self.horizonLookaheadSeconds = MountSettings.sane(horizonLookaheadSeconds, 60, 0, 1800)
         self.maximumSlewSeconds = MountSettings.sane(maximumSlewSeconds, 300, 10, 3600)
@@ -347,6 +357,7 @@ public struct MountSettings: Hashable, Sendable {
         self.maximumConsecutiveFailures = min(max(maximumConsecutiveFailures, 1), 10)
         self.maximumNudgeSeconds = MountSettings.sane(maximumNudgeSeconds, 10, 0.1, 30)
         self.maximumSyncOffsetDegrees = MountSettings.sane(maximumSyncOffsetDegrees, 180, 0.1, 180)
+        self.sunExclusionDegrees = MountSettings.sane(sunExclusionDegrees, 15, 5, 45)
     }
 
     private static func sane(_ value: Double, _ defaultValue: Double, _ lower: Double, _ upper: Double) -> Double {

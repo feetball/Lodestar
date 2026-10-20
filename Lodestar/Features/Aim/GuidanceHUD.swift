@@ -55,7 +55,7 @@ private struct AimHUDLayout: View {
 
     private var tallLayout: some View {
         VStack(spacing: 8) {
-            AimStatusChips(model: model)
+            AimStatusChips(model: model, sheet: $sheet)
             Spacer(minLength: 0)
             MountAimStrip(model: model, sheet: $sheet)
             AimReadout(model: model, sheet: $sheet, isActive: isActive)
@@ -71,7 +71,7 @@ private struct AimHUDLayout: View {
     private var wideLayout: some View {
         HStack(alignment: .top, spacing: 10) {
             VStack(spacing: 8) {
-                AimStatusChips(model: model)
+                AimStatusChips(model: model, sheet: $sheet)
                 Spacer(minLength: 0)
                 MountAimStrip(model: model, sheet: $sheet)
                 AimReadout(model: model, sheet: $sheet, isActive: isActive)

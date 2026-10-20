@@ -51,6 +51,7 @@ final class MountSession: @unchecked Sendable {
     }
 
     /// Runs `work` on the controller. A job that throws reports the `MountError`; the status is the controller's after it.
+    /// Every job on the worker starts with `channel.beginJob()`, so an `interrupt()` only ends the job it found running.
     func run<Value: Sendable>(urgent: Bool = false,
                               _ work: @escaping @Sendable (MountController) throws -> Value) async -> MountJobResult<Value> {
         await withCheckedContinuation { (continuation: CheckedContinuation<MountJobResult<Value>, Never>) in
@@ -108,7 +109,8 @@ final class MountSession: @unchecked Sendable {
         }
     }
 
-    /// Ends the exchange that is waiting for the mount right now, whatever it is.
+    /// Ends the exchange that is waiting for the mount right now, whatever it is, and fails everything else the job that
+    /// is running now still sends. Jobs that start afterwards (the Stop) are not affected.
     func interrupt() {
         channel.interrupt()
     }
@@ -118,6 +120,7 @@ final class MountSession: @unchecked Sendable {
         // Whatever is waiting for the mount now is cut short; the jobs after it run normally.
         channel.interrupt()
         let accepted = queue.submit { [self] in
+            channel.beginJob()
             controller?.disconnect()
             controller = nil
             bundle = nil
@@ -131,6 +134,7 @@ final class MountSession: @unchecked Sendable {
 
     private func performConnect(option: MountConnectionOption, options: MountDriverOptions, observer: Observer,
                                 settings: MountSettings) -> MountJobResult<MountCapabilities> {
+        channel.beginJob()
         do {
             try channel.open(timeoutSeconds: 8)
             let made = try option.makeDriver(channel, options)
@@ -146,6 +150,7 @@ final class MountSession: @unchecked Sendable {
     }
 
     private func performReconfigure(_ settings: MountSettings) -> MountJobResult<Void> {
+        channel.beginJob()
         guard let bundle, let current = controller else {
             return MountJobResult(.failure(.notConnected), status: .disconnected)
         }
@@ -160,11 +165,17 @@ final class MountSession: @unchecked Sendable {
             controller = fresh
             return MountJobResult(.success(()), status: fresh.status, detail: bundle.detail?())
         } catch {
+            // The failed handshake disconnected the driver, which the controller that stays in use still shares:
+            // connect it again, as well as it can be, so a limit that could not be sent does not end the session.
+            // The link starts afresh, so that a Stop that cut the handshake short does not cut this one short too.
+            channel.beginJob()
+            _ = try? bundle.driver.connect()
             return MountJobResult(.failure(Self.mountError(error)), status: current.status)
         }
     }
 
     private func execute<Value: Sendable>(_ work: (MountController) throws -> Value) -> MountJobResult<Value> {
+        channel.beginJob()
         guard let controller else { return MountJobResult(.failure(.notConnected), status: .disconnected) }
         bundle?.prepare?()
         do {
@@ -176,6 +187,7 @@ final class MountSession: @unchecked Sendable {
     }
 
     private func performCentre(on place: EquatorialCoordinate) -> MountJobResult<Void> {
+        channel.beginJob()
         guard let controller, let bundle, let centre = bundle.centreSimulated else {
             return MountJobResult(.failure(.notSupported(feature: .other)), status: controller?.status ?? .disconnected)
         }
@@ -192,6 +204,7 @@ final class MountSession: @unchecked Sendable {
     }
 
     private func executeOnDriver<Value: Sendable>(_ work: (MountDriver) throws -> Value) -> MountJobResult<Value> {
+        channel.beginJob()
         guard let controller, let bundle else { return MountJobResult(.failure(.notConnected), status: .disconnected) }
         bundle.prepare?()
         do {

@@ -230,12 +230,26 @@ final class TonightLinesTests: XCTestCase {
     }
 
     func testTheNeedsLocationWords() {
-        XCTAssertEqual(TonightNeedsLocationText.full, "Open Lodestar to set your location")
-        XCTAssertFalse(TonightNeedsLocationText.short.isEmpty)
-        XCTAssertTrue(TonightNeedsLocationText.spoken.contains("location"))
+        XCTAssertEqual(TonightNeedsLocationText.full(.notAsked), "Open Lodestar to allow location")
+        XCTAssertFalse(TonightNeedsLocationText.short(.notAsked).isEmpty)
+        XCTAssertFalse(TonightNeedsLocationText.corner(.notAsked).isEmpty)
+        XCTAssertTrue(TonightNeedsLocationText.spoken(.notAsked).contains("location"))
         let entry = TonightEntry.needsLocation(at: now)
         XCTAssertEqual(entry.date, now)
-        XCTAssertEqual(entry.content, .needsLocation)
+        XCTAssertEqual(entry.content, .needsLocation(.notAsked))
+    }
+
+    func testAUserWhoSaidNoIsSentToSettingsNotToTheApp() {
+        let issue = TonightLocationIssue.deniedOrRestricted
+        XCTAssertEqual(TonightNeedsLocationText.full(issue), "Allow location for Lodestar in Settings")
+        XCTAssertTrue(TonightNeedsLocationText.short(issue).contains("Settings"))
+        XCTAssertTrue(TonightNeedsLocationText.spoken(issue).contains("Settings"))
+        for text in [TonightNeedsLocationText.full(issue), TonightNeedsLocationText.short(issue),
+                     TonightNeedsLocationText.corner(issue), TonightNeedsLocationText.spoken(issue)] {
+            XCTAssertFalse(text.contains("Open"), text)
+        }
+        XCTAssertNotEqual(TonightNeedsLocationText.corner(issue), TonightNeedsLocationText.corner(.notAsked))
+        XCTAssertEqual(TonightEntry.needsLocation(at: now, issue: issue).content, .needsLocation(.deniedOrRestricted))
     }
 
     // MARK: Numbers

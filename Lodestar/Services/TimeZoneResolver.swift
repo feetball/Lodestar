@@ -7,15 +7,20 @@ import MapKit
 
 /// Finds the time zone of an observing site so rise, set and twilight times can be shown in local time.
 ///
-/// The lookup reverse-geocodes one user-chosen coordinate, which is the app's only network use besides map
-/// tiles. It gives up after `lookupTimeout`; callers fall back to `nominalTimeZone(longitude:)`.
+/// The lookup reverse-geocodes the coordinate of one saved site (or of a site being added) with Apple's service. Besides
+/// that, the network is used only for map tiles and for the optional downloads in Online Data. It gives up after
+/// `lookupTimeout`; callers fall back to `nominalTimeZone(longitude:)`.
 enum TimeZoneResolver {
     /// Longest wait for the geocoding service.
     private static let lookupTimeout: Duration = .seconds(8)
+    /// The coordinates are rounded to this many degrees (about 1 km) before they leave the phone: a time zone border
+    /// closer than that to a site is rare, and the site editor lets the user look up again.
+    private static let coordinateStepDegrees = 0.01
 
-    /// The IANA time zone at `location`, or `nil` when the service is unreachable, slow or has no answer.
+    /// The IANA time zone at `location`, or `nil` when the service is unreachable, slow or has no answer. Only the
+    /// position rounded to `coordinateStepDegrees` is sent.
     static func timeZone(for location: GeographicLocation) async -> TimeZone? {
-        let point = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        let point = CLLocation(latitude: rounded(location.latitude), longitude: rounded(location.longitude))
         // First answer wins: the lookup and the deadline both post to one stream, and the lookup is abandoned if
         // the deadline fires first (the system geocoders do not reliably honour task cancellation).
         let (answers, channel) = AsyncStream.makeStream(of: TimeZone?.self, bufferingPolicy: .unbounded)
@@ -45,6 +50,10 @@ enum TimeZoneResolver {
     }
 
     // MARK: Geocoding
+
+    private static func rounded(_ degrees: Double) -> Double {
+        (degrees / coordinateStepDegrees).rounded() * coordinateStepDegrees
+    }
 
     private static func reverseGeocodedTimeZone(at point: CLLocation) async -> TimeZone? {
         #if compiler(>=6.2)

@@ -180,6 +180,8 @@ struct SkyChartPickable: Sendable {
     let point: CGPoint
     /// The object itself when the snapshot has it; stars are looked up in the catalog by `id`.
     let object: CelestialObject?
+    /// The zoom from which the chart draws it; a tap on a spot where it is not drawn passes it by.
+    var minimumZoom: CGFloat = 0
 }
 
 /// Everything the planisphere draws for one instant and observer, in chart space: derived from a
@@ -212,7 +214,7 @@ extension SkyChartScene {
     func pickable(near location: CGPoint, in viewport: PlanisphereViewport,
                   tolerance: CGFloat = 24) -> SkyChartPickable? {
         var best: (pickable: SkyChartPickable, score: CGFloat)?
-        for pickable in pickables {
+        for pickable in pickables where viewport.zoom >= pickable.minimumZoom {
             let point = viewport.screen(pickable.point)
             let distance = hypot(point.x - location.x, point.y - location.y)
             guard distance <= tolerance else { continue }
@@ -446,9 +448,12 @@ enum SkyChartSceneBuilder {
             result.append(SkyChartPickable(id: body.id, kind: .body, point: body.point, object: body.object))
         }
         for item in snapshot.deepSky where item.direction.z >= 0 {
+            // The renderer leaves obscure objects out until the chart is zoomed in; so does a tap.
             result.append(SkyChartPickable(id: item.object.id, kind: .deepSky,
                                            point: PlanisphereProjection.chartPoint(item.direction),
-                                           object: item.object))
+                                           object: item.object,
+                                           minimumZoom: item.prominence == .obscure
+                                               ? PlanisphereRenderer.obscureMinimumZoom : 0))
         }
         for star in snapshot.stars where star.direction.z >= 0 {
             result.append(SkyChartPickable(id: star.id, kind: .star,
