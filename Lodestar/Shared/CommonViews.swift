@@ -72,14 +72,31 @@ struct InfoRow: View {
     let value: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-                .foregroundStyle(palette.secondaryText)
-            Spacer(minLength: 12)
-            Text(value)
-                .foregroundStyle(palette.primaryText)
-                .monospacedDigit()
-                .multilineTextAlignment(.trailing)
+        // Label and value share a line when both fit on it; otherwise the value goes under the label and wraps there,
+        // instead of being squeezed into a narrow column that breaks "10:54 PM" in two.
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(label)
+                    .foregroundStyle(palette.secondaryText)
+                    .fixedSize(horizontal: true, vertical: false)
+                Spacer(minLength: 12)
+                Text(value)
+                    .foregroundStyle(palette.primaryText)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .foregroundStyle(palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(value)
+                    .foregroundStyle(palette.primaryText)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.subheadline)
         .accessibilityElement(children: .combine)
