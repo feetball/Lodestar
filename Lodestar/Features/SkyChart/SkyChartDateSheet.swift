@@ -34,6 +34,7 @@ struct SkyChartDateSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .sheetDragIndicator(palette, daytime: .automatic)
         .presentationBackground(palette.background)
     }
 

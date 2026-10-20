@@ -37,12 +37,15 @@ struct SettingsNightSection: View {
                 caption: "Shows the camera picture in red tones behind the sky. It is brighter than the sky overlay "
                     + "alone, so it costs some night vision.",
                 isOn: $store.settings.cameraPreviewAtNight)
-            SettingsToggleRow(
-                title: "Red screen overlay (experimental)",
-                caption: "Multiplies everything on screen with pure red, so system-drawn colors such as maps and "
-                    + "keyboards turn red as well. It may not reach every system view and only works in night mode. "
-                    + "Color Filters (below) are more reliable.",
-                isOn: $store.settings.redFilterOverlay)
+            // On iOS 26 the overlay is always on at night (see `NightOverlay`), so the switch would do nothing there.
+            if !NightOverlay.isAutomatic {
+                SettingsToggleRow(
+                    title: "Red screen overlay (experimental)",
+                    caption: "Multiplies everything on screen with pure red, so system-drawn colors such as maps and "
+                        + "keyboards turn red as well. It may not reach every system view and only works in night mode. "
+                        + "Color Filters (below) are more reliable.",
+                    isOn: $store.settings.redFilterOverlay)
+            }
         }
         SettingsSection(title: "Pure Red for the Whole iPhone") {
             ColorFiltersGuideCard(showsTitle: false)

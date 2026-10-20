@@ -23,9 +23,27 @@ extension View {
     }
 
     /// Applies the palette, tint and colour scheme to a presentation root (window or sheet) and,
-    /// in night mode, a red multiply filter that turns any remaining system colours red.
+    /// in night mode, a red multiply filter that turns any remaining system colours red. The filter is on when the
+    /// user asks for it, and always on iOS 26 and later (see `NightOverlay`).
     func themedRoot(_ palette: Palette, redFilter: Bool) -> some View {
         modifier(ThemedRootModifier(palette: palette, redFilter: redFilter))
+    }
+
+    /// The drag indicator of a sheet: `daytime` in the day, hidden at night on iOS 26 and later, where the system
+    /// draws it grey above the sheet, out of reach of the red filter.
+    func sheetDragIndicator(_ palette: Palette, daytime: Visibility = .visible) -> some View {
+        presentationDragIndicator(palette.isNight && NightOverlay.isAutomatic ? .hidden : daytime)
+    }
+}
+
+/// The red multiply filter at night. On iOS 26 and later the system draws the back button, the toolbar and Done
+/// capsules, switches, segmented pickers and the search field in grey and white glass whatever the palette says, so
+/// there the filter is always on at night; before that the system controls follow the palette and the filter stays
+/// the user's choice (Settings ▸ Night Mode).
+enum NightOverlay {
+    static var isAutomatic: Bool {
+        if #available(iOS 26, *) { return true }
+        return false
     }
 }
 
@@ -33,13 +51,17 @@ private struct ThemedRootModifier: ViewModifier {
     let palette: Palette
     let redFilter: Bool
 
+    private var showsOverlay: Bool {
+        palette.isNight && (redFilter || NightOverlay.isAutomatic)
+    }
+
     func body(content: Content) -> some View {
         content
             .environment(\.palette, palette)
             .tint(palette.accent)
             .preferredColorScheme(.dark)
             .overlay {
-                if palette.isNight && redFilter {
+                if showsOverlay {
                     // Multiply by pure red: white → red, blue/green → black. Hit testing is off so
                     // the overlay never intercepts touches.
                     Color(red: 1, green: 0, blue: 0)
