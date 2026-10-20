@@ -52,23 +52,16 @@ private struct ThemedRootModifier: ViewModifier {
     }
 }
 
-/// UIKit appearance for the controls SwiftUI does not fully theme (tab bar, navigation bar,
-/// switch/slider thumbs, search field text). Applied to the appearance proxies (for new views) and
-/// to the bars already on screen, so switching night mode never has to rebuild the view tree.
+/// UIKit appearance for the controls SwiftUI does not fully theme (navigation bar, switch/slider
+/// thumbs, segmented controls, search field text). Applied to the appearance proxies (for new views)
+/// and to the navigation bars already on screen, so switching night mode never has to rebuild the
+/// view tree. The tab bar is not here: the app draws its own (`AppTabBar`).
 @MainActor
 enum BarAppearance {
     static func apply(_ palette: Palette) {
-        let tab = tabBarAppearance(palette)
         let navigation = navigationBarAppearance(palette)
         let accent = UIColor(palette.accent)
 
-        let unselected = UIColor(palette.tertiaryText)
-        UITabBar.appearance().standardAppearance = tab
-        UITabBar.appearance().scrollEdgeAppearance = tab
-        // The floating glass tab bar of iOS 26 ignores the item colours of the appearance and draws unselected
-        // items in the label colour (white), but follows the bar's tint colours.
-        UITabBar.appearance().tintColor = accent
-        UITabBar.appearance().unselectedItemTintColor = unselected
         UINavigationBar.appearance().standardAppearance = navigation
         UINavigationBar.appearance().scrollEdgeAppearance = navigation
         UINavigationBar.appearance().compactAppearance = navigation
@@ -84,36 +77,20 @@ enum BarAppearance {
         UISlider.appearance().maximumTrackTintColor = palette.isNight ? UIColor(palette.stroke) : nil
         UITextField.appearance(whenContainedInInstancesOf: [UISearchBar.self]).textColor = UIColor(palette.primaryText)
 
-        // The track of iOS 26 is a light glass on which dim red text disappears: give it the surface colour, and at
-        // night the unselected titles full text strength.
+        // The track of iOS 26 is a light glass on which dim red text disappears: give it the surface colour and, at
+        // night, give the unselected titles the accent's full strength.
         UISegmentedControl.appearance().backgroundColor = UIColor(palette.surface)
         UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(palette.surfaceRaised)
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(palette.primaryText)], for: .selected)
-        let unselectedSegment = palette.isNight ? palette.primaryText.opacity(0.8) : palette.secondaryText
+        let unselectedSegment = palette.isNight ? palette.accent : palette.secondaryText
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(unselectedSegment)], for: .normal)
 
         // Restyle the bars that already exist; the proxies above only affect views created later.
         for scene in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
             for window in scene.windows {
-                restyle(window, tab: tab, navigation: navigation, accent: accent, unselected: unselected)
+                restyle(window, navigation: navigation, accent: accent)
             }
         }
-    }
-
-    private static func tabBarAppearance(_ palette: Palette) -> UITabBarAppearance {
-        let selected = UIColor(palette.accent)
-        let normal = UIColor(palette.tertiaryText)
-        let tab = UITabBarAppearance()
-        tab.configureWithOpaqueBackground()
-        tab.backgroundColor = UIColor(palette.surface)
-        tab.shadowColor = UIColor(palette.stroke)
-        for itemAppearance in [tab.stackedLayoutAppearance, tab.inlineLayoutAppearance, tab.compactInlineLayoutAppearance] {
-            itemAppearance.normal.iconColor = normal
-            itemAppearance.normal.titleTextAttributes = [.foregroundColor: normal]
-            itemAppearance.selected.iconColor = selected
-            itemAppearance.selected.titleTextAttributes = [.foregroundColor: selected]
-        }
-        return tab
     }
 
     private static func navigationBarAppearance(_ palette: Palette) -> UINavigationBarAppearance {
@@ -135,21 +112,15 @@ enum BarAppearance {
         return navigation
     }
 
-    private static func restyle(_ view: UIView, tab: UITabBarAppearance, navigation: UINavigationBarAppearance,
-                                accent: UIColor, unselected: UIColor) {
-        if let bar = view as? UITabBar {
-            bar.standardAppearance = tab
-            bar.scrollEdgeAppearance = tab
-            bar.tintColor = accent
-            bar.unselectedItemTintColor = unselected
-        } else if let bar = view as? UINavigationBar {
+    private static func restyle(_ view: UIView, navigation: UINavigationBarAppearance, accent: UIColor) {
+        if let bar = view as? UINavigationBar {
             bar.standardAppearance = navigation
             bar.scrollEdgeAppearance = navigation
             bar.compactAppearance = navigation
             bar.tintColor = accent
         }
         for subview in view.subviews {
-            restyle(subview, tab: tab, navigation: navigation, accent: accent, unselected: unselected)
+            restyle(subview, navigation: navigation, accent: accent)
         }
     }
 }

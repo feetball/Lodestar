@@ -14,26 +14,31 @@ struct RootView: View {
             if let host = reviewHost {
                 host
             } else if app.settings.hasCompletedOnboarding {
+                // Every tab hides the system tab bar, whose glass the night palette does not reach, and the app's own
+                // bar (`AppTabBar`) takes its place in a bottom safe area inset.
                 TabView(selection: $app.selectedTab) {
                     AimView()
-                        .tabItem { Label(AppTab.aim.title, systemImage: AppTab.aim.systemImage) }
+                        .toolbar(.hidden, for: .tabBar)
                         .tag(AppTab.aim)
                     ObjectsView()
                         .statusBarHidden(app.isNightModeActive)
-                        .tabItem { Label(AppTab.objects.title, systemImage: AppTab.objects.systemImage) }
+                        .toolbar(.hidden, for: .tabBar)
                         .tag(AppTab.objects)
                     SkyChartView()
                         .statusBarHidden(app.isNightModeActive)
-                        .tabItem { Label(AppTab.sky.title, systemImage: AppTab.sky.systemImage) }
+                        .toolbar(.hidden, for: .tabBar)
                         .tag(AppTab.sky)
                     TonightView()
                         .statusBarHidden(app.isNightModeActive)
-                        .tabItem { Label(AppTab.tonight.title, systemImage: AppTab.tonight.systemImage) }
+                        .toolbar(.hidden, for: .tabBar)
                         .tag(AppTab.tonight)
                     SettingsView()
                         .statusBarHidden(app.isNightModeActive)
-                        .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.systemImage) }
+                        .toolbar(.hidden, for: .tabBar)
                         .tag(AppTab.settings)
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    AppTabBar(selection: $app.selectedTab)
                 }
             } else {
                 OnboardingView()
