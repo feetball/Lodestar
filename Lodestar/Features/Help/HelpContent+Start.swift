@@ -41,9 +41,9 @@ extension HelpContent {
         summary: "What the Aim screen shows and what its buttons do.",
         keywords: ["arrow", "guidance", "chips", "status", "icons", "hud", "roll", "crosshair", "readout", "buttons"],
         blocks: [
-            .paragraph("The Aim tab is your screen at the tripod. It shows the sky where your camera points and leads you to the target."),
+            .paragraph("The Aim tab shows the sky where your camera points and leads you to the target."),
             .bullets([
-                "**Camera** switches your camera\u{2019}s picture behind the sky on and off. Pinch to zoom, or tap the zoom button to step through 100\u{00B0}, 60\u{00B0}, 40\u{00B0} and 20\u{00B0} of virtual sky, or 1\u{00D7}, 2\u{00D7}, 4\u{00D7} and 8\u{00D7} of picture.",
+                "**Camera** switches your camera\u{2019}s picture behind the sky on and off. Pinch to zoom, or tap the zoom button to step through 100\u{00B0}, 60\u{00B0}, 40\u{00B0} and 20\u{00B0} of virtual sky, or 1\u{00D7}, 2\u{00D7}, 4\u{00D7} and 8\u{00D7} of picture, as far as your camera allows.",
                 "**The arrow** circles the middle of the screen and points the shortest way to the target, with the distance left in degrees. The rectangle outlines your camera\u{2019}s frame.",
                 "**The card** shows the target\u{2019}s name, kind, altitude (**Alt**, height) and azimuth (**Az**, compass direction). Two readouts such as **Pan right 30.7\u{00B0}** and **Tilt up 12.4\u{00B0}** say how far to turn each axis.",
                 "**On target**, a ring with a check mark replaces the arrow and the panel reads **In your frame \u{00B7} 8.2\u{00B0} from center**. Haptics tap when you arrive and leave. Optional audio ticks are in **Settings** \u{25B8} **Feedback**.",
@@ -69,7 +69,7 @@ extension HelpContent {
                 "For much better accuracy, repeat with a second object in another part of the sky, at a different height. Tap **Done** when you finish.",
             ]),
             .bullets([
-                "The chip at the top then reads, for example, **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts**: the expected pointing error and the number of stars synced. Aim for \u{00B1}1\u{00B0} or better. After one star it is large (over \u{00B1}10\u{00B0}), because one star cannot tell a compass error from a tilted bracket.",
+                "The chip at the top then reads, for example, **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts**. The first number is the expected pointing error; the second counts the stars you synced. Aim for \u{00B1}1\u{00B0} or better. After one star it is large (over \u{00B1}10\u{00B0}), because one star cannot tell a compass error from a tilted bracket.",
                 "In the panel, a minus button removes one point and **Reset alignment** starts over. **Settings** \u{25B8} **Mount** also has **Reset Alignment** and shows the corrections.",
                 "With a GoTo mount connected, a switch in the panel can also sync the mount to the star.",
             ]),
@@ -91,7 +91,7 @@ extension HelpContent {
                 "The chip **Set heading: align on a star** means Gyro Lock has no heading yet. One alignment sets it.",
                 "Lodestar turns the compass reading into true north with the World Magnetic Model, so it works without Location Services.",
                 "With two or more stars at different heights, expect to land within about a degree, inside the frame of all but long telephoto lenses.",
-                "**Settings** \u{25B8} **About** \u{25B8} **Sensor Diagnostics** checks the sensors. With the phone upright and the camera facing north, the gravity check should read PASS.",
+                "**Settings** \u{25B8} **About** \u{25B8} **Sensor Diagnostics** checks the sensors. With the phone upright and the camera facing north, the gravity check should read **PASS**.",
             ]),
             .tip("A phone case with a magnetic clasp can throw the compass off. If the chip says **Compass poor**, try the phone without its case, as far from metal as the bracket allows."),
             .caution("Changing the heading source clears your star alignment."),
