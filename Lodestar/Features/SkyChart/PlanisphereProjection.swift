@@ -290,10 +290,8 @@ struct PlanisphereViewport: Equatable, Sendable {
 
     /// `pan` limited to the distance the zoomed chart overhangs the view, `baseRadius * (zoom - 1)`,
     /// so the middle of the view always stays on the chart; at zoom 1 the chart cannot be moved.
-    /// With `reachesHorizon` (a camera frame fixed in the middle of the view) the limit is the radius of
-    /// the horizon circle instead, so the middle can be moved anywhere on the sky, even at zoom 1.
-    static func clampedPan(_ pan: CGSize, zoom: CGFloat, in size: CGSize, reachesHorizon: Bool = false) -> CGSize {
-        let limit = baseRadius(in: size) * (reachesHorizon ? zoom : zoom - 1)
+    static func clampedPan(_ pan: CGSize, zoom: CGFloat, in size: CGSize) -> CGSize {
+        let limit = baseRadius(in: size) * (zoom - 1)
         let length = (pan.width * pan.width + pan.height * pan.height).squareRoot()
         guard length > limit else { return pan }
         guard limit > 0 else { return .zero }
