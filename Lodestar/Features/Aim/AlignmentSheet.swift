@@ -63,6 +63,7 @@ struct AlignmentSheet: View {
             Text("Align on a star")
                 .font(.title3.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
+            HelpButton(topic: .alignment)
             Spacer()
             Button("Done") { dismiss() }
                 .buttonStyle(.lodestarSecondary)

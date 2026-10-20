@@ -12,6 +12,7 @@ tilt the tripod head until it is in your frame.
   pointing the shortest way, "Pan right 23.4° / Tilt up 12.1°" read-outs for pan-tilt heads, the
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
   closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
+  With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Optional **Gyro Lock** keeps the heading on the gyroscope so
@@ -25,7 +26,11 @@ tilt the tripod head until it is in your frame.
   altitude chart over the night with twilight shading, how it fits your frame, and the longest
   exposure before stars trail (NPF and 500 rules).
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
-  objects, your camera's live pointing, tap-to-identify, and time travel.
+  objects, your camera's live pointing, tap-to-identify, time travel and zoom up to 15×. **Plan your
+  framing** holds your camera's frame in the middle of the chart so you can move the sky under it and
+  turn it (position angle for a tracker, roll for a tripod) without holding the phone up.
+- **Help** — a searchable guide to every screen in *Settings ▸ Help*, and ? buttons on the screens that
+  open the page that belongs to them.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night, and a polar-scope clock for star trackers.

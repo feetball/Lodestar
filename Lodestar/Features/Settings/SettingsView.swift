@@ -8,6 +8,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                SettingsHelpSection()
                 SettingsLocationSection()
                 SettingsMountSection()
                 SettingsMountControlSection()

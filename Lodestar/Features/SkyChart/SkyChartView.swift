@@ -125,6 +125,8 @@ struct SkyChartView: View {
             }
             .accessibilityLabel("Layers")
             .accessibilityValue(isShowingLayers ? "Shown" : "Hidden")
+
+            HelpButton(topic: .skyChart)
         }
     }
 

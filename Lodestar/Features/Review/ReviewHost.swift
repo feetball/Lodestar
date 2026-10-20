@@ -110,6 +110,10 @@ private struct ReviewDestination: View {
         case .mountConnection, .mountConnected, .mountSkyWatcher, .mountSkyWatcherEquatorial, .mountSkyWatcherConnected,
              .mountSkyWatcherAligned1, .mountSkyWatcherAligned2:
             MountConnectionView()
+        case .help:
+            HelpView()
+        case .helpTopic(let id):
+            HelpTopicView(topic: HelpContent.topic(id))
         default:
             EmptyView()
         }

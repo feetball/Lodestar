@@ -39,6 +39,7 @@ struct AimStatusChips: View {
                 }
             }
             SatelliteStreakChip(model: model)
+            HelpButton(topic: .aimScreen, appearance: .chip)
         }
         .frame(maxWidth: .infinity)
     }
