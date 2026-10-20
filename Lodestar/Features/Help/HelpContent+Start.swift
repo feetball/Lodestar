@@ -46,11 +46,11 @@ extension HelpContent {
                 "**Camera** switches your camera\u{2019}s picture behind the sky on and off. Pinch to zoom, or tap the zoom button to step through 100\u{00B0}, 60\u{00B0}, 40\u{00B0} and 20\u{00B0} of virtual sky, or 1\u{00D7}, 2\u{00D7}, 4\u{00D7} and 8\u{00D7} of picture, as far as your camera allows.",
                 "**The arrow** circles the middle of the screen and points the shortest way to the target, with the distance left in degrees. The rectangle outlines your camera\u{2019}s frame.",
                 "**The card** shows the target\u{2019}s name, kind, altitude (**Alt**, height) and azimuth (**Az**, compass direction). Two readouts such as **Pan right 30.7\u{00B0}** and **Tilt up 12.4\u{00B0}** say how far to turn each axis.",
-                "**On target**, a ring with a check mark replaces the arrow and the panel reads **In your frame \u{00B7} 8.2\u{00B0} from center**. Haptics tap when you arrive and leave. Optional audio ticks are in **Settings** \u{25B8} **Feedback**.",
-                "**Chips**, the small labels along the top: **Compass good**, **Compass fair** or **Compass poor** (or **Gyro lock**), **Magnetic interference**, **Not aligned** or **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts**, **Virtual sky**, **Approx. location**, camera notices and Starlink streak warnings.",
+                "**On target**, a ring with a check mark replaces the arrow and the panel reads **In your frame \u{00B7} 8.2\u{00B0} from center**. Haptics tap when you arrive and leave; audio ticks are optional (**Settings** \u{25B8} **Feedback**).",
+                "**Chips** (small labels) along the top: **Compass good**, **Compass fair** or **Compass poor** (or **Gyro lock**), **Magnetic interference**, **Not aligned** or **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts**, **Virtual sky**, **Approx. location**, camera notices and Starlink streak warnings.",
                 "**The level gauge**, top right, reads **Level** with a check mark when the camera is level.",
                 "**Buttons:** **Target**, **Align**, **Mosaic**, **Camera**, the night button (**Night off**, **Night on** or **Night auto**) and zoom. **Mount** appears once a GoTo mount has connected.",
-                "**No target?** A panel names the planet, bright star or deep-sky object closest to the middle of the picture, within a few degrees. **Aim here** makes it your target; **Choose target** opens the list. The circled \u{00D7} on the card clears the target.",
+                "**No target?** A panel names the planet, bright star or deep-sky object within a few degrees of the middle of the picture. **Aim here** makes it your target; **Choose target** opens the list. The circled \u{00D7} on the card clears the target.",
             ]),
         ],
         related: [.alignment, .compassAndGyro, .mounts, .troubleshooting])
@@ -63,14 +63,14 @@ extension HelpContent {
             .paragraph("Phone compasses can be off by several degrees near camera bodies and metal. Aligning teaches Lodestar which way north really is for your phone and how the phone sits on the camera. One star corrects the heading; stars at different heights in the sky also correct the tilt of your bracket."),
             .steps([
                 "On the Aim tab, tap **Align**.",
-                "Choose a bright star or planet. The list shows objects between 15\u{00B0} and 78\u{00B0} above the horizon, nearest to where your camera points first.",
+                "Choose a bright star or planet. The list shows objects 15\u{00B0} to 78\u{00B0} above the horizon, nearest to where your camera points first.",
                 "The object becomes your target, so the arrows lead you to it. Steer the tripod until it is centered in your camera\u{2019}s frame, in the viewfinder or live view.",
                 "Tap **Centered \u{2014} Sync**.",
                 "For much better accuracy, repeat with a second object in another part of the sky, at a different height. Tap **Done** when you finish.",
             ]),
             .bullets([
                 "The chip at the top then reads, for example, **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts**. The first number is the expected pointing error; the second counts the stars you synced. Aim for \u{00B1}1\u{00B0} or better. After one star it is large (over \u{00B1}10\u{00B0}), because one star cannot tell a compass error from a tilted bracket.",
-                "In the panel, a minus button removes one point and **Reset alignment** starts over. **Settings** \u{25B8} **Mount** also has **Reset Alignment** and shows the corrections.",
+                "In the panel, a minus button removes one point and **Reset alignment** starts over. **Settings** \u{25B8} **Mount** shows the corrections and has **Reset Alignment**.",
                 "With a GoTo mount connected, a switch in the panel can also sync the mount to the star.",
             ]),
             .tip("Align on a star near your target, then add a second star far from the first."),
@@ -83,7 +83,7 @@ extension HelpContent {
         summary: "What the compass chips mean and how to steady them.",
         keywords: ["heading", "north", "magnetic", "interference", "gyroscope", "declination", "drift", "diagnostics", "sensors", "wmm"],
         blocks: [
-            .paragraph("Lodestar finds where the camera points from the phone\u{2019}s compass and gyroscope. A compass is typically good to a few degrees, and tripod heads, camera bodies, lens motors and even a magnetic case can disturb it."),
+            .paragraph("Lodestar finds where the camera points from the phone\u{2019}s compass and gyroscope. A compass is typically good to a few degrees, and tripod heads, camera bodies and lens motors can disturb it."),
             .bullets([
                 "The chip at the top says **Compass good**, **Compass fair** or **Compass poor**. **Magnetic interference** appears when the magnetic field the phone measures differs a lot from what it should be at your place.",
                 "Two things help: align on a star, or use Gyro Lock.",
@@ -93,7 +93,7 @@ extension HelpContent {
                 "With two or more stars at different heights, expect to land within about a degree, inside the frame of all but long telephoto lenses.",
                 "**Settings** \u{25B8} **About** \u{25B8} **Sensor Diagnostics** checks the sensors. With the phone upright and the camera facing north, the gravity check should read **PASS**.",
             ]),
-            .tip("A phone case with a magnetic clasp can throw the compass off. If the chip says **Compass poor**, try the phone without its case, as far from metal as the bracket allows."),
+            .tip("A magnetic phone case can throw the compass off. If the chip says **Compass poor**, try the phone without its case, away from metal."),
             .caution("Changing the heading source clears your star alignment."),
         ],
         related: [.alignment, .mounting, .troubleshooting])

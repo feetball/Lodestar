@@ -14,7 +14,7 @@ extension HelpContent {
                 "**Browse** by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters and Special (the Milky Way core and the celestial poles). Asteroids, and comets if you switch them on in **Settings** \u{25B8} **Online Data**, are under Solar System.",
                 "**Chips** above the list limit it to one catalog, such as Messier. **The menu** at the top right sorts by name, brightness, altitude or rise time, and filters with **Above Horizon Now**, **Hide Faint** and **Popular Only**.",
                 "**Swipe** a row right to favorite it, or left to aim at it. Favorites and recents are listed first. The **+** button adds a custom target from a right ascension and declination, the sky\u{2019}s coordinates.",
-                "**Tap a row** for the object\u{2019}s page: where it is now, when it rises, reaches its highest point and sets, an altitude chart for the night, how much of your camera frame it fills, and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
+                "**Tap a row** for the object\u{2019}s page. It shows where the object is now, and when it rises, reaches its highest point and sets, with an altitude chart. It also shows how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
             ]),
             .caution("The Sun is listed under Solar System. Never point a camera at it without a certified solar filter."),
         ],
@@ -23,7 +23,7 @@ extension HelpContent {
     private static let skyChart = HelpTopic(
         topic: .skyChart, category: .sky, title: "The sky chart", systemImage: "circle.dotted.circle",
         summary: "Your whole sky at any hour, with a time bar.",
-        keywords: ["sky tab", "planisphere", "star map", "planetarium", "zenith", "layers", "constellations", "time travel", "camera view", "zoom"],
+        keywords: ["planisphere", "star map", "planetarium", "zenith", "overhead", "layers", "constellations", "time travel", "camera view", "zoom"],
         blocks: [
             .paragraph("The **Sky** tab draws the whole sky above you as a round chart. The point straight overhead, the zenith, is in the middle, and the horizon is the outer circle. North is at the top and east is on the left, as when you lie on your back and look up."),
             .bullets([
@@ -48,7 +48,7 @@ extension HelpContent {
                 "**Darkness** is a timeline of the night with a **Now** marker. Its bars show the sky\u{2019}s brightness, when the Moon is up, the dark hours without the Moon, and when the Milky Way core can be photographed.",
                 "**Sun & Twilight** lists sunset, dusk, dawn and sunrise. The sky is fully dark when the Sun is more than 18\u{00B0} below the horizon.",
                 "**Moon** gives the phase, moonrise, moonset and the dark hours you get without it. **Milky Way Core** and **Planets** say when they are high enough to shoot.",
-                "**Best Targets** ranks deep-sky objects by height in the dark, brightness and size. **Upcoming** lists the next sky events. **Polar Alignment** is a clock for aligning a star tracker.",
+                "**Best Targets** ranks deep-sky objects (galaxies, nebulae and clusters) by height in the dark, brightness and size. **Upcoming** lists the next sky events. **Polar Alignment** is a clock for aligning a star tracker.",
                 "To see another night, use the arrows at the top or tap the date. You can go a year either way. **Tonight** brings you back.",
                 "With a recorded skyline, the times follow it. If you switch on **Cloud forecast** in **Settings** \u{25B8} **Online Data**, a **Clouds tonight** card appears.",
             ]),
@@ -87,7 +87,7 @@ extension HelpContent {
             .steps([
                 "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from them.",
                 "On the **Sky** tab, open the layers menu. Turn on **Camera view**, then **Frame in the middle**.",
-                "Drag to move the frame over the sky and pinch to zoom, up to 15\u{00D7}. Zoomed in, large objects are drawn near their real size. The frame stays on the same stars as time passes, so use the time bar to see how it will look later.",
+                "Drag to move the frame over the sky and pinch to zoom, up to 15\u{00D7}. Zoomed in, large deep-sky objects are drawn near their real size. The frame stays on the same stars as time passes, so use the time bar to see how it will look later.",
                 "Turn the frame by twisting two fingers, or press and hold on the chart, then drag around the middle. It snaps at 0\u{00B0}, 90\u{00B0}, 180\u{00B0} and 270\u{00B0}. The **90\u{00B0}** button gives a quarter turn, for a portrait frame.",
                 "Tap **Aim here** to open the Aim screen, guided to the middle of the frame. There, the frame follows how you turn the phone, as your camera does on the tripod.",
             ]),
@@ -109,7 +109,7 @@ extension HelpContent {
             .steps([
                 "On the **Aim** screen, tap **Mosaic**.",
                 "Under **Cover**, choose **Fit target** (the Aim target, with a margin), **Milky Way arch panorama** or **Custom size**. For a custom size, set the width and height. **Use where the camera points now** centers it.",
-                "Under **Shots**, set the **Overlap** and how you hold the camera: **Landscape** or **Portrait**. Lodestar suggests the one that needs fewer panels. The lens comes from Settings.",
+                "Under **Shots**, set the **Overlap**, how much neighboring panels share, and how you hold the camera: **Landscape** or **Portrait**. Lodestar suggests the one that needs fewer panels. The lens comes from Settings.",
                 "Check the **Plan** card for the rows, columns, panel count and any warnings. Then tap **Start**.",
                 "Lodestar steers you to each panel in turn and tells you how far to rotate the camera. The screen shows progress, such as Panel 3 of 12. Take the shot, then tap **Shot taken \u{2192} Next**. The panels also appear on the sky chart.",
                 "Tap **Finish** to end the mosaic.",
@@ -122,7 +122,7 @@ extension HelpContent {
     private static let trailsAndExposure = HelpTopic(
         topic: .trailsAndExposure, category: .planning, title: "Exposure, star trails and time-lapse", systemImage: "timer",
         summary: "Longest exposure, star trail and time-lapse planners.",
-        keywords: ["exposure calculator", "npf", "500 rule", "star trails", "timelapse", "interval", "stacking", "shutter", "trailing", "tools"],
+        keywords: ["npf", "500 rule", "startrails", "timelapse", "interval", "stacking", "shutter", "trailing", "polar alignment", "tools"],
         blocks: [
             .paragraph("Stars drift across the sky, so a long exposure turns them into streaks. These tools help you pick an exposure that keeps stars sharp, or plan star trails and time-lapses on purpose."),
             .bullets([
@@ -147,7 +147,7 @@ extension HelpContent {
             .steps([
                 "Go to your site and choose it in **Settings** \u{25B8} **Location**. A skyline belongs to a saved site, so for **Current Location** Lodestar offers to save it as a site first.",
                 "Tap the mountain button on the site, or edit the site and open its **Horizon** section. Choose **Record Skyline\u{2026}**, or **Clear Skyline\u{2026}** to remove one.",
-                "Hold the phone so its back camera points at the skyline, with the line on the crosshair. Turn slowly all the way round. Sweep back over a stretch to redo it.",
+                "Hold the phone so its back camera points at the skyline, with the line on the crosshair. Turn slowly all the way around. Sweep back over a stretch to redo it.",
                 "The screen shows how much is covered and what is still to sweep. **Start Over** begins again.",
                 "Tap **Done** to save. If the circle is not complete, Lodestar asks what to do with the gaps.",
             ]),

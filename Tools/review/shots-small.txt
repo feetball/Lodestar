@@ -18,3 +18,6 @@ widgets|n|screen=widgets|pages=4
 satellite-passes|n|screen=satellite-passes|pages=3
 satellite-pass-detail|n|screen=satellite-pass-detail|pages=5
 aim-satellite|n|screen=aim-satellite|
+# Help at the largest text size.
+help-aim-screen|n|screen=help-aimScreen|pages=3
+help-alignment|d|screen=help-alignment|pages=3

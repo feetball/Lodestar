@@ -48,6 +48,9 @@ enum ReviewScreen: Hashable {
     case aimSatellite
     case aimSatellitePeak
     case onlineFirstTime
+    // Settings ▸ Help: the list, and one page of it (`help-<topic id>`, such as "help-aimScreen").
+    case help
+    case helpTopic(HelpTopic.ID)
     // The widgets drawn at their sizes (the widget views are in the app only in the review build), by variant.
     case widgets
     case widgetsStates
@@ -70,16 +73,18 @@ enum ReviewScreen: Hashable {
         "satellite-passes": .satellitePasses, "satellite-pass-detail": .satellitePassDetail,
         "aim-satellite": .aimSatellite, "aim-satellite-peak": .aimSatellitePeak, "online-first-time": .onlineFirstTime,
         "widgets": .widgets, "widgets-states": .widgetsStates, "widgets-large-type": .widgetsLargeType,
-        "widgets-red": .widgetsRed,
+        "widgets-red": .widgetsRed, "help": .help,
     ]
 
     /// The screen called `name` (exactly), or `nil`. Events are "event-" and the engine's name of the kind, such as
-    /// "event-meteorShower".
+    /// "event-meteorShower"; help pages are "help-" and the id of the topic, such as "help-aimScreen".
     init?(name: String) {
         if let screen = Self.named[name] {
             self = screen
         } else if name.hasPrefix("event-"), let kind = EventKind(rawValue: String(name.dropFirst("event-".count))) {
             self = .event(kind)
+        } else if name.hasPrefix("help-"), let topic = HelpTopic.ID(rawValue: String(name.dropFirst("help-".count))) {
+            self = .helpTopic(topic)
         } else {
             return nil
         }
@@ -98,7 +103,7 @@ enum ReviewScreen: Hashable {
             return .objects
         case .starTrails, .timeLapse, .mountConnection, .mountConnected, .skyline, .siteEditor, .mountSkyWatcher,
              .mountSkyWatcherEquatorial, .mountSkyWatcherConnected, .mountSkyWatcherAligned1, .mountSkyWatcherAligned2,
-             .onlineFirstTime:
+             .onlineFirstTime, .help, .helpTopic:
             return .settings
         }
     }
