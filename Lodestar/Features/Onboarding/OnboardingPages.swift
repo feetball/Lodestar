@@ -80,6 +80,9 @@ struct OnboardingWelcomePage: View {
                               text: "Turn the head until the target sits in the middle, then shoot.")
             OnboardingFactRow(systemImage: "lock", title: "Private by design",
                               text: "Everything is worked out on your iPhone. There are no accounts and no tracking.")
+            OnboardingFactRow(systemImage: "questionmark.circle", title: "Help is always at hand",
+                              text: "Settings \u{25B8} Help explains every screen, and the ? buttons open the page "
+                                  + "that belongs to it.")
         }
     }
 }
