@@ -827,14 +827,20 @@ public final class SkyWatcherDriver: MountDriver {
 
     private func endNudge(atLimit: Bool = false) throws {
         nudge = nil
-        if atLimit {
-            // The nudge ran into a limit of the mount. The axes still turn at the nudge rate, and braking them would carry the
-            // mount on past the limit (0.75 degrees from the fastest nudge): stop them at once, so that the mount rests where the
-            // limit was found, tracking goes on from there, and nothing travels on until the next poll if it cannot.
-            try stopAxesAtOnce()
+        // The axes still turn at the nudge speed. They are stopped before the position is read, so that what tracking starts from is
+        // where the mount rests and not a place it passes on its way: a nudge that ends at a limit must not carry the mount beyond
+        // that limit while this runs (near the zenith a fraction of a degree of the axis is several degrees of the sky). A nudge that
+        // ran into a limit is stopped at once: braking would carry the mount on past the limit (0.75 degrees from the fastest nudge),
+        // so that it rests where the limit was found and tracking goes on from there.
+        do {
+            if atLimit { try stopAxesAtOnce() } else { try stopAxes() }
             try waitUntilStopped()
+        } catch {
+            // The stop did not get through: the next poll sends it again, whatever else the driver believes about the motion.
+            motion = .stopped
+            pendingStop = true
+            throw error
         }
-        try refreshStatuses()
         let reading = try readAxes()
         anchor = pointing(reading)
         if trackingEnabled {
@@ -843,8 +849,6 @@ public final class SkyWatcherDriver: MountDriver {
             _ = try applyTracking(reading)
         } else {
             motion = .stopped
-            try stopAxes()
-            try waitUntilStopped()
         }
     }
 
