@@ -25,7 +25,7 @@ struct TonightWidgetView: View {
     var body: some View {
         content
             // The Home Screen layouts have a fixed size: beyond this the text only truncates ("Fir…", "Da… · n…").
-            .dynamicTypeSize(Self.isHomeScreen(family) ? .xSmall ... .xxxLarge : .xSmall ... .accessibility5)
+            .dynamicTypeSize(Self.dynamicTypeRange(for: family))
             .widgetURL(TonightLink.url)
             .containerBackground(for: .widget) {
                 switch family {
@@ -37,8 +37,13 @@ struct TonightWidgetView: View {
             }
     }
 
-    private static func isHomeScreen(_ family: WidgetFamily) -> Bool {
-        family == .systemSmall || family == .systemMedium
+    /// The medium widget's tiles are about 133 pt wide, so its text stops growing a size earlier than the small one's.
+    private static func dynamicTypeRange(for family: WidgetFamily) -> ClosedRange<DynamicTypeSize> {
+        switch family {
+        case .systemSmall: return .xSmall ... .xxxLarge
+        case .systemMedium: return .xSmall ... .xxLarge
+        default: return .xSmall ... .accessibility5
+        }
     }
 
     @ViewBuilder

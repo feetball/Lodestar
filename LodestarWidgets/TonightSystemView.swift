@@ -143,16 +143,20 @@ struct TonightSystemView: View {
                     .foregroundStyle(TonightStyle.secondaryText)
                     .accessibilityHidden(true)
             }
+            // When the line is too wide the figure at the end keeps its room, then the badge; the label gives way first.
             Text(short ? item.shortLabel : item.label)
                 .font(.caption2)
                 .foregroundStyle(TonightStyle.secondaryText)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             if let badge = item.badge {
                 Text("\u{00B7} \(badge)")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(TonightStyle.accent)
                     .widgetAccentable()
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
             }
             if let trailing = item.trailing {
                 Spacer(minLength: 2)
@@ -160,6 +164,8 @@ struct TonightSystemView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(TonightStyle.primaryText)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .layoutPriority(2)
             }
         }
     }
