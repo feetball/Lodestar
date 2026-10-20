@@ -70,6 +70,9 @@ struct HorizonRecordView: View {
         .onAppear {
             app.keepsMotionRunning = true
             app.keepsScreenAwake = true
+            // The camera is shared with the Aim screen, which may have left it zoomed in; the recorder wants the whole
+            // field of view. The Aim screen sets its own zoom again when its tab is shown.
+            app.camera.setZoom(1)
         }
         .onChange(of: isCameraWanted, initial: true) { _, wanted in
             app.keepsCameraRunning = wanted
