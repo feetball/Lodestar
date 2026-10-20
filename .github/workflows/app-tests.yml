@@ -1,0 +1,46 @@
+# Unit tests of the app's own logic (AppTests: the services, models and formatters of Lodestar/ that need no UIKit, SwiftUI,
+# AVFoundation or CoreMotion), with line coverage. It runs `swift test` on a macOS runner: no simulator, so a few minutes.
+name: App tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['AppTests/**', 'Lodestar/**', 'LodestarKit/**', 'Tools/coverage_report.py', '.github/workflows/app-tests.yml']
+  pull_request:
+    paths: ['AppTests/**', 'Lodestar/**', 'LodestarKit/**', 'Tools/coverage_report.py', '.github/workflows/app-tests.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  app-tests:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select --switch "$XCODE"
+          swift --version
+
+      - name: Check the links of AppTests are the ones appcore-files.txt lists
+        run: |
+          bash AppTests/sync-links.sh
+          test -z "$(git status --porcelain -- AppTests/Sources)" || { git status --porcelain -- AppTests/Sources; exit 1; }
+
+      - name: Test the app's logic
+        run: swift test --package-path AppTests --enable-code-coverage
+
+      - name: Coverage of the app's logic
+        run: |
+          set -o pipefail
+          JSON="$(swift test --package-path AppTests --show-codecov-path)"
+          echo "# App logic (Lodestar/)" >> "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" AppTests/Sources/AppCore/ | tee -a "$GITHUB_STEP_SUMMARY"
