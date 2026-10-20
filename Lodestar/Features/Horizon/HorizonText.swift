@@ -104,13 +104,13 @@ enum HorizonCoverageMemory {
     }
 
     /// The coverage recorded with `site`'s skyline, or `nil` when there is none or the skyline has changed since.
-    static func recall(for site: SavedSite) -> Double? {
-        entry(for: site)?.coverage
+    static func recall(for site: SavedSite, defaults: UserDefaults = .standard) -> Double? {
+        entry(for: site, defaults: defaults)?.coverage
     }
 
     /// Everything remembered with `site`'s skyline, or `nil` when there is nothing or the skyline has changed since.
-    static func entry(for site: SavedSite) -> Entry? {
-        guard let horizon = site.horizon, let text = UserDefaults.standard.string(forKey: key(site.id)) else {
+    static func entry(for site: SavedSite, defaults: UserDefaults = .standard) -> Entry? {
+        guard let horizon = site.horizon, let text = defaults.string(forKey: key(site.id)) else {
             return nil
         }
         let parts = text.split(separator: ":", maxSplits: 2).map(String.init)
@@ -121,28 +121,29 @@ enum HorizonCoverageMemory {
 
     /// Remembers `coverage` (and the swept degrees, if known) for `horizon` of the site `siteID`; forgets it when
     /// there is no skyline.
-    static func store(siteID: UUID, horizon: HorizonProfile?, coverage: Double, mask: [Bool]? = nil) {
+    static func store(siteID: UUID, horizon: HorizonProfile?, coverage: Double, mask: [Bool]? = nil,
+                      defaults: UserDefaults = .standard) {
         guard let horizon else {
-            forget(siteID: siteID)
+            forget(siteID: siteID, defaults: defaults)
             return
         }
         var text = "\(fingerprint(of: horizon)):\(coverage)"
         if let mask, mask.count == HorizonProfile.binCount {
             text += ":\(encode(mask))"
         }
-        UserDefaults.standard.set(text, forKey: key(siteID))
+        defaults.set(text, forKey: key(siteID))
     }
 
     /// Drops what is remembered for the site `siteID`.
-    static func forget(siteID: UUID) {
-        UserDefaults.standard.removeObject(forKey: key(siteID))
+    static func forget(siteID: UUID, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(siteID))
     }
 
     /// What is known of the circle when a sweep that reached `mask` is saved over `site`'s skyline and the old one
     /// stays wherever the sweep did not reach: both sweeps added up. `nil` when nothing is remembered about the old
     /// skyline, because then it is not known how much of it was ever swept.
-    static func merged(sweep mask: [Bool], over site: SavedSite) -> Entry? {
-        guard let old = entry(for: site) else { return nil }
+    static func merged(sweep mask: [Bool], over site: SavedSite, defaults: UserDefaults = .standard) -> Entry? {
+        guard let old = entry(for: site, defaults: defaults) else { return nil }
         guard let oldMask = old.mask, oldMask.count == mask.count else {
             // Stored without the degrees: all that can be said is that at least the larger of the two shares is known.
             return Entry(coverage: max(old.coverage, share(of: mask)), mask: nil)
