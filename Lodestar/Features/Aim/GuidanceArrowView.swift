@@ -96,6 +96,10 @@ private struct AimArrowContent: View {
             .monospacedDigit()
             .foregroundStyle(color)
             .shadow(color: .black.opacity(0.7), radius: 3)
+            // On a backing, so the stars and lines behind the text do not run through its digits.
+            .padding(.horizontal, 8)
+            .padding(.vertical, 1)
+            .background(Capsule().fill(palette.background.opacity(0.7)))
             .rotationEffect(.degrees(rotation.degrees))
             .offset(rotation.rotated(CGSize(width: 0, height: offset)))
     }

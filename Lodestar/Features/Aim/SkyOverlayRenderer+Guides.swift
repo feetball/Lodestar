@@ -157,8 +157,9 @@ extension SkyOverlayRenderer {
         layer.stroke(arrow, with: .color(.black.opacity(0.5)), lineWidth: 1)
 
         let separation = AimFormat.angle(boresight.angle(to: direction))
-        labels.add(separation, at: CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38),
-                   style: AimLabelStyle(size: 14, weight: .bold, color: color), priority: 3)
+        // On a backing, so a star or a line behind the number does not read as part of it.
+        let style = AimLabelStyle(size: 14, weight: .bold, color: color, backing: palette.background.opacity(0.72))
+        labels.add(separation, at: CGPoint(x: tip.x - heading.dx * 38, y: tip.y - heading.dy * 38), style: style, priority: 3)
     }
 
     // MARK: Reticle
