@@ -38,7 +38,7 @@ extension HelpContent {
         summary: "Optional downloads for satellites, comets and cloud cover.",
         keywords: ["internet", "download", "satellites", "starlink", "comets", "clouds", "forecast", "network"],
         blocks: [
-            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets and a cloud forecast. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup when you add or edit a site."),
+            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets and a cloud forecast. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
             .bullets([
                 "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",

@@ -280,6 +280,18 @@ final class MountService {
                 return MountError.belowHorizonLimit(altitude: target.lowestAltitude,
                                                     limit: settings.altitudeLimit).userMessage
             }
+            // The engine refuses a target near the Sun while it is up (`MountError.nearSun`); saying so here keeps the
+            // GoTo from being offered at all.
+            let frame = SkyFrame(date: Date(), observer: observer)
+            let sun = frame.horizontal(of: .sun, refraction: false)
+            if sun.altitude > -1 {
+                let limit = settings.engineSettings.sunExclusionDegrees
+                let place = frame.horizontal(j2000: target.j2000, properMotion: target.properMotion, refraction: false)
+                let separation = place.angularSeparation(to: sun)
+                if separation < limit {
+                    return MountError.nearSun(separationDegrees: separation, limitDegrees: limit).userMessage
+                }
+            }
         }
         if usesLodestarAlignment {
             if needsFirstSync { return MountAlignmentText.notAlignedYet }
