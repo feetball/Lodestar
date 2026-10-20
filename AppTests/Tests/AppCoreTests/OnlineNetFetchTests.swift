@@ -637,10 +637,9 @@ final class OnlineNetDownloaderTests: XCTestCase {
         }
     }
 
-
-
-
-
+    // An answer that is followed by a broken connection (mapped to `.interrupted`, or to the status failure) cannot be produced with a
+    // `URLProtocol`: URLSession drops the buffered answer when the protocol fails the load. That branch of `OnlineDownloader` is not
+    // covered by tests.
 
     // MARK: Cancellation
 
@@ -1384,7 +1383,6 @@ final class OnlineNetRefresherTests: XCTestCase {
         XCTAssertEqual(message, "The provider sent no data.")
         expectRecorded(.comets, wait: 3600)
     }
-
 
     func testTooManyRedirectsWaitTheRetryIntervalOfTheResource() async {
         // Seven redirects in a row: the fifth is refused.
