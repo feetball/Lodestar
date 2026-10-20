@@ -69,18 +69,20 @@ jobs:
       # Line coverage per folder and file (Tools/coverage_report.py), also shown on the run's summary page.
       - name: Coverage of LodestarKit
         run: |
+          set -o pipefail
           JSON="$(swift test --package-path LodestarKit --show-codecov-path)"
           echo "# LodestarKit" >> "$GITHUB_STEP_SUMMARY"
-          python3 Tools/coverage_report.py "$JSON" LodestarKit/Sources/ | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" LodestarKit/Sources/ 97 | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Test the widgets' shared code
         run: swift test --package-path WidgetTests --enable-code-coverage
 
       - name: Coverage of the widgets' shared code
         run: |
+          set -o pipefail
           JSON="$(swift test --package-path WidgetTests --show-codecov-path)"
           echo "# WidgetShared/Core" >> "$GITHUB_STEP_SUMMARY"
-          python3 Tools/coverage_report.py "$JSON" TonightCore/ | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" TonightCore/ 97 | tee -a "$GITHUB_STEP_SUMMARY"
 
       # A wall-clock check of a Debug build (200 000 Kepler solutions in under 5 s) that the shared runners sometimes
       # miss by a few tenths of a second; kept as its own step so that it stays visible without failing the job.
