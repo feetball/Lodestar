@@ -47,6 +47,11 @@ public final class SkyWatcherDriver: MountDriver {
     private static let trackingLeadExtraSeconds = 0.5
     private static let trackingRateSlack = 1.5
     private static let limitSlackDegrees = 0.25
+    /// How far above the overhead limit an alt-azimuth mount may keep tracking. A nudge towards the limit ends where the mount
+    /// is when the limit is found, which can be above it (the axes were turning, and the pointing model adds a few tenths of a
+    /// degree to the altitude the driver sees); tracking has to be able to go on from there for a while, and a target that
+    /// creeps over the limit by sidereal motion stops it soon enough. A goto or a nudge still stops at the limit itself.
+    private static let trackingOverheadSlackDegrees = 1.0
     private static let slewOverheadSeconds = 1.5
     private static let refinementLeadSeconds = 1.5
     private static let settleSeconds = 1.0
@@ -531,6 +536,11 @@ public final class SkyWatcherDriver: MountDriver {
         for axis in SkyWatcherAxis.allCases { try link.exchange(.stopMotion, axis: axis, data: "", operation: "stop") }
     }
 
+    /// Stops both axes without braking (the protocol's instant stop), for a move that has run into a limit of the mount.
+    private func stopAxesAtOnce() throws {
+        for axis in SkyWatcherAxis.allCases { try link.exchange(.instantStop, axis: axis, data: "", operation: "stop") }
+    }
+
     private func waitUntilStopped() throws {
         for _ in 0 ..< SkyWatcherDriver.stopPolls {
             try refreshStatuses()
@@ -589,13 +599,15 @@ public final class SkyWatcherDriver: MountDriver {
 
     // MARK: Choosing axis angles
 
-    /// The axis angles for `place` at `at`, within the limits; throws the mount's limit errors.
-    private func choose(_ place: EquatorialCoordinate, _ at: Date, _ near: Reading, keepSide: Bool) throws -> Choice {
+    /// The axis angles for `place` at `at`, within the limits; throws the mount's limit errors. `overheadSlack` degrees are allowed
+    /// above the overhead limit (tracking uses it, see `trackingOverheadSlackDegrees`).
+    private func choose(_ place: EquatorialCoordinate, _ at: Date, _ near: Reading, keepSide: Bool,
+                        overheadSlack: Double = 0.0) throws -> Choice {
         let limits = configuration.limits
         let sidereal = lst(at)
         let altitude = SkyWatcherSky.altitude(place, localSiderealTime: sidereal, latitude: location.latitude)
         if altitude < limits.minimumAltitudeDegrees { throw MountError.mountHorizonLimit }
-        if resolvedMode == .altAzimuth && altitude > limits.maximumAltitudeDegrees { throw MountError.mountOverheadLimit }
+        if resolvedMode == .altAzimuth && altitude > limits.maximumAltitudeDegrees + overheadSlack { throw MountError.mountOverheadLimit }
         let direction = SkyWatcherSky.localDirection(place, localSiderealTime: sidereal, latitude: location.latitude, mode: resolvedMode)
         let solutions = model.solutions(direction, preferredAxis1Degrees: near.axis1)
         if resolvedMode == .altAzimuth {
@@ -796,7 +808,8 @@ public final class SkyWatcherDriver: MountDriver {
     /// Closed loop: the rate includes the correction of the distance to where the anchor is now.
     private func servoStep(_ reading: Reading, lead: Double, anchorAt: (Date) -> EquatorialCoordinate) throws {
         let at = reading.time.addingTimeInterval(lead)
-        let wanted = try choose(anchorAt(at), at, reading, keepSide: true)
+        let wanted = try choose(anchorAt(at), at, reading, keepSide: true,
+                                overheadSlack: motion == .tracking ? SkyWatcherDriver.trackingOverheadSlackDegrees : 0.0)
         // Beyond the azimuth limit of an alt-azimuth mount `choose` answers with the same direction from another turn, a jump of
         // nearly a full turn. Tracking would be stopped by the rate check below, but a nudge is only clamped to the rate limit and
         // would unwind the cable at full speed: both end here as at any other limit.
@@ -816,9 +829,22 @@ public final class SkyWatcherDriver: MountDriver {
         try setAxisRate(.axis2, rate2)
     }
 
-    private func endNudge() throws {
+    private func endNudge(atLimit: Bool = false) throws {
         nudge = nil
-        try refreshStatuses()
+        // The axes still turn at the nudge speed. They are stopped before the position is read, so that what tracking starts from is
+        // where the mount rests and not a place it passes on its way: a nudge that ends at a limit must not carry the mount beyond
+        // that limit while this runs (near the zenith a fraction of a degree of the axis is several degrees of the sky). A nudge that
+        // ran into a limit is stopped at once: braking would carry the mount on past the limit (0.75 degrees from the fastest nudge),
+        // so that it rests where the limit was found and tracking goes on from there.
+        do {
+            if atLimit { try stopAxesAtOnce() } else { try stopAxes() }
+            try waitUntilStopped()
+        } catch {
+            // The stop did not get through: the next poll sends it again, whatever else the driver believes about the motion.
+            motion = .stopped
+            pendingStop = true
+            throw error
+        }
         let reading = try readAxes()
         anchor = pointing(reading)
         if trackingEnabled {
@@ -827,8 +853,6 @@ public final class SkyWatcherDriver: MountDriver {
             _ = try applyTracking(reading)
         } else {
             motion = .stopped
-            try stopAxes()
-            try waitUntilStopped()
         }
     }
 
@@ -947,8 +971,8 @@ public final class SkyWatcherDriver: MountDriver {
         } catch let limit as MountError {
             if limit.isCommunicationFailure { throw limit }
             print("DBG serviceNudge limit=\(limit) reading.axis1=\(reading.axis1) axis2=\(reading.axis2)")
-            // The nudge has reached a limit of the mount: end it here and go on tracking from where the mount is.
-            try endNudge()
+            // The nudge has reached a limit of the mount: end it here and go on tracking from where the mount comes to rest.
+            try endNudge(atLimit: true)
         }
     }
 }

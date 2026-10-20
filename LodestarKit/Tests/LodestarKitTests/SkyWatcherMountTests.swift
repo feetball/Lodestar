@@ -878,8 +878,9 @@ final class SkyWatcherMountTests: XCTestCase {
         // The mount tracks at the place where the nudge ended.
         let place = rig.trueJ2000()
         Support.poll(rig, seconds: 60)
-        XCTAssertTrue(rig.trueJ2000().angularSeparation(to: place) < 0.05)
-        XCTAssertEqual(rig.controller.poll().isTracking, true)
+        let moved = rig.trueJ2000().angularSeparation(to: place)
+        XCTAssertTrue(moved < 0.05, "moved \(moved) degrees from altitude \(altitude)")
+        XCTAssertEqual(rig.controller.poll().isTracking, true, "tracking stopped: \(String(describing: rig.driver.trackingStopReason))")
     }
 
     func testANudgeIntoTheAzimuthLimitEndsInsteadOfUnwinding() throws {
