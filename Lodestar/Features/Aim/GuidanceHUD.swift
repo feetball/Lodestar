@@ -39,8 +39,6 @@ private struct AimHUDLayout: View {
 
     /// The readout does not grow wider than this in a wide layout.
     private static let wideReadoutWidth: CGFloat = 420
-    /// Distance of the level gauge from the top of a tall layout.
-    private static let levelGaugeTopInset: CGFloat = 84
 
     var body: some View {
         Group {
@@ -56,16 +54,25 @@ private struct AimHUDLayout: View {
     private var tallLayout: some View {
         VStack(spacing: 8) {
             AimStatusChips(model: model, sheet: $sheet)
-            Spacer(minLength: 0)
+            levelGaugeSlot
             MountAimStrip(model: model, sheet: $sheet)
             AimReadout(model: model, sheet: $sheet, isActive: isActive)
             AimControlsBar(model: model, sheet: $sheet)
         }
-        .overlay(alignment: .topTrailing) {
-            // Below the chips and clear of the arrow around the reticle.
-            AimLevelGauge(model: model, isActive: isActive)
-                .padding(.top, Self.levelGaugeTopInset)
+    }
+
+    /// The free space between the chips and the cards, with the level gauge in its upper right corner: right under the
+    /// chips, however many rows they take, and clear of the arrow around the reticle. While the cards leave less room
+    /// than the gauge needs (a mount's tall card, large text), the gauge is left out instead of drawn over them.
+    private var levelGaugeSlot: some View {
+        ViewThatFits(in: .vertical) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                AimLevelGauge(model: model, isActive: isActive)
+            }
+            Color.clear
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var wideLayout: some View {
