@@ -14,7 +14,7 @@ extension RootView {
 
 /// The tab bar with one tab's navigation stack in it, opened on a screen (pushed) or with a sheet over it. The stack
 /// registers the same destinations as the tab it stands for, so the screen is shown the way the app shows it, with its
-/// navigation bar and the tab bar under it.
+/// navigation bar and the app's own tab bar (`AppTabBar`, set up as in `RootView`) under it.
 struct ReviewHost: View {
     let screen: ReviewScreen
 
@@ -37,9 +37,12 @@ struct ReviewHost: View {
         TabView(selection: $app.selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 tabContent(tab)
-                    .tabItem { Label(tab.title, systemImage: tab.systemImage) }
+                    .toolbar(.hidden, for: .tabBar)
                     .tag(tab)
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            AppTabBar(selection: $app.selectedTab)
         }
     }
 

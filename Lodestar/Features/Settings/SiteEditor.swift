@@ -320,7 +320,7 @@ private struct SiteCoordinateField: View {
             Text(title)
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-            TextField(title, text: $text, prompt: Text(prompt))
+            TextField(title, text: $text, prompt: Text(prompt).foregroundStyle(palette.tertiaryText))
                 .keyboardType(.numbersAndPunctuation)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
