@@ -22,10 +22,11 @@ jobs:
         run: swift test --package-path LodestarKit --enable-code-coverage --skip CometsOrbitTests/testSolverIsFast 2>&1 | grep -E "error:|Executed [0-9]+ tests, with [0-9]+ failures" | tail -8 || true
       - name: Coverage report (from the raw profile, so that failing tests do not matter)
         run: |
-          PROF="$(find LodestarKit/.build -name default.profdata | head -1)"
-          BIN="$(find LodestarKit/.build -path '*.xctest/Contents/MacOS/*' -type f | head -1)"
-          echo "profdata: $PROF"
-          echo "binary: $BIN"
+          BIN="LodestarKit/.build/arm64-apple-macosx/debug/LodestarKitPackageTests.xctest/Contents/MacOS/LodestarKitPackageTests"
+          ls -la "$BIN"
+          find LodestarKit/.build -name '*.profraw' | head -5
+          PROF="$RUNNER_TEMP/merged.profdata"
+          xcrun llvm-profdata merge -sparse $(find LodestarKit/.build -name '*.profraw') -o "$PROF"
           xcrun llvm-cov export -summary-only -instr-profile "$PROF" "$BIN" > kit-coverage.json
           python3 Tools/coverage_report.py kit-coverage.json LodestarKit/Sources/ | tee coverage-kit.md
           cat coverage-kit.md >> "$GITHUB_STEP_SUMMARY"
