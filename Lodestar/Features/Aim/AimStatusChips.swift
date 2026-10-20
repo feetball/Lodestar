@@ -9,6 +9,7 @@ struct AimStatusChips: View {
     @Binding var sheet: AimSheet?
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
+    @Environment(\.palette) private var palette
 
     /// Fractional deviation of the measured magnetic field from the expected one above which the compass is suspect.
     private static let interferenceThreshold = 0.25
@@ -31,6 +32,7 @@ struct AimStatusChips: View {
                     } label: {
                         // Padded to the minimum touch target.
                         StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
+                            .aimChipBacking(palette)
                             .padding(.vertical, 9)
                             .contentShape(Rectangle())
                     }
@@ -38,16 +40,24 @@ struct AimStatusChips: View {
                     .accessibilityHint("Opens the iOS settings to allow camera access. The virtual sky still works.")
                 } else {
                     StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
+                        .aimChipBacking(palette)
                 }
             }
-            SatelliteStreakChip(model: model)
-            // The alignment and mount sheets leave the display usable, and the screen shows one sheet at a time. The
-            // chip stays in its place, so the other chips do not move, but is out of reach while a sheet is up.
-            HelpButton(topic: .aimScreen, appearance: .chip, action: { sheet = .help })
-                .opacity(sheet == nil ? 1 : 0)
-                .disabled(sheet != nil)
-                .accessibilityHidden(sheet != nil)
+            // The Starlink chip and the help button are one child of the row: with large text the chip fills the row,
+            // and the button then keeps the end of its row, the chip giving up width, instead of dropping to a row of
+            // its own over the sky.
+            HStack(spacing: 6) {
+                SatelliteStreakChip(model: model)
+                // The alignment and mount sheets leave the display usable, and the screen shows one sheet at a time.
+                // The chip stays in its place, so the other chips do not move, but is out of reach while a sheet is up.
+                HelpButton(topic: .aimScreen, appearance: .chip, action: { sheet = .help })
+                    .opacity(sheet == nil ? 1 : 0)
+                    .disabled(sheet != nil)
+                    .accessibilityHidden(sheet != nil)
+            }
         }
+        // A chip wider than the row (the Starlink warning, with large text) shrinks its text to fit.
+        .minimumScaleFactor(0.7)
         .frame(maxWidth: .infinity)
     }
 

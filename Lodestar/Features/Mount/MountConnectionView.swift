@@ -456,10 +456,16 @@ private struct MountControlsSection: View {
             // A mount that Lodestar aligns is sent nothing (see `MountAlignmentText.siteAndTime`), so there is nothing to send.
             if capabilities?.canSetSiteAndTime == true, !service.usesLodestarAlignment,
                let observer = app.observerContext?.observer {
-                VStack(alignment: .leading, spacing: 4) {
-                    Button("Send location and time to the mount") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
                         Task { await service.sendSiteAndTime(location: observer.location) }
+                    } label: {
+                        Label("Send location and time to the mount", systemImage: "paperplane.fill")
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.lodestarSecondary)
+                    .disabled(service.isWorking)
                     SettingsCaption("Sends your location and the iPhone's clock (UTC) to the mount, for mounts that work "
                                     + "out their own sky. Do it again after moving to a new place.")
                 }

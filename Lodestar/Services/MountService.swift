@@ -1111,7 +1111,7 @@ enum MountAlignmentText {
             text += ", \(AngleFormatter.formatDegrees(residual, decimals: 2)) residual"
         }
         if let predicted = alignment.predictedErrorDegrees {
-            text += ", \u{2248} \(accuracy(predicted)) accuracy"
+            text += ", \u{2248}\u{00A0}\(accuracy(predicted)) accuracy"
         }
         return text
     }

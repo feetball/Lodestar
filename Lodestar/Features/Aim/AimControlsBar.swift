@@ -8,13 +8,20 @@ struct AimControlsBar: View {
     @Binding var sheet: AimSheet?
     var axis: Axis = .horizontal
     @Environment(AppModel.self) private var app
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// The two columns of a wide HUD.
     private static let columns = [GridItem(.fixed(66), spacing: 6), GridItem(.fixed(66), spacing: 6)]
+    /// The four columns of the bar with larger text, which has no room for all the buttons in one row.
+    private static let wrappedColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
 
     var body: some View {
         if axis == .horizontal {
-            HStack(spacing: 6) { buttons }
+            if dynamicTypeSize > .large {
+                LazyVGrid(columns: Self.wrappedColumns, spacing: 6) { buttons }
+            } else {
+                HStack(spacing: 6) { buttons }
+            }
         } else {
             LazyVGrid(columns: Self.columns, spacing: 6) { buttons }
                 .frame(width: 2 * 66 + 6)

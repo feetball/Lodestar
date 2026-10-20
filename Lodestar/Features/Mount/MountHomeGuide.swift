@@ -74,7 +74,8 @@ struct MountHomeDrawing: View {
                 context.stroke(shaft, with: .color(line), lineWidth: 3)
                 context.fill(Path(ellipseIn: CGRect(x: point(92, 92).x, y: point(92, 92).y, width: 16 * unit, height: 16 * unit)),
                              with: .color(highlight))
-                context.draw(Text("counterweight").font(.caption2).foregroundStyle(line), at: point(146, 98))
+                // Level with the weight and right of the tripod's leg, which runs through x 118 to 128 at that height.
+                context.draw(Text("counterweight").font(.caption2).foregroundStyle(line), at: point(134, 100), anchor: .leading)
             }
         }
         .aspectRatio(200.0 / 120.0, contentMode: .fit)

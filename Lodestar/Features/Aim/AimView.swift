@@ -43,6 +43,13 @@ private struct AimScreen: View {
         let configuration = AimConfiguration(app: app)
         let skyInputs = model.skyInputs(for: configuration)
         content
+            // The `TabView` does not hand the bottom inset of the app's tab bar (`AppTabBar`, set up in `RootView`) on
+            // to its tabs, so the display ended behind the bar. An invisible bar of the same layout, in the same
+            // place, keeps the display above the real one at every text size; the sky still runs under it.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                AppTabBar(selection: .constant(.aim))
+                    .hidden()
+            }
             .screenBackground(palette)
             .sheet(item: $sheet) { sheet in
                 sheetContent(sheet)
@@ -134,10 +141,15 @@ private struct AimStage: View {
                 palette.background
                 CameraPreviewView(isWanted: model.configuration.wantsCameraPreview)
                 SkyOverlayView(model: model, isActive: isActive)
-                GuidanceArrowView(model: model, isActive: isActive)
             }
             .ignoresSafeArea()
             GuidanceHUD(model: model, sheet: $sheet, isActive: isActive)
+                // The arrow lies between the sky and the display, as before, and reads from the display where it
+                // leaves the sky free, so that the big number inside the ring is never under one of its cards.
+                .backgroundPreferenceValue(AimFreeSpaceKey.self) { freeSpace in
+                    GuidanceArrowView(model: model, isActive: isActive, freeSpace: freeSpace)
+                        .ignoresSafeArea()
+                }
             AimAccessibilitySummary(model: model, isActive: isActive)
         }
         .contentShape(Rectangle())
