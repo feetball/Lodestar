@@ -165,7 +165,7 @@ final class CatalogSmallBodySearchTests: XCTestCase {
         let bundled = try bundled()
         let group = catalog.objects(in: .solarSystem)
         let listedSmall = catalog.smallBodies.filter(\.isListed)
-        XCTAssertEqual(group.count, 9 + listedSmall.count)
+        XCTAssertEqual(group.count, 10 + listedSmall.count)
         XCTAssertTrue(bundled.objects(in: .solarSystem).allSatisfy { group.contains($0) })
         XCTAssertTrue(listedSmall.allSatisfy { group.contains($0) })
         XCTAssertFalse(group.contains { $0.id == "asteroid.2024 YR4" }, "an obscure asteroid is not listed")

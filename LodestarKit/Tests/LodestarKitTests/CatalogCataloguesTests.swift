@@ -535,6 +535,8 @@ final class CatalogCataloguesTests: XCTestCase {
         for id in ["sun", "moon", "planet.mars", "planet.neptune", "special.galacticCenter", "special.ncp", "special.scp"] {
             XCTAssertEqual(try obj(id).prominence, .showpiece, id)
         }
+        XCTAssertEqual(try obj("planet.pluto").prominence, .notable, "a dwarf planet at magnitude 14")
+        XCTAssertTrue(try obj("planet.pluto").isListed)
         XCTAssertEqual(try obj("star.hip32349").prominence, .showpiece, "Sirius")
         XCTAssertEqual(try obj("star.hip11767").prominence, .prominent, "Polaris, magnitude 2.0")
         for star in catalog.objects where star.id.hasPrefix("star.") {
