@@ -228,7 +228,7 @@ final class CatalogMalformedDataTests: XCTestCase {
 
     func testAMinimalCatalogWorks() throws {
         let catalog = try CatalogFixture.syntheticCatalog()
-        XCTAssertEqual(catalog.objects.count, 9 + 3 + 1 + 1)
+        XCTAssertEqual(catalog.objects.count, 10 + 3 + 1 + 1)
         XCTAssertEqual(catalog.renderStars.count, 1)
         XCTAssertEqual(catalog.constellations.map(\.abbreviation), ["Ori"])
         XCTAssertEqual(catalog.object(id: "star.hip1")?.constellationName, "Orion")
@@ -552,7 +552,7 @@ final class CatalogMalformedDataTests: XCTestCase {
             let count = (try? CatalogFixture.syntheticCatalog().objects.count) ?? -1
             box.add(count)
         }
-        XCTAssertEqual(box.counts(), Array(repeating: 14, count: 8))
+        XCTAssertEqual(box.counts(), Array(repeating: 15, count: 8))
     }
 
     func testRandomDamageToTheRealFilesNeverCrashes() throws {

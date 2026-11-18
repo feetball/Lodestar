@@ -214,10 +214,26 @@ STARS = (
 )
 STAR_BY_NAME = {star.name: star for star in STARS}
 
-BODY_KEYS = ("sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune")
+BODY_KEYS = (
+    "sun",
+    "moon",
+    "mercury",
+    "venus",
+    "mars",
+    "jupiter",
+    "saturn",
+    "uranus",
+    "neptune",
+    "pluto",
+)
+# Mercury to Neptune and Pluto (a dwarf planet, listed with the planets like LodestarKit does).
 PLANET_KEYS = BODY_KEYS[2:]
+# Skyfield's magnitudelib (Mallama and Hilton 2018) has no model for Pluto.
+NO_MAGNITUDE_MODEL_KEYS = ("pluto",)
 # DE440s has no body-centre segments for Mars and the outer planets, only system
-# barycentres (offset from the planet centre by at most ~200 km, i.e. < 0.07 arcsecond).
+# barycentres.  The offset from the planet centre is at most ~200 km (< 0.07 arcsecond) for
+# Mars to Neptune.  Pluto's centre is 2,131 km from the Pluto-Charon barycentre, which is
+# 0.07 arcsecond at 42 AU and 0.10 arcsecond at 28.7 AU (the closest approach of 1950-2049).
 EPHEMERIS_TARGET_NAMES = {
     "sun": "sun",
     "moon": "moon",
@@ -228,6 +244,7 @@ EPHEMERIS_TARGET_NAMES = {
     "saturn": "saturn barycenter",
     "uranus": "uranus barycenter",
     "neptune": "neptune barycenter",
+    "pluto": "pluto barycenter",
 }
 
 
@@ -573,7 +590,7 @@ def heliocentric_distance_au(sky: Sky, key: str, t: Time, light_time_days: float
 
 
 def build_bodies(sky: Sky) -> dict[str, Any]:
-    """Build bodies_apparent.json: 9 bodies x 50 instants, each instant at one site."""
+    """Build bodies_apparent.json: 10 bodies x 50 instants, each instant at one site."""
     observers = {site.key: sky.observer(site) for site in SITES}
     cases = []
     for i, moment in enumerate(sample_moments((J2000_NOON, TODAY), 48, seed_offset=3)):
@@ -620,18 +637,22 @@ def build_bodies(sky: Sky) -> dict[str, Any]:
                 case["heliocentric_distance_au"] = rounded(
                     heliocentric_distance_au(sky, key, t, astrometric.light_time), 12
                 )
-                magnitude = float(planetary_magnitude(astrometric))
-                case["apparent_magnitude"] = (
-                    rounded(magnitude, 3) if math.isfinite(magnitude) else None
-                )
+                if key not in NO_MAGNITUDE_MODEL_KEYS:
+                    magnitude = float(planetary_magnitude(astrometric))
+                    case["apparent_magnitude"] = (
+                        rounded(magnitude, 3) if math.isfinite(magnitude) else None
+                    )
             cases.append(case)
     return document(
         sky,
-        "Apparent geocentric and topocentric places of the Sun, Moon and planets.",
+        "Apparent geocentric and topocentric places of the Sun, Moon, planets and Pluto.",
         [
             "Bodies are DE440s targets: sun, moon, mercury and venus (body centres) and the "
-            "system barycentres of Mars, Jupiter, Saturn, Uranus and Neptune (DE440s has no "
-            "body-centre segments for these; the offset is below 0.07 arcsec).",
+            "system barycentres of Mars, Jupiter, Saturn, Uranus, Neptune and Pluto (DE440s has "
+            "no body-centre segments for these; the offset is below 0.07 arcsec for Mars to "
+            "Neptune). Pluto's centre lies 2,131 km from the Pluto-Charon barycentre (JPL "
+            "Horizons vectors, 999 relative to 9), which is 0.07 arcsec at 42 AU and 0.10 "
+            "arcsec at 28.7 AU, the closest the Pluto system comes to the Earth in 1950-2049.",
             "ra_apparent_j2000_deg, dec_apparent_j2000_deg: geocentric apparent direction "
             "(light time, light deflection, annual aberration) on the ICRS axes, which are the "
             "mean equator and equinox of J2000.0 to within 20 mas; this is the direction of "
@@ -648,11 +669,12 @@ def build_bodies(sky: Sky) -> dict[str, Any]:
             "position is taken at the observation instant). elongation_deg: angle between the "
             "geocentric apparent directions of the body and the Sun. All three are null for "
             "the Sun.",
-            "heliocentric_distance_au (planets only): Sun-planet distance with both bodies at "
+            "heliocentric_distance_au (Mercury to Pluto): Sun-planet distance with both bodies at "
             "the instant the light left the planet (observation time minus light time).",
-            "apparent_magnitude (planets only): Mallama and Hilton (2018) via Skyfield "
+            "apparent_magnitude (Mercury to Neptune): Mallama and Hilton (2018) via Skyfield "
             "magnitudelib; null if the model is undefined (NaN), which does not happen for "
-            "these instants.",
+            "these instants. Pluto: always null, because magnitudelib has no Pluto model "
+            "(Mallama and Hilton 2018 cover Mercury to Neptune).",
         ],
         sites=[site.description() for site in SITES],
         cases=cases,
@@ -1018,7 +1040,7 @@ def cross_check_riseset(sky: Sky, riseset: dict[str, Any]) -> tuple[float, float
 # ---------------------------------------------------------------------------------------
 
 HORIZONS_API = "https://ssd.jpl.nasa.gov/api/horizons.api"
-# Horizons commands: body centres, plus the system barycentres DE440s provides for Mars-Neptune.
+# Horizons commands: body centres, plus the system barycentres DE440s provides for Mars-Pluto.
 HORIZONS_CENTER = {
     "sun": "10",
     "moon": "301",
@@ -1029,8 +1051,16 @@ HORIZONS_CENTER = {
     "saturn": "699",
     "uranus": "799",
     "neptune": "899",
+    "pluto": "999",
 }
-HORIZONS_BARYCENTER = {"mars": "4", "jupiter": "5", "saturn": "6", "uranus": "7", "neptune": "8"}
+HORIZONS_BARYCENTER = {
+    "mars": "4",
+    "jupiter": "5",
+    "saturn": "6",
+    "uranus": "7",
+    "neptune": "8",
+    "pluto": "9",
+}
 
 
 def horizons_query(**parameters: str) -> str:

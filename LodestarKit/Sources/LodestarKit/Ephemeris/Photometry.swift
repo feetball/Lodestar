@@ -1,14 +1,15 @@
 import Foundation
 
 extension Ephemeris {
-    /// Apparent visual magnitudes of the Sun, Moon and planets.
+    /// Apparent visual magnitudes of the Sun, Moon, planets and Pluto.
     ///
     /// The planets follow A. Mallama & J. L. Hilton, "Computing Apparent Planetary Magnitudes for
     /// The Astronomical Almanac" (*Astronomy and Computing* 25, 2018; arXiv:1808.01973), section 3.
     /// There `r` is the Sun–planet and `d` the Earth–planet distance in AU and `α` the Sun–planet–Earth
     /// phase angle in degrees. Mars omits the sub-Earth-longitude and Ls corrections (about ±0.05 mag).
     /// Jupiter, Saturn, Uranus and Neptune use the equations for the phase angles seen from the
-    /// Earth (up to 12°, 6.5°, 3.1° and 1.9°).
+    /// Earth (up to 12°, 6.5°, 3.1° and 1.9°). Pluto is not in that paper; it uses the older Pluto-plus-Charon
+    /// law described on `pluto(sunDistance:earthDistance:phaseAngle:)`.
     enum Photometry {
         /// Visual magnitude of the Sun, −26.74 at 1 AU.
         static func sun(distanceAU: Double) -> Double {
@@ -22,7 +23,7 @@ extension Ephemeris {
             return -12.73 + 0.026 * α + 4e-9 * pow(α, 4) + 5 * log10(r * d / meanEarthDistanceAU)
         }
 
-        /// Visual magnitude of a planet, or `nil` for the Sun and the Moon.
+        /// Visual magnitude of a planet or Pluto, or `nil` for the Sun and the Moon.
         ///
         /// - Parameters:
         ///   - heliocentric: The planet's position relative to the Sun (J2000 equatorial, AU).
@@ -56,6 +57,8 @@ extension Ephemeris {
                               earthLatitude: planetographic(subLatitude(of: -geocentric, pole: pole)))
             case .neptune:
                 return neptune(sunDistance: r, earthDistance: d, year: julianDate.julianYearTT)
+            case .pluto:
+                return pluto(sunDistance: r, earthDistance: d, phaseAngle: α)
             }
         }
 
@@ -108,6 +111,21 @@ extension Ephemeris {
         static func neptune(sunDistance r: Double, earthDistance d: Double, year: Double) -> Double {
             let brightness = year < 1980 ? -6.89 : (year <= 2000 ? -6.89 - 0.0054 * (year - 1980) : -7.00)
             return 5 * log10(r * d) + brightness
+        }
+
+        /// Visual magnitude of Pluto and Charon together, V = 5 log₁₀(r d) − 1.00 + 0.041 α, for the Sun–Pluto and
+        /// Earth–Pluto distances in AU and the Sun–Pluto–Earth phase angle α in degrees.
+        ///
+        /// Mallama & Hilton (2018) do not cover Pluto. The absolute magnitude V(1, 0) = −1.00 is the long-standing
+        /// value for the unresolved pair (NASA's Pluto fact sheet gives −1.0) and 0.041 mag/deg is the phase
+        /// coefficient that Binzel & Mulholland measured at α = 0.6°–1.7° (*Astronomical Journal* 89, 1759, 1984).
+        /// JPL Horizons' APmag for Pluto, whose value "includes Charon", follows the same line: 60 Horizons values
+        /// spread over 1900–2099 fit −1.0001 and 0.0411 with residuals within 0.0006 mag. Seen from the Earth Pluto
+        /// is always within 2° of full phase (0.01° to 1.96° from 1885 to 2100), so the straight line is never
+        /// stretched. Pluto's rotational light curve (a few tenths of a magnitude) and the mutual eclipses with
+        /// Charon are not modelled.
+        static func pluto(sunDistance r: Double, earthDistance d: Double, phaseAngle α: Double) -> Double {
+            5 * log10(r * d) - 1.00 + 0.041 * α
         }
 
         // MARK: Rotation poles

@@ -78,8 +78,8 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
     ///
     /// Deep-sky objects have the value of the data file (a record without one counts as `.notable`),
     /// stars follow their magnitude (`Prominence(starMagnitude:)`), comets and asteroids follow their
-    /// `estimatedPeakMagnitude` (`Prominence(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets, the
-    /// special directions and custom targets are showpieces.
+    /// `estimatedPeakMagnitude` (`Prominence(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets (but not
+    /// Pluto, a faint dwarf planet that is notable), the special directions and custom targets are showpieces.
     public let prominence: Prominence
     /// The object's numbers in the catalogues of `DeepSkyCatalogue`, in the order of `designations`
     /// (Messier, NGC, IC, then the others).
@@ -193,6 +193,7 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
         case .saturn: -0.2
         case .uranus: 5.7
         case .neptune: 7.8
+        case .pluto: 14.4
         }
     }
 

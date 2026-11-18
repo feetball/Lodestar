@@ -105,15 +105,15 @@ final class EphemerisMeeusTests: XCTestCase {
 
     // MARK: Planets
 
-    /// Distance ranges over 1900–2100 from DE440s, widened by a little.
+    /// Distance ranges over 2000–2065 (the grid below) from DE440s, widened by a little.
     func testPlanetDistancesStayWithinTheirOrbits() throws {
         let heliocentricRange: [SolarSystemBody: ClosedRange<Double>] = [
             .mercury: 0.30...0.47, .venus: 0.71...0.73, .mars: 1.37...1.67, .jupiter: 4.94...5.47,
-            .saturn: 9.0...10.1, .uranus: 18.2...20.15, .neptune: 29.7...30.4,
+            .saturn: 9.0...10.1, .uranus: 18.2...20.15, .neptune: 29.7...30.4, .pluto: 30.1...44.6,
         ]
         let geocentricRange: [SolarSystemBody: ClosedRange<Double>] = [
             .mercury: 0.54...1.46, .venus: 0.26...1.74, .mars: 0.37...2.68, .jupiter: 3.9...6.5,
-            .saturn: 7.9...11.1, .uranus: 17.2...21.1, .neptune: 28.7...31.4,
+            .saturn: 7.9...11.1, .uranus: 17.2...21.1, .neptune: 28.7...31.4, .pluto: 29.4...45.5,
         ]
         for (body, helio) in heliocentricRange {
             for step in 0..<120 {
@@ -224,8 +224,9 @@ final class EphemerisMeeusTests: XCTestCase {
                 XCTAssertGreaterThan(state.angularDiameterArcseconds, 0, message)
                 XCTAssertTrue((0..<360).contains(state.eclipticLongitudeOfDate), message)
                 XCTAssertTrue((-90...90).contains(state.eclipticLatitudeOfDate), message)
-                // Largest geocentric ecliptic latitudes: the Moon 5.3°, Venus 8.9°, the other planets less.
-                let latitudeLimit = body == .sun ? 0.001 : (body == .moon ? 5.4 : 9.5)
+                // Largest geocentric ecliptic latitudes: the Moon 5.3°, Venus 8.9°, Pluto 17.7° (its orbit is
+                // inclined 17.1° to the ecliptic), the other planets less.
+                let latitudeLimit = body == .sun ? 0.001 : (body == .moon ? 5.4 : (body == .pluto ? 18.0 : 9.5))
                 XCTAssertLessThan(abs(state.eclipticLatitudeOfDate), latitudeLimit, message)
 
                 XCTAssertEqual(state.heliocentricDistanceAU == nil, body == .sun, message)
@@ -276,13 +277,17 @@ final class EphemerisMeeusTests: XCTestCase {
     }
 
     func testStateForTimesFarFromToday() {
-        // The series are trigonometric, so they stay finite and sensible for thousands of years.
+        // The series are trigonometric, so they stay finite and sensible for thousands of years (Pluto's, which is
+        // only fitted to 1885-2099, is bounded too, but not accurate outside that span).
         for year in [-2000, -1000, 0, 1000, 1800, 2200, 3000, 4000] {
             let jd = JulianDate(ut: JulianDate.julianDay(year: year, month: 6, day: 1))
             for body in SolarSystemBody.allCases {
                 let state = Ephemeris.state(of: body, at: jd)
+                // Pluto's radius is 40.7241 ± 11.08 AU whatever the date (the sum of the term amplitudes), so its
+                // distance stays below 52.9 AU; Neptune and the rest stay below 35.
+                let farthest = body == .pluto ? 55.0 : 35.0
                 XCTAssertTrue(state.geocentricJ2000.isFinite, "\(body) in \(year)")
-                XCTAssertTrue(state.distanceAU > 0.002 && state.distanceAU < 35, "\(body) distance in \(year)")
+                XCTAssertTrue(state.distanceAU > 0.002 && state.distanceAU < farthest, "\(body) distance in \(year)")
             }
         }
     }
@@ -333,15 +338,17 @@ final class EphemerisMeeusTests: XCTestCase {
 
     func testSolarSystemBodyProperties() throws {
         XCTAssertEqual(SolarSystemBody.allCases.map(\.rawValue),
-                       ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune"])
+                       ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn", "uranus", "neptune", "pluto"])
         XCTAssertEqual(SolarSystemBody.allCases.map(\.displayName),
-                       ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune"])
-        XCTAssertEqual(SolarSystemBody.allCases.filter(\.isPlanet).count, 7)
+                       ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"])
+        XCTAssertEqual(SolarSystemBody.allCases.filter(\.isPlanet).count, 8)
+        XCTAssertTrue(SolarSystemBody.pluto.isPlanet)
         XCTAssertFalse(SolarSystemBody.sun.isPlanet)
         XCTAssertFalse(SolarSystemBody.moon.isPlanet)
         XCTAssertEqual(SolarSystemBody.moon.meanRadiusKilometers, 1737.4, accuracy: 0.05)
         XCTAssertEqual(SolarSystemBody.sun.meanRadiusKilometers, 695_700, accuracy: 1)
         XCTAssertEqual(SolarSystemBody.jupiter.meanRadiusKilometers, 69_911, accuracy: 1)
+        XCTAssertEqual(SolarSystemBody.pluto.meanRadiusKilometers, 1_188.3, accuracy: 0.05)
         for body in SolarSystemBody.allCases {
             XCTAssertGreaterThan(body.meanRadiusKilometers, 0)
             let data = try JSONEncoder().encode(body)

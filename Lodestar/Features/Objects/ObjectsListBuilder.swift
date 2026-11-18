@@ -175,8 +175,8 @@ enum ObjectsListBuilder {
         if options.showsOnlyAboveHorizon, positions[object.id]?.isAboveHorizon != true {
             return false
         }
-        // A comet or an asteroid has no catalog magnitude: its current one decides.
-        let magnitude = object.magnitude ?? (object.smallBody == nil ? nil : positions[object.id]?.magnitude)
+        // A planet, a comet or an asteroid has no catalog magnitude: its current one decides.
+        let magnitude = object.magnitude ?? (object.isSolarSystem ? positions[object.id]?.magnitude : nil)
         if options.hidesFaintObjects, let magnitude, magnitude > ObjectsListOptions.faintMagnitudeLimit {
             return false
         }
