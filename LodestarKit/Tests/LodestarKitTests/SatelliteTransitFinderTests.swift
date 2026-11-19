@@ -135,10 +135,10 @@ final class SatelliteTransitFinderTests: XCTestCase {
             // Measured with the kit's own look and SkyFrame, not the finder.
             let measured = try separation(transit.body, moved, transit.date)
             XCTAssertLessThan(measured, 0.02, "separation \(measured)")
-            // And found again from there, as a transit from the site itself.
+            // And found again from there, as a transit from the site itself, with its own centreline right there.
             let again = SatelliteTransitFinder.transits(
                 satellite: ground, body: transit.body, observer: moved, from: transit.date.addingTimeInterval(-900),
-                to: transit.date.addingTimeInterval(900), maxGroundDistanceMeters: 0
+                to: transit.date.addingTimeInterval(900), maxGroundDistanceMeters: 1_000
             )
             XCTAssertEqual(again.count, 1)
             let here = try XCTUnwrap(again.first)
