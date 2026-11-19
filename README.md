@@ -33,7 +33,10 @@ tilt the tripod head until it is in your frame.
   open the page that belongs to them.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
-  targets of the night, and a polar-scope clock for star trackers.
+  targets of the night, and a polar-scope clock for star trackers. A **Sky quality** card estimates the
+  Bortle class of the site offline from satellite night-light imagery, points to the darkest direction and
+  scores the night for imaging (dark hours, Moon, sky brightness and, when the forecast is on, clouds); the
+  same estimate shows on every site, and the sky chart can draw a thin glow ring on the horizon.
 - **Events calendar** — meteor showers (with hourly rates and the radiant's altitude from your site), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
   and where to look and a button to aim at it.
@@ -192,5 +195,5 @@ rounded to about 10 km. GoTo mount control talks to the mount on the local netwo
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation
 figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025
 (public domain). Planetary theory VSOP87 (Bretagnon & Francou); Pluto and lunar theory after
-J. Meeus. Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
+J. Meeus. Night lights: NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP). Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
 and [Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.
