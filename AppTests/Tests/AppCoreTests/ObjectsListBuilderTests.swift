@@ -7,7 +7,7 @@ import LodestarKit
 /// A small synthetic catalog with known names, magnitudes, prominences and catalogue numbers, built from the JSON of the
 /// real data files (so every object goes through the engine's own loading code).
 ///
-/// Listed objects (browse list, 28 of them): the nine solar-system bodies, the three special objects, the stars
+/// Listed objects (browse list, 29 of them): the ten solar-system bodies, the three special objects, the stars
 /// "Alpha Test" (0.5), "Beta Test" (2.5), "Gamma Test" (4.5) and "Faint Named" (10.5), and the deep-sky objects M 31, M 42,
 /// M 13, NGC 7000, B 33, NGC 891, NGC 2000, NGC 2001, Cl 399, the LMC (no catalogue number) and the twins NGC 100 and
 /// NGC 101 (both named "Twin Cluster", magnitude 7). Not listed: the unnamed stars HIP 1005 and HIP 1007 (both 6.0),
@@ -22,8 +22,8 @@ private enum ObjectsBuilderFixture {
     static let browseNames = [
         "Alpha Test", "Andromeda Galaxy", "Beta Test", "Coathanger", "Faint Named", "Galactic Center", "Gamma Test",
         "Hercules Cluster", "Horsehead Nebula", "Jupiter", "Large Magellanic Cloud", "Mars", "Mercury", "Moon", "Neptune",
-        "NGC 891", "NGC 2000", "NGC 2001", "North America Nebula", "North Celestial Pole", "Orion Nebula", "Saturn",
-        "South Celestial Pole", "Sun", "Twin Cluster", "Twin Cluster", "Uranus", "Venus",
+        "NGC 891", "NGC 2000", "NGC 2001", "North America Nebula", "North Celestial Pole", "Orion Nebula", "Pluto",
+        "Saturn", "South Celestial Pole", "Sun", "Twin Cluster", "Twin Cluster", "Uranus", "Venus",
     ]
 
     static func catalog(smallBodies: Bool = false) throws -> Catalog {
@@ -150,7 +150,8 @@ private enum ObjectsBuilderFixture {
                           isBehindSkyline: false, usesSkyline: false)
     }
 
-    /// Positions that give the Sun, the Moon and the planets a current magnitude, as the position model does.
+    /// Positions that give the Sun, the Moon and the planets a current magnitude, as the position model does. Pluto
+    /// gets none, so it sorts with the objects that have no magnitude.
     static func solarSystemPositions() -> [String: ObjectSkyPosition] {
         let magnitudes: [String: Double] = [
             "sun": -26.7, "moon": -12.7, "planet.venus": -4.4, "planet.jupiter": -2.7, "planet.saturn": 0.2,
@@ -185,7 +186,7 @@ final class ObjectsListBuilderSectionTests: XCTestCase {
         XCTAssertEqual(sections.map(\.title), ["Solar System", "Stars", "Galaxies", "Nebulae", "Star Clusters", "Special"])
         XCTAssertEqual(sections.map(\.systemImage), ["sun.max", "star", "hurricane", "cloud", "sparkles", "scope"])
         XCTAssertEqual(sections[0].objects.map(\.name),
-                       ["Jupiter", "Mars", "Mercury", "Moon", "Neptune", "Saturn", "Sun", "Uranus", "Venus"])
+                       ["Jupiter", "Mars", "Mercury", "Moon", "Neptune", "Pluto", "Saturn", "Sun", "Uranus", "Venus"])
         XCTAssertEqual(sections[1].objects.map(\.name), ["Alpha Test", "Beta Test", "Faint Named", "Gamma Test"])
         XCTAssertEqual(sections[2].objects.map(\.name), ["Andromeda Galaxy", "Large Magellanic Cloud", "NGC 891"])
         XCTAssertEqual(sections[3].objects.map(\.name), ["Horsehead Nebula", "North America Nebula", "Orion Nebula"])
@@ -207,7 +208,8 @@ final class ObjectsListBuilderSectionTests: XCTestCase {
         XCTAssertEqual(sections[1].objects.map(\.name),
                        ["Beta Test", "Hercules Cluster", "Horsehead Nebula", "North America Nebula"])
         XCTAssertEqual(sections[2].objects.map(\.name),
-                       ["Coathanger", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Twin Cluster", "Twin Cluster"])
+                       ["Coathanger", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Pluto", "Twin Cluster",
+                        "Twin Cluster"])
         XCTAssertEqual(sections[3].objects.map(\.name), ["Faint Named"])
     }
 
@@ -231,7 +233,7 @@ final class ObjectsListBuilderSectionTests: XCTestCase {
         XCTAssertEqual(sections[0].objects.map(\.name), ObjectsBuilderFixture.browseNames)
         let catalog = try ObjectsBuilderFixture.catalog()
         XCTAssertEqual(Set(sections[0].objects.map(\.id)), Set(catalog.listedObjects.map(\.id)))
-        XCTAssertEqual(sections[0].objects.count, 28)
+        XCTAssertEqual(sections[0].objects.count, 29)
     }
 
     func testCometsAndAsteroidsGetASectionEachInsideTheSolarSystemGroup() throws {
@@ -244,7 +246,7 @@ final class ObjectsListBuilderSectionTests: XCTestCase {
         XCTAssertEqual(sections[1].systemImage, "sparkle")
         XCTAssertEqual(sections[2].systemImage, "circle.fill")
         // The Solar System section keeps the Sun, the Moon and the planets only.
-        XCTAssertEqual(sections[0].objects.count, 9)
+        XCTAssertEqual(sections[0].objects.count, 10)
         XCTAssertTrue(sections[0].objects.allSatisfy { $0.smallBody == nil })
         XCTAssertEqual(sections[1].objects.map(\.name), ["C/2099 A1 (Test Comet)", "C/2099 B2 (Dim Comet)"])
         XCTAssertEqual(sections[2].objects.map(\.name), ["(9999) Testrock"])
@@ -256,7 +258,7 @@ final class ObjectsListBuilderSectionTests: XCTestCase {
         XCTAssertTrue(rows.contains("comet.C/2099 A1"))
         XCTAssertTrue(rows.contains("comet.C/2099 B2"))
         XCTAssertTrue(rows.contains("asteroid.9999"))
-        XCTAssertEqual(rows.count, 28 + 3)
+        XCTAssertEqual(rows.count, 29 + 3)
     }
 
     func testTheSolarSystemSectionIsLeftOutWhenOnlyCometsRemain() throws {
@@ -366,7 +368,21 @@ final class ObjectsListBuilderFilterTests: XCTestCase {
         let shown = try names(ObjectsBuilderFixture.options(hideFaint: true))
         let removed = ["NGC 891", "NGC 2001", "Faint Named"]
         XCTAssertEqual(shown, ObjectsBuilderFixture.browseNames.filter { !removed.contains($0) })
-        XCTAssertEqual(shown.count, 25)
+        XCTAssertEqual(shown.count, 26)
+    }
+
+    func testHideFaintRemovesPlutoByItsCurrentMagnitudeAndKeepsUranusAndNeptune() throws {
+        // Pluto (about 14.4) is the one planet past the limit. Without a position it has no magnitude and stays.
+        let positions = [
+            "planet.pluto": ObjectsBuilderFixture.position(20, magnitude: 14.4),
+            "planet.uranus": ObjectsBuilderFixture.position(20, magnitude: 5.7),
+            "planet.neptune": ObjectsBuilderFixture.position(20, magnitude: 7.8),
+        ]
+        let shown = try names(ObjectsBuilderFixture.options(hideFaint: true), positions: positions)
+        XCTAssertFalse(shown.contains("Pluto"))
+        XCTAssertTrue(shown.contains("Uranus"))
+        XCTAssertTrue(shown.contains("Neptune"))
+        XCTAssertTrue(try names(ObjectsBuilderFixture.options(hideFaint: true)).contains("Pluto"))
     }
 
     func testHideFaintKeepsAnObjectExactlyAtTheLimit() throws {
@@ -408,8 +424,8 @@ final class ObjectsListBuilderFilterTests: XCTestCase {
 
     func testPopularOnlyKeepsShowpieceAndProminentObjects() throws {
         let shown = try names(ObjectsBuilderFixture.options(popular: true))
-        let removed = ["Coathanger", "Faint Named", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Twin Cluster",
-                       "Twin Cluster"]
+        let removed = ["Coathanger", "Faint Named", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Pluto",
+                       "Twin Cluster", "Twin Cluster"]
         XCTAssertEqual(shown, ObjectsBuilderFixture.browseNames.filter { !removed.contains($0) })
         XCTAssertEqual(shown.count, 20)
         XCTAssertEqual(ObjectsListOptions.popularProminence, .prominent)
@@ -427,7 +443,8 @@ final class ObjectsListBuilderFilterTests: XCTestCase {
         let notFaint = try names(ObjectsBuilderFixture.options(hideFaint: true))
         XCTAssertEqual(shown, popular.filter { notFaint.contains($0) })
         XCTAssertEqual(shown, ObjectsBuilderFixture.browseNames.filter {
-            !["Coathanger", "Faint Named", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Twin Cluster"].contains($0)
+            !["Coathanger", "Faint Named", "Gamma Test", "NGC 891", "NGC 2000", "NGC 2001", "Pluto",
+              "Twin Cluster"].contains($0)
         })
     }
 
@@ -496,8 +513,8 @@ final class ObjectsListBuilderFilterTests: XCTestCase {
         let up = Set(try ObjectsBuilderFixture.rows(ObjectsBuilderFixture.options(aboveHorizon: true), positions: positions))
         let sharp = Set(try ObjectsBuilderFixture.rows(ObjectsBuilderFixture.options(hideFaint: true), positions: positions))
         let popular = Set(try ObjectsBuilderFixture.rows(ObjectsBuilderFixture.options(popular: true), positions: positions))
-        XCTAssertEqual(up.count, 14)
-        XCTAssertEqual(sharp.count, 25)
+        XCTAssertEqual(up.count, 15)
+        XCTAssertEqual(sharp.count, 26)
         XCTAssertEqual(popular.count, 20)
         for useUp in [false, true] {
             for useSharp in [false, true] {
@@ -668,11 +685,11 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
             "dso.NGC2001", "dso.B33", "dso.Cl399",
             // No catalogue number: last, in name order.
             "star.hip1001", "star.hip1002", "star.hip1006", "special.galacticCenter", "star.hip1003", "planet.jupiter",
-            "dso.ESO56-115", "planet.mars", "planet.mercury", "moon", "planet.neptune", "special.ncp", "planet.saturn",
-            "special.scp", "sun", "planet.uranus", "planet.venus",
+            "dso.ESO56-115", "planet.mars", "planet.mercury", "moon", "planet.neptune", "special.ncp", "planet.pluto",
+            "planet.saturn", "special.scp", "sun", "planet.uranus", "planet.venus",
         ]
         XCTAssertEqual(try rows(.number), expected)
-        XCTAssertEqual(expected.count, 28)
+        XCTAssertEqual(expected.count, 29)
     }
 
     func testNumberOrderUsesTheFirstCatalogueInTheNumberingOrder() throws {
@@ -692,11 +709,11 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
             "dso.NGC7000", "dso.M42", "star.hip1003", "planet.uranus", "dso.M13",
             // The twins are both 7.0: name, then identifier.
             "dso.NGC100", "dso.NGC101", "planet.neptune", "dso.NGC2000", "dso.NGC2001", "star.hip1006", "dso.NGC891",
-            // Without a magnitude: last, in name order.
-            "special.galacticCenter", "dso.B33", "special.ncp", "special.scp",
+            // Without a magnitude (the fixture gives Pluto none): last, in name order.
+            "special.galacticCenter", "dso.B33", "special.ncp", "planet.pluto", "special.scp",
         ]
         XCTAssertEqual(try rows(.brightness, positions: ObjectsBuilderFixture.solarSystemPositions()), expected)
-        XCTAssertEqual(expected.count, 28)
+        XCTAssertEqual(expected.count, 29)
     }
 
     func testBrightnessOrderOfTheObjectsWithCatalogMagnitudesDoesNotNeedPositions() throws {
@@ -710,7 +727,7 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
         // They come before the dark nebula, which has no magnitude at all.
         let lastWithMagnitude = try XCTUnwrap(ids.firstIndex(of: "dso.NGC891"))
         XCTAssertLessThan(lastWithMagnitude, try XCTUnwrap(ids.firstIndex(of: "dso.B33")))
-        XCTAssertEqual(ids.count, 28)
+        XCTAssertEqual(ids.count, 29)
     }
 
     func testBrightnessOrderUsesThePositionsMagnitudeOfACometInsteadOfNone() throws {
@@ -738,7 +755,7 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
         ]
         let ids = try rows(.brightness, positions: positions)
         XCTAssertEqual(Array(ids.prefix(5)), ["sun", "planet.venus", "planet.jupiter", "dso.ESO56-115", "star.hip1001"])
-        XCTAssertEqual(ids.count, 28)
+        XCTAssertEqual(ids.count, 29)
     }
 
     func testProminenceOrderStartsWithShowpiecesAndSortsEachLevelByBrightness() throws {
@@ -749,13 +766,14 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
             "special.galacticCenter", "special.ncp", "special.scp",
             // Prominent: Beta Test 2.5, NGC 7000 4.0, M 13 5.8, then the dark nebula without a magnitude.
             "star.hip1002", "dso.NGC7000", "dso.M13", "dso.B33",
-            // Notable.
+            // Notable: Pluto last, as the fixture gives it no magnitude.
             "dso.Cl399", "star.hip1003", "dso.NGC100", "dso.NGC101", "dso.NGC2000", "dso.NGC2001", "dso.NGC891",
+            "planet.pluto",
             // Obscure.
             "star.hip1006",
         ]
         XCTAssertEqual(try rows(.prominence, positions: ObjectsBuilderFixture.solarSystemPositions()), expected)
-        XCTAssertEqual(expected.count, 28)
+        XCTAssertEqual(expected.count, 29)
     }
 
     func testProminenceOrderKeepsLevelsApartWhateverTheMagnitudes() throws {
@@ -765,7 +783,7 @@ final class ObjectsListBuilderOrderTests: XCTestCase {
             return try XCTUnwrap(catalog.object(id: id)).prominence.rawValue
         }
         XCTAssertEqual(levels, levels.sorted())
-        XCTAssertEqual(ids.count, 28)
+        XCTAssertEqual(ids.count, 29)
     }
 
     func testSortingIsWithinASectionWhenObjectsAreGrouped() throws {
@@ -1027,6 +1045,6 @@ final class ObjectsCatalogIndexTests: XCTestCase {
         let index = ObjectsCatalogIndex(catalog: try ObjectsBuilderFixture.catalog(smallBodies: true))
         XCTAssertEqual(index.rank(of: "comet.C/2099 C3"), Int.max)
         XCTAssertLessThan(index.rank(of: "comet.C/2099 A1"), Int.max)
-        XCTAssertEqual(index.listed.count, 28 + 3)
+        XCTAssertEqual(index.listed.count, 29 + 3)
     }
 }

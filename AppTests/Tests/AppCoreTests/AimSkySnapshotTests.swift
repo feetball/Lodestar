@@ -147,10 +147,11 @@ final class AimSkySnapshotTests: XCTestCase {
 
     // MARK: The Sun, the Moon and the planets
 
-    func testTheSolarSystemBodiesAreTheSunTheMoonAndTheSevenPlanets() throws {
+    func testTheSolarSystemBodiesAreTheSunTheMoonTheSevenPlanetsAndPluto() throws {
         let snapshot = try baseline()
         XCTAssertEqual(snapshot.bodies.map { $0.id }, ["sun", "moon", "planet.mercury", "planet.venus", "planet.mars",
-                                                       "planet.jupiter", "planet.saturn", "planet.uranus", "planet.neptune"])
+                                                       "planet.jupiter", "planet.saturn", "planet.uranus",
+                                                       "planet.neptune", "planet.pluto"])
     }
 
     func testObjectIdentifiersOfTheBodies() {
@@ -163,6 +164,7 @@ final class AimSkySnapshotTests: XCTestCase {
         XCTAssertEqual(SkySnapshotBuilder.objectID(for: .saturn), "planet.saturn")
         XCTAssertEqual(SkySnapshotBuilder.objectID(for: .uranus), "planet.uranus")
         XCTAssertEqual(SkySnapshotBuilder.objectID(for: .neptune), "planet.neptune")
+        XCTAssertEqual(SkySnapshotBuilder.objectID(for: .pluto), "planet.pluto")
     }
 
     func testEveryBodyStandsWhereTheEngineSaysItIsSeenRefracted() throws {
