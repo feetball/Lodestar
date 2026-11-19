@@ -18,9 +18,9 @@ final class SatelliteTransitFinderTests: XCTestCase {
     private let from = SatelliteTestSupport.iso("2026-11-19T17:00:00Z")
     private var to: Date { from.addingTimeInterval(14 * 86_400) }
 
-    private static let timeTolerance = 1.5
-    private static let distanceTolerance = 1_500.0
-    private static let bearingTolerance = 3.0
+    private static let timeTolerance = 0.25
+    private static let distanceTolerance = 500.0
+    private static let bearingTolerance = 1.0
 
     private func satellite() throws -> Satellite {
         let batch = try ElementSetParser.parseTwoLineText(Support.fixtureText("satellite_iss_transit.tle"))
@@ -67,7 +67,7 @@ final class SatelliteTransitFinderTests: XCTestCase {
             ("2026-11-25T02:17:56.29Z", 40_162.7, 241.9),
         ]
         for (transit, reference) in zip(found, expected) {
-            // UT1 = UTC and no polar motion in the kit: about a second and a few hundred metres.
+            // The kit takes UT1 = UTC and ignores polar motion; the two searches agree to a few milliseconds and tens of metres.
             XCTAssertEqual(
                 transit.date.timeIntervalSince1970, Self.referenceTime(reference.0), accuracy: Self.timeTolerance
             )
@@ -91,7 +91,7 @@ final class SatelliteTransitFinderTests: XCTestCase {
         let ground = try satellite()
         for transit in found {
             XCTAssertTrue(transit.date >= from && transit.date <= to)
-            let radius: ClosedRange<Double> = transit.body == .sun ? 0.2725...0.2745 : 0.24...0.30
+            let radius: ClosedRange<Double> = transit.body == .sun ? 0.2615...0.2725 : 0.24...0.30
             XCTAssertTrue(radius.contains(transit.bodyAngularRadius), "radius \(transit.bodyAngularRadius)")
             XCTAssertEqual(
                 transit.satelliteAngularSize, 109.0 / (transit.satelliteRangeKilometers * 1000.0) * 180.0 / Double.pi,
@@ -210,8 +210,8 @@ final class SatelliteTransitFinderTests: XCTestCase {
             ), []
         )
         // The Moon is down in the morning window.
-        let moonStart = Support.iso("2026-11-20T10:00:00Z")
-        let moonEnd = Support.iso("2026-11-20T16:00:00Z")
+        let moonStart = Support.iso("2026-11-20T12:00:00Z")
+        let moonEnd = Support.iso("2026-11-20T17:00:00Z")
         XCTAssertFalse(
             SatellitePassFinder(
                 observer: boulder, interval: DateInterval(start: moonStart, end: moonEnd), minimumAltitude: 3.0

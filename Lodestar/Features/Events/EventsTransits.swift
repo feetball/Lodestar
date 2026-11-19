@@ -51,7 +51,7 @@ enum EventsTransits {
     }
 
     /// The transits of the Sun and the Moon by `satellites` in the `horizonDays` days from `start`, from `observer`'s
-    /// site or within `maxGroundDistanceMeters` of it, by time. About a quarter of a second on a phone: run it off the
+    /// site or within `maxGroundDistanceMeters` of it, by time. A few hundred milliseconds on a phone: run it off the
     /// main actor.
     static func compute(satellites: [PassSatellite], observer: Observer, start: Date) -> [EventsTransitItem] {
         let end = start.addingTimeInterval(horizonDays * 86_400)

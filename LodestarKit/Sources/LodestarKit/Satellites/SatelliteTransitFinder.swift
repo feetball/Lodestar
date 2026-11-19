@@ -109,7 +109,7 @@ public struct SatelliteTransit: Hashable, Sendable {
 /// observers keep the elevation of the original one; terrain is not known to the engine.
 ///
 /// **Cost.** Bounded by passes × samples: about 100 samples per pass and a few hundred evaluations (2 µs each) per
-/// kept candidate. A 14-day search for the ISS takes about 20 ms on a desktop and well under a second on a phone.
+/// kept candidate. A 14-day search of the Sun and the Moon for the ISS takes about 30 ms on a desktop and well under a second on a phone.
 ///
 /// **Accuracy.** The element set decides: an along-track error of a few km grows 1–3 km a day for the ISS, which
 /// is 0.3 s a day of timing and a few km of centreline position. Use element sets that are a day or two old and
@@ -528,7 +528,8 @@ final class SatelliteTransitSearch {
         let dz = there.z - here.z
         let east = site.eastX * dx + site.eastY * dy
         let north = site.northX * dx + site.northY * dy + site.northZ * dz
-        let distance = (east * east + north * north).squareRoot()
+        // The Earth-fixed positions are in kilometres.
+        let distance = (east * east + north * north).squareRoot() * 1000.0
         if distance > maxGround { return nil }
         let bearing = distance > 0.0 ? AstroMath.normalizeDegrees(AstroMath.atan2Deg(east, north)) : 0.0
         return Centreline(
