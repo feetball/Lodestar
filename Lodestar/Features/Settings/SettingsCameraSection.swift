@@ -2,7 +2,8 @@ import SwiftUI
 import LodestarKit
 
 /// Settings ▸ Camera & Lens: the sensor, lens and pixel size of the camera on the tripod, used for the framing
-/// rectangle on the Aim screen and by the exposure tools, with a live field-of-view readout.
+/// rectangle on the Aim screen and by the exposure tools, with a live field-of-view readout, and the filter in front
+/// of the sensor, which relaxes the Moon warnings for emission nebulae.
 struct SettingsCameraSection: View {
     /// The identifier stored when the user picks a sensor that is not a preset.
     private static let customSensorID = "custom"
@@ -19,7 +20,8 @@ struct SettingsCameraSection: View {
         SettingsSection(
             title: "Camera & Lens",
             footer: "Describe the camera on the tripod, not the phone. The framing rectangle on the Aim screen and "
-                + "the exposure tools use these values.") {
+                + "the exposure tools use these values. Narrowband filters make emission nebulae usable under "
+                + "moonlight; Lodestar relaxes its Moon warnings for them.") {
             SettingsMenuPicker(title: "Sensor", selection: $store.settings.sensorID,
                                options: sensorOptions(storedID: store.settings.sensorID))
             if isCustomSensor {
@@ -37,6 +39,13 @@ struct SettingsCameraSection: View {
             SettingsMegapixelsHelper(sensor: app.lensSetup.sensor, pixelPitch: $store.settings.pixelPitch,
                                      range: Self.pixelPitchRange)
             SettingsFieldOfViewReadout(setup: app.lensSetup)
+            VStack(alignment: .leading, spacing: 4) {
+                SettingsMenuPicker(title: "Filter", selection: $store.settings.imagingFilter,
+                                   options: ImagingFilter.allCases.map {
+                                       SettingsMenuOption(title: $0.displayName, value: $0)
+                                   })
+                SettingsCaption(store.settings.imagingFilter.summary)
+            }
             SettingsToggleRow(
                 title: "Camera preview",
                 caption: "Shows the iPhone's camera behind the sky on the Aim screen. Lodestar asks for camera access "
