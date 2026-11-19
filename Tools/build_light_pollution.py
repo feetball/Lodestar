@@ -548,7 +548,7 @@ def main():
         sys.exit("error: the output (sha256 %s) differs from the lock; use --refresh-lock after a change of the method"
                  % output_sha256)
     for path in outputs:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "wb") as out:
             out.write(blob)
         print("wrote %s: %d bytes" % (path, len(blob)))
