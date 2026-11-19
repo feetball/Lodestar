@@ -94,7 +94,7 @@ struct ObjectDetailPhotographyCard: View {
     @ViewBuilder
     private func moonRows(for moon: ObjectDetailMoonConditions) -> some View {
         let filter = app.settings.imagingFilter
-        let assessment = moon.geometry.assess(filter: filter, kind: object.category)
+        let assessment = moon.geometry.assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
         let advice = moonAdvice(for: assessment, filter: filter)
         InfoRow(label: moon.isNow ? "Moon now" : "Moon at \(AppFormat.time(moon.date, in: timeZone))",
                 value: moonSummary(moon, assessment: assessment))

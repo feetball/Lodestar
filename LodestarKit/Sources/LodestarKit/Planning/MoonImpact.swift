@@ -171,9 +171,9 @@ public enum MoonImpact {
     /// Whether a target of this category shines mainly in emission lines, so that a filter can separate it from
     /// moonlight: emission nebulae (OpenNGC `HII`, `EmN`), planetary nebulae (`PN`), supernova remnants (`SNR`) and
     /// clusters with nebulosity (`Cl+N`, which are embedded in emission nebulae). Wolf-Rayet shells and similar are
-    /// typed `HII` or `EmN` in the catalog. The generic nebula (`Neb`) is left out because that type mixes emission
-    /// and reflection nebulae; so are dark and reflection nebulae, galaxies, clusters, stars, the Milky Way and every
-    /// solar-system body.
+    /// typed `HII` or `EmN` in the catalog. The generic nebula (`Neb`) is left out here because that type mixes
+    /// emission and reflection nebulae (see `isEmissionLineTarget(_:)` for an object, which tells them apart); so are
+    /// dark and reflection nebulae, galaxies, clusters, stars, the Milky Way and every solar-system body.
     public static func isEmissionLineTarget(_ objectKind: ObjectCategory) -> Bool {
         switch objectKind {
         case .emissionNebula, .planetaryNebula, .supernovaRemnant, .clusterWithNebula:
@@ -181,6 +181,25 @@ public enum MoonImpact {
         default:
             return false
         }
+    }
+
+    /// Whether `object` shines mainly in emission lines: its category is one of `isEmissionLineTarget(_:)`'s, or it is
+    /// a generic nebula (OpenNGC `Neb`) that carries a Sharpless number (`Sh2-25` for M8). Sharpless's catalogue lists
+    /// H II regions only (Sharpless 1959, "A Catalogue of H II Regions", ApJS 4, 257), so a generic nebula in it is an
+    /// emission nebula, where the other generic nebulae (the Iris Nebula, the Merope Nebula) are reflection nebulae.
+    /// The catalogue numbers of the object decide; no object is named.
+    public static func isEmissionLineTarget(_ object: CelestialObject) -> Bool {
+        isEmissionLineTarget(assessmentKind(of: object))
+    }
+
+    /// The kind to hand to `assess(moonAltitude:separation:illuminatedFraction:filter:objectKind:)` for `object`: its
+    /// category, except that a generic nebula with a Sharpless number counts as an emission nebula (see
+    /// `isEmissionLineTarget(_:)` for an object).
+    public static func assessmentKind(of object: CelestialObject) -> ObjectCategory {
+        if object.category == .nebula, object.catalogues.contains(.sharpless) {
+            return .emissionNebula
+        }
+        return object.category
     }
 
     /// How much a target at `level` counts when targets are ranked: 1 for a dark sky, falling to 0.4 for a severe

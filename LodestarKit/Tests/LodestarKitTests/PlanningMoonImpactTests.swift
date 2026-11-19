@@ -119,6 +119,55 @@ final class PlanningMoonImpactTests: XCTestCase {
         }
     }
 
+    func testGenericNebulaeWithASharplessNumberAreEmissionLineTargets() throws {
+        let catalog = try CatalogFixture.catalog()
+        let generic = catalog.deepSkyObjects.filter { $0.category == .nebula }
+        let sharpless = generic.filter { $0.catalogues.contains(.sharpless) }
+        // The data decides: a generic nebula counts exactly when it has a Sharpless number.
+        XCTAssertGreaterThanOrEqual(sharpless.count, 5)
+        XCTAssertLessThan(sharpless.count, generic.count)
+        for nebula in generic {
+            XCTAssertEqual(MoonImpact.isEmissionLineTarget(nebula), sharpless.contains(nebula), nebula.id)
+            XCTAssertFalse(MoonImpact.isEmissionLineTarget(nebula.category), nebula.id)
+        }
+        // The Lagoon (Sh2-25) and Trifid (Sh2-30) nebulae are generic nebulae in the catalog and H II regions in the sky;
+        // the Iris Nebula (Caldwell 4, no Sharpless number) is a reflection nebula.
+        let lagoon = try XCTUnwrap(catalog.object(id: "dso.M8"))
+        let trifid = try XCTUnwrap(catalog.object(id: "dso.M20"))
+        let iris = try XCTUnwrap(catalog.object(id: "dso.NGC7023"))
+        XCTAssertEqual(lagoon.category, .nebula)
+        XCTAssertTrue(MoonImpact.isEmissionLineTarget(lagoon))
+        XCTAssertTrue(MoonImpact.isEmissionLineTarget(trifid))
+        XCTAssertFalse(MoonImpact.isEmissionLineTarget(iris))
+        // A full-ish Moon 50° away is severe for all three; the narrowband filter relaxes the two H II regions only.
+        func level(_ target: CelestialObject) -> Level {
+            assess(50, 0.9, .narrowband, MoonImpact.assessmentKind(of: target))
+        }
+        XCTAssertEqual(level(lagoon), .minor)
+        XCTAssertEqual(level(trifid), .minor)
+        XCTAssertEqual(level(iris), .severe)
+    }
+
+    func testTheAssessmentKindIsTheCategoryExceptForSharplessNebulae() throws {
+        let catalog = try CatalogFixture.catalog()
+        for object in catalog.deepSkyObjects {
+            let isSharplessNebula = object.category == .nebula && object.catalogues.contains(.sharpless)
+            XCTAssertEqual(MoonImpact.assessmentKind(of: object), isSharplessNebula ? .emissionNebula : object.category,
+                           object.id)
+            // Whatever the kind, the object overload and the category overload agree on it.
+            XCTAssertEqual(MoonImpact.isEmissionLineTarget(object),
+                           MoonImpact.isEmissionLineTarget(MoonImpact.assessmentKind(of: object)), object.id)
+        }
+        // Sharpless numbers on other categories change nothing: a reflection nebula stays one.
+        let reflection = catalog.deepSkyObjects.filter {
+            $0.category == .reflectionNebula && $0.catalogues.contains(.sharpless)
+        }
+        XCTAssertFalse(reflection.isEmpty)
+        for object in reflection {
+            XCTAssertFalse(MoonImpact.isEmissionLineTarget(object), object.id)
+        }
+    }
+
     func testTargetsWithoutEmissionLinesAreNeverRelaxed() {
         for kind in otherKinds {
             for filter in ImagingFilter.allCases {

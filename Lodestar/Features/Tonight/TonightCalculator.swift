@@ -104,7 +104,7 @@ enum TonightCalculator {
             guard let peak = visibility.maxAltitudeDuringDarkness, peak >= minimumTargetAltitude,
                   let bestTime = visibility.bestTime else { continue }
             let moon = ObjectMoonGeometry(of: object, observer: summary.observer, at: bestTime)
-                .assess(filter: filter, kind: object.category)
+                .assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
             candidates.append((object, visibility, peak,
                                score(of: object, peakAltitude: peak) * MoonImpact.moonFreeWeight(level: moon.level),
                                moon))
