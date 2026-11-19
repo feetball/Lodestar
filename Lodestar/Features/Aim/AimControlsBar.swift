@@ -1,8 +1,8 @@
 import SwiftUI
 import LodestarKit
 
-/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, in a row or, in a wide HUD, in two
-/// columns.
+/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, and with several camera profiles the
+/// frame menu, in a row or, in a wide HUD, in two columns.
 struct AimControlsBar: View {
     let model: AimViewModel
     @Binding var sheet: AimSheet?
@@ -63,6 +63,10 @@ struct AimControlsBar: View {
         .accessibilityValue(nightMode.title)
         .accessibilityHint("Cycles between off, on and after sunset.")
         AimFieldOfViewButton(model: model, minHeight: buttonHeight)
+        // Switching between cameras at the tripod needs more than one profile.
+        if app.settings.cameraProfiles.count > 1 {
+            AimFrameMenu(minHeight: buttonHeight)
+        }
     }
 
     private func control(_ title: String, systemImage: String, isOn: Bool = false,
@@ -138,5 +142,45 @@ private struct AimFieldOfViewButton: View {
         let rounded = (factor * 10).rounded() / 10
         let digits = rounded == rounded.rounded() ? 0 : 1
         return rounded.formatted(.number.precision(.fractionLength(digits))) + "\u{00D7}"
+    }
+}
+
+/// The frame button: a menu of the camera profiles for switching between bodies and lenses at the tripod. The frame on
+/// the sky follows the one chosen.
+private struct AimFrameMenu: View {
+    @Environment(AppModel.self) private var app
+    let minHeight: CGFloat
+
+    var body: some View {
+        let settings = app.settings
+        Menu {
+            Picker("Camera and lens", selection: activeProfile) {
+                ForEach(settings.cameraProfiles) { profile in
+                    Text(profile.name).tag(profile.id)
+                }
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 20, weight: .medium))
+                Text("Frame")
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 2)
+        }
+        .menuStyle(.button)
+        .buttonStyle(AimControlButtonStyle(minHeight: minHeight))
+        .accessibilityLabel("Camera frame")
+        .accessibilityValue(settings.activeCameraProfile.name)
+        .accessibilityHint("Choose the camera and lens.")
+    }
+
+    /// The active profile; choosing another one switches the frame.
+    private var activeProfile: Binding<UUID> {
+        Binding(
+            get: { app.settings.activeCameraProfile.id },
+            set: { app.settingsStore.activateCameraProfile($0) })
     }
 }

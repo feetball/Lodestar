@@ -169,17 +169,8 @@ final class AppModel {
         MountProfile.presets.first { $0.id == settings.mountPresetID } ?? .backCameraPortrait
     }
 
-    /// The camera body + lens used for the framing rectangle and exposure tools.
-    var lensSetup: LensSetup {
-        let sensor: SensorFormat
-        if let preset = SensorFormat.presets.first(where: { $0.id == settings.sensorID }) {
-            sensor = preset
-        } else {
-            sensor = SensorFormat.custom(width: settings.customSensorWidth, height: settings.customSensorHeight)
-        }
-        return LensSetup(sensor: sensor, focalLengthMillimeters: settings.focalLength,
-                         aperture: settings.aperture, pixelPitchMicrometers: settings.pixelPitch)
-    }
+    /// The camera body + lens used for the framing rectangle and exposure tools: the active camera profile.
+    var lensSetup: LensSetup { settings.activeCameraProfile.lensSetup }
 
     // MARK: Lifecycle
 

@@ -374,7 +374,9 @@ struct AimMosaicSheet: View {
             planSource = .custom(width: customWidth, height: customHeight, center: customCenter)
         }
         return AimMosaicRequest(source: planSource, overlap: overlapPercent / 100, orientation: chosenOrientation,
-                                frame: app.lensSetup.fieldOfView, observer: context.observer, date: snapshotDate)
+                                frame: app.lensSetup.fieldOfView,
+                                lensIsRectilinear: app.lensSetup.projection == .rectilinear,
+                                observer: context.observer, date: snapshotDate)
     }
 
     // MARK: Actions

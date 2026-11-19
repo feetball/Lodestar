@@ -85,7 +85,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Check how a target will sit in your picture before you set up. The Sky tab can hold your camera\u{2019}s frame in the middle while you move the sky under it."),
             .steps([
-                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from them.",
+                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from the profile in use. A fisheye lens gets a curved frame.",
                 "On the **Sky** tab, open the layers menu. Turn on **Camera view**, then **Frame in the middle**.",
                 "Drag to move the frame over the sky and pinch to zoom, up to 15\u{00D7}. Zoomed in, large deep-sky objects are drawn near their real size. The frame stays on the same stars as time passes, so use the time bar to see how it will look later.",
                 "Turn the frame by twisting two fingers, or press and hold on the chart, then drag around the middle. It snaps at 0\u{00B0}, 90\u{00B0}, 180\u{00B0} and 270\u{00B0}. The **90\u{00B0}** button gives a quarter turn, for a portrait frame.",
@@ -98,7 +98,7 @@ extension HelpContent {
             ]),
             .caution("The frame is drawn from your camera and lens in Settings. If those are wrong, so is the frame. Below the horizon, only the part above it is drawn."),
         ],
-        related: [.skyChart, .aimScreen, .glossary])
+        related: [.skyChart, .aimScreen, .cameraAndLens, .glossary])
 
     private static let mosaic = HelpTopic(
         topic: .mosaic, category: .planning, title: "Mosaic planner", systemImage: "square.grid.3x3",
@@ -115,7 +115,7 @@ extension HelpContent {
                 "Tap **Finish** to end the mosaic.",
             ]),
             .tip("An object\u{2019}s page tells you when it needs a mosaic with your lens."),
-            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars."),
+            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars. It also needs a rectilinear lens: with a fisheye profile in Settings the planner says so."),
         ],
         related: [.planFraming, .aimScreen])
 

@@ -1,6 +1,29 @@
 import Foundation
 
 extension HelpContent {
+    private static let cameraAndLens = HelpTopic(
+        topic: .cameraAndLens, category: .equipment, title: "Cameras and lenses", systemImage: "camera",
+        summary: "A profile for each camera and lens, and a quick switch between them.",
+        keywords: ["camera", "lens", "profile", "sensor", "focal length", "aperture", "pixel pitch", "fisheye", "seestar", "dwarf", "vespera", "smart telescope", "preset", "exif", "photo", "frame", "crop factor", "image circle"],
+        blocks: [
+            .paragraph("Lodestar draws the frame of your picture on the sky, and works out how long you can expose, from the camera and lens you describe. A **profile** holds one camera and lens. Keep one for each body and lens you use, and switch between them in a tap."),
+            .steps([
+                "Open **Settings** \u{25B8} **Camera & Lens**. The profile with the check mark is the one in use. Tap another to use it, or tap the pencil to edit it.",
+                "Tap **Add Preset\u{2026}** for a smart telescope (Seestar, Dwarf or Vespera) or a plain full-frame camera to start from. The numbers are the makers\u{2019} published ones. Check them and tap **Save**.",
+                "Or tap **From a Photo\u{2026}** and choose a picture you took. Lodestar reads the camera, focal length and aperture from it, picks the closest sensor from the crop factor and estimates the pixel pitch. It shows what it read, so you can correct it before you save. The picture is not kept, and no permission is needed.",
+                "To remove a profile, swipe it to the left, or open it and tap **Delete Camera\u{2026}**. One profile always stays.",
+            ]),
+            .bullets([
+                "**Lens type**: **Rectilinear** is any ordinary lens. The three fisheye types draw the frame as a curve, because a fisheye sees more than a rectangle can show. For a circular fisheye whose picture is a circle smaller than the sensor, enter the circle\u{2019}s diameter as the **Image circle**.",
+                "The **pixel pitch** is the spacing of the sensor\u{2019}s photosites. The NPF exposure rule and the image scale need it. Enter the resolution and Lodestar works it out from the sensor size.",
+                "With more than one profile, a **Frame** button on the Aim screen switches between them.",
+                "The exposure tools use the real focal length of a profile, fisheye or not. A mosaic needs a rectilinear lens: with a fisheye profile the mosaic planner says so.",
+            ]),
+            .tip("A smart telescope has fixed optics, so its preset is usually all you need."),
+            .caution("The frame and the exposure numbers are only as good as the profile. If the frame on the sky looks too big or too small, check the focal length and the sensor."),
+        ],
+        related: [.aimScreen, .planFraming, .trailsAndExposure, .glossary])
+
     private static let mounts = HelpTopic(
         topic: .mounts, category: .equipment, title: "GoTo mounts", systemImage: "antenna.radiowaves.left.and.right",
         summary: "Slew a GoTo mount to your target over Wi-Fi.",
@@ -99,8 +122,10 @@ extension HelpContent {
                 HelpTerm(term: "Azimuth", meaning: "The compass direction of an object, in degrees clockwise from north. East is 90\u{00B0}, south 180\u{00B0} and west 270\u{00B0}."),
                 HelpTerm(term: "Conjunction", meaning: "Two objects that look close together in the sky, such as a planet and the Moon."),
                 HelpTerm(term: "Declination", meaning: "The sky\u{2019}s latitude, in degrees north (+) or south (\u{2212}) of the celestial equator."),
+                HelpTerm(term: "Camera profile", meaning: "A camera and lens saved in Settings: the sensor, focal length, aperture, pixel size and lens type. The one in use gives the frame on the sky and the exposure numbers. See Cameras and lenses."),
                 HelpTerm(term: "Elongation", meaning: "How far a planet or comet is from the Sun in the sky. A small elongation means it is lost in the Sun\u{2019}s glare."),
                 HelpTerm(term: "Field of view", meaning: "How much sky your camera\u{2019}s picture covers, worked out from the sensor and the focal length. It is written as width \u{00D7} height in degrees."),
+                HelpTerm(term: "Fisheye", meaning: "A lens that sees a very wide view by bending straight lines. Its frame on the sky is a curve, and a circular fisheye\u{2019}s is a circle."),
                 HelpTerm(term: "Greatest elongation", meaning: "The moment Mercury or Venus is farthest from the Sun in the sky. It is the best time to see it."),
                 HelpTerm(term: "Gyro Lock", meaning: "A heading from the gyroscope instead of the compass, so tripod heads and camera bodies can no longer disturb it. It drifts slowly. See Compass, Gyro Lock and accuracy."),
                 HelpTerm(term: "Magnitude", meaning: "How bright an object is. The lower the number, the brighter it is, and negative numbers are very bright. The faintest stars seen with the eye are about magnitude 6."),
@@ -120,5 +145,5 @@ extension HelpContent {
         related: [.planFraming, .alignment])
 
     /// The topics of "Equipment" and "More".
-    static let more: [HelpTopic] = [mounts, nightMode, onlineData, widgets, troubleshooting, glossary]
+    static let more: [HelpTopic] = [cameraAndLens, mounts, nightMode, onlineData, widgets, troubleshooting, glossary]
 }

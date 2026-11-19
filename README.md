@@ -12,7 +12,10 @@ tilt the tripod head until it is in your frame.
   pointing the shortest way, "Pan right 23.4° / Tilt up 12.1°" read-outs for pan-tilt heads, the
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
   closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
-  With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
+  Keep a **camera profile** for each body and lens, start from a smart-telescope preset (Seestar, Dwarf,
+  Vespera) or read a profile from a photo's EXIF data, and switch with one tap; a **fisheye** lens gets a
+  curved or circular frame. With no target it names what is in the middle of the picture, and the camera
+  picture zooms up to 8×.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Optional **Gyro Lock** keeps the heading on the gyroscope so
