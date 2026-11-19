@@ -190,9 +190,9 @@ def fetch_tiles(cache, lock, refresh):
     def one(key):
         path = os.path.join(cache, key.replace("/", "_") + ".png")
         pinned = None if refresh or lock is None else lock["tiles"].get(key)
-        if os.path.exists(path):
+        if not refresh and os.path.exists(path):
             digest = sha256_of(path)
-            if refresh or (pinned and digest == pinned["sha256"] and os.path.getsize(path) == pinned["bytes"]):
+            if pinned and digest == pinned["sha256"] and os.path.getsize(path) == pinned["bytes"]:
                 return key, path, digest, os.path.getsize(path)
         if not refresh and pinned is None:
             sys.exit("error: tile %s is not in the lock; use --refresh-lock" % key)
