@@ -47,6 +47,9 @@ struct ObjectDetailCurrent: Sendable {
     /// A comet's or asteroid's distances, elongation, phase, magnitude estimate, warnings and tail; `nil` when its
     /// orbit cannot be evaluated.
     var smallBody: SmallBodyDetail?
+    /// The hour angle and the transits around now; `nil` for a celestial pole and for a body whose orbit cannot be
+    /// evaluated.
+    var meridian: ObjectDetailMeridian?
 }
 
 /// One point of the altitude curve.

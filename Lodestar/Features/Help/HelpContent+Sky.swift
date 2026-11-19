@@ -6,7 +6,7 @@ extension HelpContent {
     private static let objects = HelpTopic(
         topic: .objects, category: .sky, title: "Finding objects", systemImage: "sparkles",
         summary: "Search, browse and favorite planets, nebulae and stars.",
-        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets"],
+        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets", "hour angle", "meridian", "transit"],
         blocks: [
             .paragraph("The **Objects** tab is the catalog of what Lodestar can aim at, from planets to faint nebulae. Find a target here, then send it to the Aim screen."),
             .bullets([
@@ -14,7 +14,7 @@ extension HelpContent {
                 "**Browse** by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters and Special (the Milky Way core and the celestial poles). Asteroids, and comets if you switch them on in **Settings** \u{25B8} **Online Data**, are under Solar System.",
                 "**Chips** above the list limit it to one catalog, such as Messier. **The menu** at the top right sorts by name, brightness, altitude or rise time, and filters with **Above Horizon Now**, **Hide Faint** and **Popular Only**.",
                 "**Swipe** a row right to favorite it, or left to aim at it. Favorites and recents are listed first. The **+** button adds a custom target from a right ascension and declination, the sky\u{2019}s coordinates.",
-                "**Tap a row** for the object\u{2019}s page. It shows where the object is now, and when it rises, reaches its highest point and sets, with an altitude chart. It also shows how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
+                "**Tap a row** for the object\u{2019}s page. It shows where the object is now, with its hour angle (negative east of the meridian, the line from north to south across the sky, and positive west of it) and when it crosses that line. It also shows when the object rises, reaches its highest point and sets, with an altitude chart. Then come how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
             ]),
             .caution("The Sun is listed under Solar System. Never point a camera at it without a certified solar filter."),
         ],
