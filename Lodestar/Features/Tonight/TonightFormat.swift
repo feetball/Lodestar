@@ -104,7 +104,7 @@ enum TonightFormat {
         }
     }
 
-    /// Type, constellation, magnitude and size on one line: "Galaxy · Andromeda · mag 3.4 · 178′ × 70′".
+    /// Type, constellation, magnitude and size on one line: "Galaxy · Andromeda · mag 3.4 · 2° 58′ × 1° 10′".
     static func description(of object: CelestialObject) -> String {
         var parts = [object.category.displayName]
         if let constellation = object.constellationName {
