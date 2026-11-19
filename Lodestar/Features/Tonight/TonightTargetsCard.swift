@@ -34,8 +34,9 @@ struct TonightTargetsCard: View {
                 }
                 TonightTargetRow(target: target, timeZone: timeZone)
             }
-            TonightNote(text: "Ranked by height in the dark, brightness and size. Only objects that climb above "
-                        + "\(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} are listed.", style: .footnote)
+            TonightNote(text: "Ranked by height in the dark, brightness and size, and lower where the Moon spoils the "
+                        + "sky. Only objects that climb above \(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} "
+                        + "are listed.", style: .footnote)
             if targets.contains(where: { $0.note != nil }) {
                 TonightNote(text: SmallBodyText.targetsNote, style: .footnote)
             }
@@ -92,6 +93,9 @@ private struct TonightTargetRow: View {
                     Text(timing)
                         .font(.footnote)
                         .foregroundStyle(palette.tertiaryText)
+                    if let moon = target.moon {
+                        moonChip(for: moon)
+                    }
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
@@ -118,6 +122,21 @@ private struct TonightTargetRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(spokenSummary)
         .accessibilityHint("Opens details")
+    }
+
+    /// What the Moon does to the target at its best time: "Moon down", "Moon: moderate", "Moon: fine with your filter".
+    /// A label rather than a capsule, so that it wraps in the narrow text column instead of being cut off.
+    private func moonChip(for moon: ObjectMoonAssessment) -> some View {
+        let appearance: (symbol: String, color: Color)
+        switch moon.level {
+        case .moonDown: appearance = ("moon.zzz", palette.positive)
+        case .minor: appearance = ("moon", moon.isRelaxed ? palette.positive : palette.secondaryText)
+        case .moderate: appearance = ("moon.fill", palette.warning)
+        case .severe: appearance = ("exclamationmark.triangle", palette.critical)
+        }
+        return Label(ObjectMoonText.chip(moon), systemImage: appearance.symbol)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(appearance.color)
     }
 
     /// The name, with the first catalog designation when it differs: "Andromeda Galaxy · M 31".
@@ -151,6 +170,9 @@ private struct TonightTargetRow: View {
         } else {
             parts.append("\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above"
                          + " \(Int(TonightCalculator.minimumTargetAltitude)) degrees")
+        }
+        if let moon = target.moon {
+            parts.append(ObjectMoonText.chip(moon))
         }
         return parts.joined(separator: ", ")
     }

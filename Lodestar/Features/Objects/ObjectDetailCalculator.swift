@@ -258,33 +258,16 @@ enum ObjectDetailCalculator {
         }
     }
 
-    /// How the Moon affects the object: now while the sky is dark, otherwise at the object's best time tonight.
+    /// Where the Moon is relative to the object: now while the sky is dark, otherwise at the object's best time
+    /// tonight.
     ///
-    /// The impact is a rule of thumb from the Moon's illuminated fraction and its distance from the object.
+    /// `ObjectMoonGeometry.assess(filter:kind:)` turns it into a level for the user's filter.
     static func moonConditions(for object: CelestialObject, observer: Observer, night: ObjectDetailNight,
                                now: Date) -> ObjectDetailMoonConditions? {
         guard object.category != .sun, object.category != .moon else { return nil }
         let isDark = night.darkness?.contains(now) ?? false
         let date = isDark ? now : (night.bestInDarkness?.date ?? now)
-        let frame = SkyFrame(date: date, observer: observer)
-        let moon = frame.horizontal(of: .moon, refraction: false)
-        let separation = frame.horizontal(of: object, refraction: false).angularSeparation(to: moon)
-        let illuminatedFraction = frame.state(of: .moon).illuminatedFraction ?? 0
-        let impact = moonImpact(moonAltitude: moon.altitude, separation: separation,
-                                illuminatedFraction: illuminatedFraction)
-        return ObjectDetailMoonConditions(date: date, isNow: date == now, separation: separation,
-                                          illuminatedFraction: illuminatedFraction, impact: impact)
-    }
-
-    private static func moonImpact(moonAltitude: Double, separation: Double,
-                                   illuminatedFraction: Double) -> ObjectDetailMoonConditions.Impact {
-        guard moonAltitude > 0 else { return .moonDown }
-        // Moonlight scatters across the whole sky but is strongest near the Moon.
-        let proximity = min(max(1 - separation / 120, 0.25), 1)
-        switch illuminatedFraction * proximity {
-        case 0.5...: return .severe
-        case 0.2...: return .moderate
-        default: return .minor
-        }
+        return ObjectDetailMoonConditions(date: date, isNow: date == now,
+                                          geometry: ObjectMoonGeometry(of: object, observer: observer, at: date))
     }
 }

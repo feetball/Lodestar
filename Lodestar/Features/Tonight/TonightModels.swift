@@ -22,6 +22,8 @@ struct TonightInput: Sendable {
     let now: Date
     /// The sky catalog, or `nil` while it is still loading.
     let catalog: Catalog?
+    /// The filter in front of the sensor, which relaxes the Moon's weight for emission nebulae.
+    var imagingFilter: ImagingFilter = .none
 }
 
 /// A deep-sky object ranked for the night.
@@ -42,6 +44,8 @@ struct TonightTarget: Identifiable, Sendable {
     /// `TonightCalculator.minimumTargetAltitude` high (the same number as `hoursAboveMinimum`, named for the skyline);
     /// `nil` for an open horizon.
     var unobstructedHours: Double?
+    /// What the Moon does to the target at `peakTime`, with the user's filter; `nil` for comets and asteroids.
+    var moon: ObjectMoonAssessment?
 
     var id: String { object.id }
 }
