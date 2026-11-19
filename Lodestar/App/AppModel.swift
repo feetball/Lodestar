@@ -57,6 +57,10 @@ final class AppModel {
     /// Star-alignment corrections for the current mount and heading source.
     var alignment: AlignmentModel = .identity
 
+    /// When the current alignment was made: the time of its newest point, or `nil` without an alignment. It follows
+    /// the alignment, so a reset clears it, and removing a point never makes an old alignment look fresh.
+    var alignedAt: Date? { alignment.points.map(\.timestamp).max() }
+
     /// Keeps the motion sensors running outside the Aim and Sky tabs (e.g. Sensor Diagnostics).
     var keepsMotionRunning = false {
         didSet { if keepsMotionRunning != oldValue { syncServices() } }

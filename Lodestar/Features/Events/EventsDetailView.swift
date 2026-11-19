@@ -24,6 +24,9 @@ struct EventsDetailView: View {
                     EventsSafetyNotice()
                 }
                 EventsActionsCard(entry: entry, subjects: EventsCalculator.aimSubjects(of: event, now: now))
+                if case .meteorShower(let peak) = event.details, let observerContext = context {
+                    EventsMeteorCameraCard(event: event, shower: peak.shower, context: observerContext)
+                }
                 EventsFactsCard(entry: entry, isSouthernHemisphere: isSouthern, timeZone: timeZone)
                 EventsWhenCard(entry: entry, timeZone: timeZone, placeName: context?.name)
                 EventsContactsCard(entry: entry, timeZone: timeZone)
