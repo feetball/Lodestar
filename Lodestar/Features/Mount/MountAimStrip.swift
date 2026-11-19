@@ -97,6 +97,7 @@ struct MountAimStrip: View {
             }
             progress(status, target: target)
             skyWatcherLines
+            MountMeridianChip()
             messageLine
             actions(target: target)
         }

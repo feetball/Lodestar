@@ -23,6 +23,9 @@ struct ObjectDetailPhotographyCard: View {
             if let framing = photography.framing {
                 framingRow(framing, in: photography.frame)
             }
+            if let bodySize = photography.bodySize {
+                bodySizeRow(bodySize)
+            }
             exposureRows(for: photography)
             if let moon = snapshot?.moon {
                 moonRows(for: moon)
@@ -69,6 +72,28 @@ struct ObjectDetailPhotographyCard: View {
         }
         let panels = "\(framing.longSidePanels) \u{00D7} \(framing.shortSidePanels)"
         return "Larger than the frame: needs a mosaic of about \(panels) panels"
+    }
+
+    /// "46″ across · about 11 px at 200 mm" for a disc of the Sun, the Moon or a planet.
+    private func bodySizeRow(_ size: ObjectDetailBodySize) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(bodySizeText(size))
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+            if size.assumedPixelPitch {
+                Text("Assumes \(trimmed(ExposureCalculator.defaultPixelPitchMicrometers)) \u{00B5}m pixels: yours are not set.")
+                    .font(.caption)
+                    .foregroundStyle(palette.tertiaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func bodySizeText(_ size: ObjectDetailBodySize) -> String {
+        let pixels = size.pixels < 1 ? "under 1 px" : "about \(Int(size.pixels.rounded())) px"
+        let angle = AppFormat.separation(size.diameterDegrees)
+        return "\(angle) across \u{00B7} \(pixels) at \(trimmed(lens.focalLengthMillimeters)) mm"
     }
 
     // MARK: Exposure
