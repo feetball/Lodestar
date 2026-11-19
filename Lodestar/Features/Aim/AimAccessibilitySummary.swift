@@ -3,6 +3,7 @@ import SwiftUI
 /// An invisible element for VoiceOver that says where the camera points relative to the target, refreshed once a
 /// second. The canvas and the live numbers are not accessible, and speaking them ten times a second would be noise.
 struct AimAccessibilitySummary: View {
+    @Environment(AppModel.self) private var app
     let model: AimViewModel
     let isActive: Bool
 
@@ -34,7 +35,7 @@ struct AimAccessibilitySummary: View {
     private func liveSummary() -> String {
         guard let frame = model.engine.frame() else { return "Waiting for the motion sensors." }
         let skyline = model.skyContent?.skyline.map {
-            " The sky overlay shades the ground below your recorded skyline, up to \(AimFormat.spoken($0.highestAltitude)) high."
+            " The sky overlay shades the ground below the \(HorizonText.spokenName(app.observerContext?.horizonSource)), up to \(AimFormat.spoken($0.highestAltitude)) high."
         } ?? ""
         let session = model.mosaicSession
         if session.isActive {

@@ -262,8 +262,8 @@ private struct SettingsSavedSiteRow: View {
                         .font(.footnote)
                         .foregroundStyle(palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
-                    if site.horizon != nil {
-                        Text("Horizon: \(HorizonText.status(of: site))")
+                    if site.horizon != nil || site.terrainHorizon != nil {
+                        Text("Horizon: \(HorizonText.summary(of: site))")
                             .font(.footnote)
                             .foregroundStyle(palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)

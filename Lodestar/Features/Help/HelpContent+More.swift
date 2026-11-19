@@ -36,15 +36,17 @@ extension HelpContent {
 
     private static let onlineData = HelpTopic(
         topic: .onlineData, category: .more, title: "Optional online data", systemImage: "arrow.down.circle",
-        summary: "Optional downloads for satellites, comets and cloud cover.",
-        keywords: ["internet", "download", "satellites", "starlink", "comets", "clouds", "forecast", "network"],
+        summary: "Optional downloads for satellites, comets, cloud cover and terrain.",
+        keywords: ["internet", "download", "satellites", "starlink", "comets", "clouds", "forecast", "network", "terrain",
+                   "elevation"],
         blocks: [
-            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets and a cloud forecast. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
+            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets, a cloud forecast and terrain horizons. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
             .bullets([
                 "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",
                 "**Comets** join the object list, the sky chart and Aim. About 164 KB from the Minor Planet Center.",
                 "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover, dew, wind, fog and temperature on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
+                "**Terrain horizons** work out the skyline of the hills around a saved site from elevation data. Nothing downloads until you ask in the site\u{2019}s editor: up to four tiles of about 11 MB each from AWS Open Data, deleted after the calculation. The tile server sees which 1\u{00B0} tiles you request, which is where the site is to within about 100 km.",
             ]),
             .tip("**Update now** refreshes a feed. CelesTrak answers repeated requests for unchanged data with an error, so the satellite lists wait at least two hours between requests. When it is too soon, the button is grayed out and says when the next update is possible."),
             .caution("Switching a feed off deletes what it downloaded. If a feed shows **The last update failed.**, Lodestar keeps the data it already has. Wait, then try **Update now** again."),

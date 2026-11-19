@@ -162,9 +162,11 @@ final class AppModel {
                                    timeZone: .autoupdatingCurrent, name: "Current Location", source: .device)
         case .site(let id):
             guard let site = settings.savedSites.first(where: { $0.id == id }) else { return nil }
+            // The recorded skyline and the terrain horizon, as they apply together (see SiteHorizon).
+            let skyline = SiteHorizon.resolve(site)
             return ObserverContext(observer: Observer(location: site.location, atmosphere: atmosphere),
                                    timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id),
-                                   horizon: site.horizon)
+                                   horizon: skyline.profile, horizonSource: skyline.source)
         }
     }
 
