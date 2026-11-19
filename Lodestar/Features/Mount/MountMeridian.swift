@@ -41,7 +41,8 @@ enum MountMeridian {
     /// The hour angle is the one of the place the mount points at; the limit is the driver's meridian limit when it has
     /// one (a Sky-Watcher mount: its overlap past the meridian), else 0°.
     static func chip(status: MountStatus, detail: MountDriverDetail?, observer: Observer, date: Date) -> Chip? {
-        guard let position = status.position, status.isTracking == true, status.phase == .idle else { return nil }
+        guard let position = status.position, status.isTracking == true, status.phase == .idle,
+              status.isMoving != true else { return nil }
         if detail?.arrangement == .altAzimuth || detail?.pierSide == .east { return nil }
         let apparent = SkyFrame(date: date, observer: observer).apparentPlace(j2000: position)
         let hourAngle = MeridianClock.hourAngle(of: apparent, at: date, observer: observer)
