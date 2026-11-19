@@ -184,6 +184,16 @@ struct ObjectDetailFraming: Sendable, Equatable {
     }
 }
 
+/// How large the disc of the Sun, the Moon or a planet is in the user's frame.
+struct ObjectDetailBodySize: Sendable, Equatable {
+    /// The apparent diameter in degrees.
+    let diameterDegrees: Double
+    /// The diameter in pixels of the image.
+    let pixels: Double
+    /// Whether the pixel pitch was assumed because the lens setup has none.
+    let assumedPixelPitch: Bool
+}
+
 /// How an object fits the user's lens and how long an exposure can be before stars trail.
 struct ObjectDetailPhotography: Sendable {
     /// The frame of the user's camera and lens, in landscape orientation.
@@ -193,4 +203,6 @@ struct ObjectDetailPhotography: Sendable {
     /// `nil` for the Sun and the Moon, for which star trails do not matter.
     let npf: ExposureEstimate?
     let rule500: ExposureEstimate?
+    /// `nil` unless the object is a solar-system body with a known apparent diameter.
+    let bodySize: ObjectDetailBodySize?
 }
