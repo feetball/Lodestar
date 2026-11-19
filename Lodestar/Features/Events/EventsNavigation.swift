@@ -10,5 +10,8 @@ extension View {
         .navigationDestination(for: EventsCalendarRoute.self) { _ in
             EventsCalendarView()
         }
+        .navigationDestination(for: EventsTransitItem.self) { item in
+            EventsTransitDetailView(item: item)
+        }
     }
 }
