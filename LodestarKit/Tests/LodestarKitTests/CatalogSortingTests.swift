@@ -82,9 +82,9 @@ final class CatalogSortingTests: XCTestCase {
         let sorted = catalog.sorted(catalog.objects, by: .magnitude)
         let names = sorted.map(\.name)
         // Solar-system bodies are placed by a typical peak magnitude, among the other objects.
-        XCTAssertEqual(Array(names.prefix(16)),
+        XCTAssertEqual(Array(names.prefix(17)),
                        ["Sun", "Moon", "Venus", "Jupiter", "Negative", "Mars", "Mercury", "Bright", "Saturn", "Middle", "Twin A",
-                        "Twin B", "Uranus", "Dim", "Neptune", "Faint Smudge"])
+                        "Twin B", "Uranus", "Dim", "Neptune", "Faint Smudge", "Pluto"])
         // Objects without a magnitude come last, ordered by name.
         let tail = sorted.suffix(5)
         XCTAssertTrue(tail.allSatisfy { $0.rankingMagnitude == .infinity })
@@ -98,10 +98,10 @@ final class CatalogSortingTests: XCTestCase {
         let catalog = try CatalogFixture.catalog()
         XCTAssertEqual(catalog.sorted(catalog.objects(in: .solarSystem), by: .magnitude).map(\.id),
                        ["sun", "moon", "planet.venus", "planet.jupiter", "planet.mars", "planet.mercury", "planet.saturn",
-                        "planet.uranus", "planet.neptune"])
+                        "planet.uranus", "planet.neptune", "planet.pluto"])
         XCTAssertEqual(catalog.sorted(catalog.objects(in: .solarSystem), by: .name).map(\.id),
-                       ["planet.jupiter", "planet.mars", "planet.mercury", "moon", "planet.neptune", "planet.saturn", "sun",
-                        "planet.uranus", "planet.venus"])
+                       ["planet.jupiter", "planet.mars", "planet.mercury", "moon", "planet.neptune", "planet.pluto",
+                        "planet.saturn", "sun", "planet.uranus", "planet.venus"])
     }
 
     func testSortingTheWholeCatalog() throws {

@@ -152,7 +152,7 @@ final class CatalogBundledAsteroidsTests: XCTestCase {
         let listed = catalog.smallBodies.filter(\.isListed)
         XCTAssertTrue((80...140).contains(listed.count), "\(listed.count)")
         XCTAssertTrue(try listed.allSatisfy { try XCTUnwrap($0.estimatedPeakMagnitude) <= Prominence.notableSmallBodyMagnitude })
-        XCTAssertEqual(catalog.objects(in: .solarSystem).count, 9 + listed.count)
+        XCTAssertEqual(catalog.objects(in: .solarSystem).count, 10 + listed.count)
         XCTAssertEqual(Set(catalog.smallBodies.map(\.prominence)), [.showpiece, .prominent, .notable, .obscure])
         // Downloaded elements replace the bundled ones: the last body with an identifier wins.
         let fresher = try XCTUnwrap(loaded.bodies.first { $0.id == "asteroid.4" })

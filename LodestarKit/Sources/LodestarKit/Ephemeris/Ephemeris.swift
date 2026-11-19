@@ -1,10 +1,13 @@
 import Foundation
 
-/// Apparent positions and physical ephemerides of the Sun, the Moon and the planets.
+/// Apparent positions and physical ephemerides of the Sun, the Moon, the planets and Pluto.
 ///
 /// Sources, all with light-time applied:
 /// - **Sun and planets**: truncated VSOP87B series for the Earth and each planet
 ///   (`PlanetaryTheory`; a few arcseconds against JPL's DE440s).
+/// - **Pluto**: the 43-term series of Meeus, chapter 37 (`PlutoTheory`), valid 1885–2099: at most 1.4″ against
+///   DE440s over 1950–2049, growing to about 3″ by 2099. Outside that span the error grows quickly (27″ in 1880,
+///   about 6′ in 2110, over 20′ by 2140), so Pluto's place in the far past or future is only roughly right.
 /// - **Moon**: the truncated ELP-2000/82 series of Meeus, chapter 47 (`LunarTheory`; about 10″).
 ///
 /// Times are `JulianDate`s; TT drives the theories, so a `JulianDate` built from a `Date` carries
@@ -27,19 +30,21 @@ public enum Ephemeris {
         case .moon:
             return moonState(earth, eclipticFrame: eclipticFrame)
         case .mercury:
-            return planetState(.mercury, .mercury, earth, eclipticFrame: eclipticFrame)
+            return planetState(.mercury, planetGeometry(.mercury, earth), earth, eclipticFrame: eclipticFrame)
         case .venus:
-            return planetState(.venus, .venus, earth, eclipticFrame: eclipticFrame)
+            return planetState(.venus, planetGeometry(.venus, earth), earth, eclipticFrame: eclipticFrame)
         case .mars:
-            return planetState(.mars, .mars, earth, eclipticFrame: eclipticFrame)
+            return planetState(.mars, planetGeometry(.mars, earth), earth, eclipticFrame: eclipticFrame)
         case .jupiter:
-            return planetState(.jupiter, .jupiter, earth, eclipticFrame: eclipticFrame)
+            return planetState(.jupiter, planetGeometry(.jupiter, earth), earth, eclipticFrame: eclipticFrame)
         case .saturn:
-            return planetState(.saturn, .saturn, earth, eclipticFrame: eclipticFrame)
+            return planetState(.saturn, planetGeometry(.saturn, earth), earth, eclipticFrame: eclipticFrame)
         case .uranus:
-            return planetState(.uranus, .uranus, earth, eclipticFrame: eclipticFrame)
+            return planetState(.uranus, planetGeometry(.uranus, earth), earth, eclipticFrame: eclipticFrame)
         case .neptune:
-            return planetState(.neptune, .neptune, earth, eclipticFrame: eclipticFrame)
+            return planetState(.neptune, planetGeometry(.neptune, earth), earth, eclipticFrame: eclipticFrame)
+        case .pluto:
+            return planetState(.pluto, plutoGeometry(earth), earth, eclipticFrame: eclipticFrame)
         }
     }
 
@@ -56,6 +61,7 @@ public enum Ephemeris {
         case .saturn: return planetGeometry(.saturn, EarthState(julianDate: julianDate)).apparent
         case .uranus: return planetGeometry(.uranus, EarthState(julianDate: julianDate)).apparent
         case .neptune: return planetGeometry(.neptune, EarthState(julianDate: julianDate)).apparent
+        case .pluto: return plutoGeometry(EarthState(julianDate: julianDate)).apparent
         }
     }
 
@@ -113,11 +119,22 @@ public enum Ephemeris {
     }
 
     private static func planetGeometry(_ planet: PlanetaryTheory.Planet, _ earth: EarthState) -> Geometry {
+        lightTimeGeometry(earth) { PlanetaryTheory.heliocentricJ2000(planet, julianDayTT: $0) }
+    }
+
+    /// Pluto from Meeus' series (`PlutoTheory`, valid 1885–2099), with the planets' light-time loop.
+    private static func plutoGeometry(_ earth: EarthState) -> Geometry {
+        lightTimeGeometry(earth) { PlutoTheory.heliocentricJ2000(julianDayTT: $0) }
+    }
+
+    /// A planet's position as seen from the Earth's centre, given its heliocentric position (J2000 equatorial, AU)
+    /// as a function of the TT Julian day.
+    private static func lightTimeGeometry(_ earth: EarthState, heliocentric: (Double) -> Vector3) -> Geometry {
         // Light-time: the planet is seen where it was `lightTime` ago, the Earth where it is now.
         var lightTime = 0.0
         var position = Vector3.zero
         for _ in 0..<4 {
-            position = PlanetaryTheory.heliocentricJ2000(planet, julianDayTT: earth.julianDate.tt - lightTime)
+            position = heliocentric(earth.julianDate.tt - lightTime)
             let updated = (position - earth.position).length * lightTimePerAU
             let converged = abs(updated - lightTime) < 2e-6
             lightTime = updated
@@ -145,9 +162,8 @@ public enum Ephemeris {
             ecliptic: ecliptic)
     }
 
-    private static func planetState(_ body: SolarSystemBody, _ theory: PlanetaryTheory.Planet,
-                                    _ earth: EarthState, eclipticFrame: EclipticOfDate) -> BodyState {
-        let planet = planetGeometry(theory, earth)
+    private static func planetState(_ body: SolarSystemBody, _ planet: Geometry, _ earth: EarthState,
+                                    eclipticFrame: EclipticOfDate) -> BodyState {
         let sun = sunGeometry(earth)
         let phaseAngle = planet.heliocentric.angle(to: planet.geometric)
         return BodyState(

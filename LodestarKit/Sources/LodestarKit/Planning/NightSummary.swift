@@ -27,7 +27,7 @@ public struct NightSummary: Sendable, Hashable {
     public let darknessIntervals: [DateInterval]
     /// When the Galactic Centre can be photographed.
     public let milkyWayCore: MilkyWayCoreVisibility
-    /// Mercury to Neptune, in that order.
+    /// Mercury to Neptune and then Pluto, in that order (`SolarSystemBody.allCases` filtered by `isPlanet`).
     public let planets: [PlanetVisibility]
 
     /// `false` when the Sun never gets 18° below the horizon during the night.
@@ -134,7 +134,8 @@ public struct MilkyWayCoreVisibility: Sendable, Hashable {
 /// A planet is visible while it is at least `minimumAltitude` above the horizon during astronomical
 /// darkness; the Moon is ignored because planets are bright. Mercury and Venus stay close to the Sun
 /// and are mostly seen in twilight, before or after the dark hours; `riseTransitSet` still shows when
-/// they set or rise.
+/// they set or rise. Pluto is the exception to "bright": it is counted as visible like the others, but at
+/// magnitude 14 it takes a telescope or a long lens on a tracker, see `magnitude`.
 public struct PlanetVisibility: Sendable, Hashable {
     /// The altitude, in degrees, from which a planet counts as visible.
     public static let minimumAltitude = 10.0

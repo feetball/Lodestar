@@ -5,8 +5,8 @@ import Foundation
 /// The value is part of the catalog data: for deep-sky objects it follows the rules in `Tools/README.md`
 /// (catalogue membership, name, brightness and size; dark nebulae have no magnitude and are rated by name
 /// and size), for stars it follows the magnitude, for comets and asteroids it follows the peak magnitude
-/// estimate (`init(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets, the Milky Way core, the
-/// celestial poles and custom targets are always showpieces. A smaller value is more conspicuous, so
+/// estimate (`init(smallBodyPeakMagnitude:)`), and the Sun, the Moon, the planets (Pluto is notable), the Milky
+/// Way core, the celestial poles and custom targets are always showpieces. A smaller value is more conspicuous, so
 /// the natural order is the order of importance: `showpiece < prominent < notable < obscure`.
 ///
 /// Use it to keep a crowded sky readable: draw (or label) only the objects up to a limit that grows as the

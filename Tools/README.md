@@ -279,13 +279,16 @@ to a release tag; find newer ones at <https://github.com/mattiaverga/OpenNGC/tag
 
 ## Ephemeris theories
 
-`ephemeris/` regenerates the two coefficient files of LodestarKit's Ephemeris module. Both scripts use
-only the Python standard library and must be run with `-I`.
+`ephemeris/` regenerates the three coefficient files of LodestarKit's Ephemeris module (the Pluto
+script also writes the Kotlin twin). The generators use only the Python standard library and must be
+run with `-I`.
 
 ```
 python3 -I Tools/ephemeris/gen_lunar_theory.py LodestarKit/Sources/LodestarKit/Ephemeris/LunarTheory.swift
 python3 -I Tools/ephemeris/gen_planetary_theory.py <dir with VSOP87B.*> \
     LodestarKit/Sources/LodestarKit/Ephemeris/PlanetaryTheory.swift
+python3 -I Tools/ephemeris/gen_pluto_theory.py LodestarKit/Sources/LodestarKit/Ephemeris/PlutoTheory.swift \
+    <Android repo>/lodestar-kit/src/main/kotlin/net/kuecker/lodestar/kit/ephemeris/PlutoTheory.kt
 ```
 
 - `LunarTheory.swift` comes from Meeus, *Astronomical Algorithms* (2nd ed.), Tables 47.A and 47.B
@@ -295,6 +298,14 @@ python3 -I Tools/ephemeris/gen_planetary_theory.py <dir with VSOP87B.*> \
   Francou (A&A 202, 309, 1988). Download the eight `VSOP87B.*` files from
   `ftp.imcce.fr/pub/ephem/planets/vsop87/` (also on CDS VizieR, catalogue VI/81); their SHA-256 digests
   are listed in the header of the generated file, which the script reproduces byte for byte.
+- `PlutoTheory.swift` and its Kotlin twin `PlutoTheory.kt` are the series of Meeus, *Astronomical
+  Algorithms* (2nd ed.), chapter 37 (Table 37.A, 43 terms, valid 1885–2099; VSOP87 has no Pluto).
+  `pluto_tables.py` holds the rows and constants, compared digit by digit with `soniakeys/meeus`,
+  `commenthol/astronomia`, `saurvs/astro-rust` and `architest/pymeeus` (libnova's `pluto.c` differs in
+  three digits and is not used); `gen_pluto_theory.py` writes both files from that one table and prints
+  the SHA-256 that the Kotlin test pins. `check_pluto_theory.py` (needs NumPy, Skyfield and the DE440s
+  kernel that `make_fixtures.py` caches) compares the series with Meeus's example 37.a and with DE440s
+  and prints the accuracy quoted in the generated files' headers.
 
 ## Satellite test fixtures — `make_satellite_fixtures.py`
 

@@ -14,10 +14,10 @@ final class PlanningPlanetTests: XCTestCase {
 
     // MARK: Contents
 
-    func testPlanetsRunFromMercuryToNeptune() throws {
+    func testPlanetsRunFromMercuryToPluto() throws {
         let summary = try Support.summary(boulder, 2026, 12, 14)
         XCTAssertEqual(summary.planets.map(\.body),
-                       [.mercury, .venus, .mars, .jupiter, .saturn, .uranus, .neptune])
+                       [.mercury, .venus, .mars, .jupiter, .saturn, .uranus, .neptune, .pluto])
         XCTAssertEqual(PlanetVisibility.minimumAltitude, 10)
     }
 
@@ -40,7 +40,7 @@ final class PlanningPlanetTests: XCTestCase {
         let summary = try Support.summary(boulder, 2026, 12, 14)
         let limits: [SolarSystemBody: ClosedRange<Double>] = [
             .mercury: (-2.7)...6, .venus: (-4.95)...(-3.3), .mars: (-3)...2, .jupiter: (-3)...(-1.5),
-            .saturn: (-0.6)...1.6, .uranus: 5.3...6.1, .neptune: 7.7...8.0,
+            .saturn: (-0.6)...1.6, .uranus: 5.3...6.1, .neptune: 7.7...8.0, .pluto: 14.3...14.9,
         ]
         for planet in summary.planets {
             let magnitude = try XCTUnwrap(planet.magnitude, planet.body.displayName)
@@ -52,11 +52,12 @@ final class PlanningPlanetTests: XCTestCase {
 
     func testDecemberEveningSkyHoldsTheOuterPlanets() throws {
         // Boulder, 14 December 2026: Saturn, Uranus and Neptune are up in the evening; Mars and Jupiter climb
-        // from the east before midnight; Venus is a morning object; Mercury is lost in the dawn.
+        // from the east before midnight; Venus is a morning object; Mercury is lost in the dawn. Pluto, 40° east of
+        // the Sun, is 11.5° high at astronomical dusk and sinks below 10° eleven minutes later.
         let summary = try Support.summary(boulder, 2026, 12, 14)
         let visible = Dictionary(uniqueKeysWithValues: summary.planets.map { ($0.body, $0.visibleDuringDarkness) })
         XCTAssertEqual(visible, [.mercury: false, .venus: true, .mars: true, .jupiter: true, .saturn: true,
-                                 .uranus: true, .neptune: true])
+                                 .uranus: true, .neptune: true, .pluto: true])
         let night = try XCTUnwrap(summary.astronomicalDarknessIntervals.first)
         let saturn = try XCTUnwrap(summary.planets.first { $0.body == .saturn })
         XCTAssertEqual(try XCTUnwrap(saturn.visibleIntervals.first).start, night.start, "up already at dusk")

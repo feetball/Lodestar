@@ -113,7 +113,7 @@ final class CatalogLoadingTests: XCTestCase {
         XCTAssertEqual(catalog.constellations.count, 88)
         XCTAssertEqual(catalog.milkyWay.levels.count, 5)
         let merged = catalog.loadReport.deepSkyObjects.merged
-        XCTAssertEqual(catalog.objects.count, 9 + 3 + (deepSky.count - merged) + stars.count)
+        XCTAssertEqual(catalog.objects.count, 10 + 3 + (deepSky.count - merged) + stars.count)
         XCTAssertEqual(catalog.listedObjects.count, catalog.objects.filter(\.isListed).count)
         XCTAssertEqual(catalog.listedObjects.map(\.id), catalog.objects.filter(\.isListed).map(\.id))
     }
@@ -121,13 +121,14 @@ final class CatalogLoadingTests: XCTestCase {
     func testObjectsAreOrderedSolarSystemSpecialDeepSkyThenStarsByMagnitude() throws {
         let catalog = try CatalogFixture.catalog()
         let objects = catalog.objects
-        XCTAssertEqual(objects.prefix(9).map(\.id), ["sun", "moon", "planet.mercury", "planet.venus", "planet.mars",
-                                                     "planet.jupiter", "planet.saturn", "planet.uranus", "planet.neptune"])
-        XCTAssertEqual(objects[9..<12].map(\.id), ["special.galacticCenter", "special.ncp", "special.scp"])
+        XCTAssertEqual(objects.prefix(10).map(\.id), ["sun", "moon", "planet.mercury", "planet.venus", "planet.mars",
+                                                      "planet.jupiter", "planet.saturn", "planet.uranus", "planet.neptune",
+                                                      "planet.pluto"])
+        XCTAssertEqual(objects[10..<13].map(\.id), ["special.galacticCenter", "special.ncp", "special.scp"])
         let firstStar = try XCTUnwrap(objects.firstIndex { $0.id.hasPrefix("star.") })
-        XCTAssertTrue(objects[12..<firstStar].allSatisfy { $0.id.hasPrefix("dso.") })
+        XCTAssertTrue(objects[13..<firstStar].allSatisfy { $0.id.hasPrefix("dso.") })
         XCTAssertTrue(objects[firstStar...].allSatisfy { $0.id.hasPrefix("star.") })
-        XCTAssertEqual(objects[12].id, "dso.M1", "deep-sky objects keep the file order: Messier first")
+        XCTAssertEqual(objects[13].id, "dso.M1", "deep-sky objects keep the file order: Messier first")
         let magnitudes = objects[firstStar...].compactMap(\.magnitude)
         XCTAssertEqual(magnitudes.count, objects.count - firstStar)
         XCTAssertEqual(magnitudes, magnitudes.sorted())
@@ -191,7 +192,7 @@ final class CatalogLoadingTests: XCTestCase {
             }
             XCTAssertFalse(object.name.isEmpty)
         }
-        XCTAssertEqual(fixed, catalog.objects.count - 9 - 2)
+        XCTAssertEqual(fixed, catalog.objects.count - 10 - 2)
     }
 
     func testStarsFollowTheNamingAndListingRules() throws {
@@ -364,7 +365,7 @@ final class CatalogLoadingTests: XCTestCase {
         XCTAssertTrue(try object(boundary).isListed, "magnitude 3.5 is still listed")
         let listedStars = catalog.listedObjects.filter { $0.id.hasPrefix("star.") }
         XCTAssertEqual(listedStars.count, stars.filter { $0.n != nil || $0.m <= 3.5 }.count)
-        XCTAssertEqual(catalog.listedObjects.count, 9 + 3 + catalog.deepSkyObjects.filter(\.isListed).count + listedStars.count)
+        XCTAssertEqual(catalog.listedObjects.count, 10 + 3 + catalog.deepSkyObjects.filter(\.isListed).count + listedStars.count)
     }
 
     func testCategoryMappingCoversEveryOpenNGCType() throws {
@@ -405,6 +406,7 @@ final class CatalogLoadingTests: XCTestCase {
             ("planet.venus", "Venus", .planet, .venus), ("planet.mars", "Mars", .planet, .mars),
             ("planet.jupiter", "Jupiter", .planet, .jupiter), ("planet.saturn", "Saturn", .planet, .saturn),
             ("planet.uranus", "Uranus", .planet, .uranus), ("planet.neptune", "Neptune", .planet, .neptune),
+            ("planet.pluto", "Pluto", .planet, .pluto),
         ]
         for (id, name, category, body) in expected {
             let object = try XCTUnwrap(catalog.object(id: id), id)
@@ -421,6 +423,15 @@ final class CatalogLoadingTests: XCTestCase {
         }
         XCTAssertTrue(try XCTUnwrap(catalog.object(id: "sun")).notes?.contains("solar filter") ?? false)
         XCTAssertNil(catalog.object(id: "planet.jupiter")?.notes)
+        let pluto = try XCTUnwrap(catalog.object(id: "planet.pluto"))
+        XCTAssertEqual(pluto.alternateNames, ["134340 Pluto"])
+        XCTAssertEqual(pluto.prominence, .notable)
+        XCTAssertEqual(pluto.rankingMagnitude, 14.4)
+        XCTAssertEqual(pluto.notes, "A dwarf planet beyond Neptune, about magnitude 14 at its best: far too faint for the eye or a short exposure. It takes a telescope or a long lens on a tracker and stacked frames, and gives itself away by moving against the stars from night to night.")
+        for id in ["sun", "moon", "planet.mercury", "planet.venus", "planet.mars", "planet.jupiter", "planet.saturn",
+                   "planet.uranus", "planet.neptune"] {
+            XCTAssertEqual(catalog.object(id: id)?.prominence, .showpiece, id)
+        }
     }
 
     func testBuiltInSpecialObjects() throws {
@@ -611,7 +622,7 @@ final class CatalogLoadingTests: XCTestCase {
         }
         XCTAssertEqual(Set(seen), Set(catalog.listedObjects.map(\.id)))
         XCTAssertEqual(seen.count, catalog.listedObjects.count)
-        XCTAssertEqual(catalog.objects(in: .solarSystem).count, 9)
+        XCTAssertEqual(catalog.objects(in: .solarSystem).count, 10)
         XCTAssertTrue(catalog.objects(in: .galaxies).contains { $0.id == "dso.M31" })
         XCTAssertTrue(catalog.objects(in: .nebulae).contains { $0.id == "dso.M42" })
         XCTAssertTrue(catalog.objects(in: .clusters).contains { $0.id == "dso.M45" })
