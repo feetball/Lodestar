@@ -11,10 +11,12 @@ struct AccuracyNotesView: View {
     private static let notes = [
         Note(title: "Where things are",
              text: "The Sun, Moon and planets come from published solar-system theories (VSOP87 for the planets, a "
-                 + "Meeus-based lunar theory) and are good to well under an arcminute. Stars and deep-sky objects use "
-                 + "catalog positions with proper motion, precession, nutation, aberration and atmospheric "
-                 + "refraction applied. The star catalog reaches magnitude 6.5; the deep-sky catalog holds the "
-                 + "Messier objects, named objects and the brighter NGC and IC objects."),
+                 + "Meeus-based lunar theory) and are good to well under an arcminute. Pluto comes from a Meeus "
+                 + "series valid for 1885 to 2099 and is good to a few arcseconds there; outside those years its "
+                 + "error grows quickly. Stars and deep-sky objects use catalog positions with proper motion, "
+                 + "precession, nutation, aberration and atmospheric refraction applied. The star catalog reaches "
+                 + "magnitude 6.5; the deep-sky catalog holds the Messier objects, named objects and the brighter "
+                 + "NGC and IC objects."),
         Note(title: "Where the camera points",
              text: "The phone's compass and gyroscope tell Lodestar where the camera points. A compass is typically "
                  + "good to a few degrees and is disturbed by metal and electronics: tripod heads, camera bodies, "

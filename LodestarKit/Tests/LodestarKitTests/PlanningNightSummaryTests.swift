@@ -294,7 +294,7 @@ final class PlanningNightSummaryTests: XCTestCase {
         XCTAssertNil(core.maxAltitude)
         XCTAssertNil(core.bestAzimuth)
         XCTAssertEqual(core.riseTransitSet.circumstance, .alwaysDown, "Sagittarius A* never rises at 69.65° N")
-        XCTAssertEqual(summary.planets.count, 7)
+        XCTAssertEqual(summary.planets.count, 8)
         for planet in summary.planets {
             XCTAssertNil(planet.maxAltitudeDuringDarkness, planet.body.displayName)
             XCTAssertFalse(planet.visibleDuringDarkness, planet.body.displayName)
@@ -512,7 +512,7 @@ final class PlanningNightSummaryTests: XCTestCase {
             let pole = Support.Site(name: "pole \(latitude)", latitude: latitude, longitude: 0)
             let summary = try Support.summary(pole, 2026, 12, 21)
             XCTAssertEqual(summary.night.duration, 24 * 3_600, accuracy: 1e-6)
-            XCTAssertEqual(summary.planets.count, 7)
+            XCTAssertEqual(summary.planets.count, 8)
             XCTAssertTrue(summary.astronomicalDarkHours == 0 || summary.astronomicalDarkHours == 24, "all or nothing at a pole")
             XCTAssertEqual(summary.hasAstronomicalDarkness, latitude > 0)
             XCTAssertTrue(summary.milkyWayCore.visibleIntervals.isEmpty || latitude < 0)

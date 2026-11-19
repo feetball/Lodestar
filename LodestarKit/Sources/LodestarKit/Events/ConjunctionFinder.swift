@@ -244,6 +244,8 @@ public enum ConjunctionFinder {
         return vectors
     }
 
+    /// The VSOP87 series of one of `planets`. The Sun, the Moon and Pluto (which has no VSOP87 series) are never
+    /// passed; they map to the Earth's only to keep the switch exhaustive.
     private static func theory(_ body: SolarSystemBody) -> Ephemeris.PlanetaryTheory.Planet {
         switch body {
         case .mercury: .mercury
@@ -253,7 +255,7 @@ public enum ConjunctionFinder {
         case .saturn: .saturn
         case .uranus: .uranus
         case .neptune: .neptune
-        case .sun, .moon: .earth
+        case .sun, .moon, .pluto: .earth
         }
     }
 

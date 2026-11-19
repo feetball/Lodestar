@@ -8,7 +8,7 @@ enum BuiltInObjects {
     /// Declination of Sagittarius A* (J2000): −29° 00′ 28.1″.
     private static let sagittariusADeclination = -(29.0 + 28.1 / 3600)
 
-    /// The Sun, the Moon and the seven other planets, in `SolarSystemBody.allCases` order.
+    /// The Sun, the Moon, the seven other planets and Pluto, in `SolarSystemBody.allCases` order.
     static func solarSystem() -> [CelestialObject] {
         SolarSystemBody.allCases.map { body in
             let id: String
@@ -20,17 +20,14 @@ enum BuiltInObjects {
             case .moon:
                 id = "moon"
                 category = .moon
-            case .mercury, .venus, .mars, .jupiter, .saturn, .uranus, .neptune:
+            case .mercury, .venus, .mars, .jupiter, .saturn, .uranus, .neptune, .pluto:
                 id = "planet.\(body.rawValue)"
                 category = .planet
             }
             return CelestialObject(
                 id: id, name: body.displayName, alternateNames: alternateNames(of: body), category: category,
-                position: .solarSystem(body), isListed: true,
-                notes: body == .sun
-                    ? "Look at the Sun only through a certified solar filter. Pointing a camera or telescope at it without one can damage eyes and equipment."
-                    : nil,
-                prominence: .showpiece)
+                position: .solarSystem(body), isListed: true, notes: notes(of: body),
+                prominence: body == .pluto ? .notable : .showpiece)
         }
     }
 
@@ -39,7 +36,20 @@ enum BuiltInObjects {
         switch body {
         case .sun: ["Sol"]
         case .moon: ["Luna"]
+        case .pluto: ["134340 Pluto"]
         default: []
+        }
+    }
+
+    /// The note of the detail view: a warning for the Sun, what to expect of Pluto.
+    private static func notes(of body: SolarSystemBody) -> String? {
+        switch body {
+        case .sun:
+            "Look at the Sun only through a certified solar filter. Pointing a camera or telescope at it without one can damage eyes and equipment."
+        case .pluto:
+            "A dwarf planet beyond Neptune, about magnitude 14 at its best: far too faint for the eye or a short exposure. It takes a telescope or a long lens on a tracker and stacked frames, and gives itself away by moving against the stars from night to night."
+        default:
+            nil
         }
     }
 

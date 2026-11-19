@@ -105,11 +105,14 @@ extension DataCredit {
             sourceURL: URL(string: "https://www.ncei.noaa.gov/products/world-magnetic-model"),
             notice: "A work of the US Government. Valid from 2025 to 2030."),
         DataCredit(
-            id: "ephemeris", name: "VSOP87 and lunar theory", usedFor: "Planets and Moon",
+            id: "ephemeris", name: "VSOP87 and Meeus theories", usedFor: "Planets, Pluto and Moon",
             author: "Bretagnon & Francou (IMCCE); Jean Meeus",
             license: "Published scientific theories", licenseURL: nil, sourceURL: nil,
-            notice: "VSOP87 planetary theory (Astronomy & Astrophysics 202, 309, 1988) and the lunar theory of "
-                + "Meeus, Astronomical Algorithms, 2nd ed. Planetary magnitudes follow Mallama & Hilton (2018)."),
+            notice: "VSOP87 planetary theory (Astronomy & Astrophysics 202, 309, 1988), and the lunar theory and the "
+                + "series for Pluto (valid from 1885 to 2099) of Meeus, Astronomical Algorithms, 2nd ed., chapters 47 "
+                + "and 37. Planetary magnitudes follow Mallama & Hilton (2018). Pluto's magnitude, for Pluto and "
+                + "Charon together, uses the phase coefficient of Binzel & Mulholland (Astronomical Journal 89, 1759, "
+                + "1984)."),
         DataCredit(
             id: "imo", name: "IMO Meteor Shower Calendar 2026", usedFor: "Meteor showers",
             author: "International Meteor Organization, edited by J\u{00FC}rgen Rendtel",
@@ -166,9 +169,9 @@ struct DataCreditsView: View {
         + "by Olaf Frohn (BSD-3-Clause), the latter after Jose R. Vieira's Milky Way Outline Catalog. Meteor "
         + "showers: IMO Meteor Shower Calendar 2026 (\u{00A9} International Meteor Organization). Geomagnetic "
         + "model: WMM2025 by NOAA NCEI and the British Geological Survey (public domain). Planetary theory: "
-        + "VSOP87 (Bretagnon & Francou, IMCCE); lunar theory after J. Meeus. Optional downloads: orbital data: "
-        + "CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather forecast from MET Norway "
-        + "(CC BY 4.0)."
+        + "VSOP87 (Bretagnon & Francou, IMCCE); Pluto and lunar theory after J. Meeus. Optional downloads: "
+        + "orbital data: CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather forecast from "
+        + "MET Norway (CC BY 4.0)."
 
     private static let bsdLicense = """
         Copyright (c) 2015, Olaf Frohn
