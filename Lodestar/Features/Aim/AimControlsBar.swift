@@ -1,7 +1,7 @@
 import SwiftUI
 import LodestarKit
 
-/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, in a row or, in a wide HUD, in two
+/// The buttons of the screen: target, align, mosaic, time, camera, night mode and zoom, in a row or, in a wide HUD, in two
 /// columns.
 struct AimControlsBar: View {
     let model: AimViewModel
@@ -12,12 +12,18 @@ struct AimControlsBar: View {
 
     /// The two columns of a wide HUD.
     private static let columns = [GridItem(.fixed(66), spacing: 6), GridItem(.fixed(66), spacing: 6)]
-    /// The four columns of the bar with larger text, which has no room for all the buttons in one row.
+    /// The four columns of the bar with larger text, or with the Mount button too, which have no room for all the
+    /// buttons in one row.
     private static let wrappedColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
+    /// The most buttons that share one row.
+    private static let buttonsInRow = 7
+
+    /// Target, Align, Mosaic, Time, Camera, Night and Zoom, and Mount for people who have a GoTo mount.
+    private var buttonCount: Int { Self.buttonsInRow + (MountService.shared.showsAimButton ? 1 : 0) }
 
     var body: some View {
         if axis == .horizontal {
-            if dynamicTypeSize > .large {
+            if dynamicTypeSize > .large || buttonCount > Self.buttonsInRow {
                 LazyVGrid(columns: Self.wrappedColumns, spacing: 6) { buttons }
             } else {
                 HStack(spacing: 6) { buttons }
@@ -36,12 +42,23 @@ struct AimControlsBar: View {
         control("Target", systemImage: "scope") { sheet = .targetPicker }
             .accessibilityLabel("Choose target")
             .accessibilityValue(model.guidanceTarget?.name ?? model.satelliteSource?.title ?? "None")
-        control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) { sheet = .alignment }
-            .accessibilityLabel("Align on a star")
-            .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
+        control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) {
+            // Aligning compares the sky with the phone's sensors now: the live sky is the one to align on.
+            model.endPreview()
+            sheet = .alignment
+        }
+        .accessibilityLabel("Align on a star")
+        .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
         control("Mosaic", systemImage: "square.grid.3x3", isOn: mosaic.isActive) { sheet = .mosaic }
             .accessibilityLabel("Plan a mosaic")
             .accessibilityValue(mosaic.isActive ? mosaic.progressText : "Off")
+        let moment = model.previewMoment
+        control("Time", systemImage: moment == nil ? "clock" : "clock.fill", isOn: moment != nil) {
+            model.toggleTimeBar()
+        }
+        .accessibilityLabel("Time preview")
+        .accessibilityValue(moment.map { "Previewing \($0.text)" } ?? (model.isTimeBarOpen ? "Open" : "Live"))
+        .accessibilityHint("Shows or hides the time bar, to preview the sky at another time.")
         // Only for people who have a GoTo mount: the first connection is made in Settings.
         if MountService.shared.showsAimButton {
             control("Mount", systemImage: "antenna.radiowaves.left.and.right", isOn: MountService.shared.isConnected) {

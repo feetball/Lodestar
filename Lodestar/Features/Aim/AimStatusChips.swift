@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import LodestarKit
 
-/// The row of status chips at the top: sensors, compass, alignment, location and camera.
+/// The row of status chips at the top: the time preview, sensors, compass, alignment, location and camera.
 struct AimStatusChips: View {
     let model: AimViewModel
     /// The screen's sheet, where the help page is presented from: this view is rebuilt when the display turns.
@@ -25,6 +25,10 @@ struct AimStatusChips: View {
 
     var body: some View {
         AimFlowLayout {
+            // The preview comes first: it is what the rest of the screen is showing.
+            if let moment = model.previewMoment {
+                AimPreviewChip(model: model, moment: moment)
+            }
             ForEach(items) { item in
                 if item.opensSettings {
                     Button {
