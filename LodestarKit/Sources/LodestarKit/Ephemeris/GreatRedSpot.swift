@@ -87,7 +87,7 @@ public struct GreatRedSpot: Sendable, Hashable {
     /// The crossings of the central meridian from `from` to `to` (both inclusive), in time order: about 2.4 a day.
     /// Intervals longer than `maximumSpanDays` are cut short; a reversed interval or one outside the years 1 to 4001
     /// gives nothing. Each transit is found by Newton steps on `JupiterPhysical.state(at:)`, accurate to the second for
-    /// the given longitude. Cost: about 1 ms for a day.
+    /// the given longitude. Cost: about 0.1 ms for a day.
     public func transits(from: Date, to: Date) -> [GreatRedSpotTransit] {
         let first = from.timeIntervalSinceReferenceDate
         let last = to.timeIntervalSinceReferenceDate

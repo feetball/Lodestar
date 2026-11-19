@@ -78,7 +78,7 @@ public struct EventOptions: Sendable, Hashable {
     /// events without a visibility (equinoxes, solstices, apsides).
     public let visibleOnly: Bool
     /// How many days from the start of the interval the Great Red Spot transits and the moon events of Jupiter are
-    /// listed for, 0…30, default 2. They come many a day (about 2.4 transits and 6 moon events), so a calendar of a
+    /// listed for, 0…30, default 2. They come many a day (about 2.4 transits and 8 moon events), so a calendar of a
     /// year lists only the nearest days; 0 leaves them out.
     public let jupiterEventDays: Double
     /// The Great Red Spot whose transits are listed; `GreatRedSpot.reference` by default.

@@ -9,7 +9,7 @@ import Foundation
 /// years 1 to 4001 give nothing, and the work grows with the length of the interval. Cost of one year in an optimized build
 /// on a desktop: about 0.1 s without an observer and 0.2 s with one (the conjunctions take half of it; the visibility of an
 /// event a fraction of a millisecond); a debug build needs about 1.6 s. The stations add about 30 ms a year; the Great
-/// Red Spot and moon events of `EventOptions.jupiterEventDays` days about 30 ms a day. Nothing is cached between
+/// Red Spot and moon events of `EventOptions.jupiterEventDays` days about 1 ms a day. Nothing is cached between
 /// calls. Run it on a background thread and keep the result.
 public enum EventCalculator {
     /// The longest interval, in days, that `events(from:to:observer:options:)` searches; longer intervals are cut at
