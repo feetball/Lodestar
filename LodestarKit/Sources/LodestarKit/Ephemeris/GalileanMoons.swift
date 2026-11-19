@@ -187,9 +187,10 @@ public enum GalileanMoons {
         let psi = asin(AstroMath.clamp(earthSun / delta * sin(k), -1.0, 1.0))
         let lambda = AstroMath.radians(34.35 + 0.083091 * d + 0.329 * sinV) + b
         let sunDeclination = AstroMath.radians(3.12) * sin(lambda + AstroMath.radians(42.8))
-        let earthDeclination = sunDeclination
-            - AstroMath.radians(2.22) * sin(psi) * cos(lambda + AstroMath.radians(22.0))
-            - AstroMath.radians(1.3) * (sunJupiter - delta) / delta * sin(lambda - AstroMath.radians(100.5))
+        let earthTermPhase: Double = AstroMath.radians(2.22) * sin(psi) * cos(lambda + AstroMath.radians(22.0))
+        let earthTermDistance: Double = AstroMath.radians(1.3) * (sunJupiter - delta) / delta
+            * sin(lambda - AstroMath.radians(100.5))
+        let earthDeclination = sunDeclination - earthTermPhase - earthTermDistance
         let dd = d - delta / 173
         let u1 = AstroMath.radians(163.8069 + 203.4058646 * dd) + psi - b
         let u2 = AstroMath.radians(358.414 + 101.2916335 * dd) + psi - b

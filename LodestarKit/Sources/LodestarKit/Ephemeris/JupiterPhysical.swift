@@ -61,7 +61,7 @@ public enum JupiterPhysical {
         let meanObliquity = Obliquity.mean(julianDate)
         let toEcliptic = Matrix3.rotationX(AstroMath.radians(meanObliquity)).transposed
             * Precession.matrixFromJ2000(to: julianDate)
-        let earth = toEcliptic * PlanetaryTheory.heliocentricJ2000(.earth, julianDayTT: jde)
+        let earth = toEcliptic * Ephemeris.PlanetaryTheory.heliocentricJ2000(.earth, julianDayTT: jde)
         let earthDistance = earth.length
         let earthLongitude = atan2(earth.y, earth.x)
         var delta = 4.0
@@ -69,7 +69,7 @@ public enum JupiterPhysical {
         var geocentric = Vector3.zero
         for _ in 0..<4 {
             let lightTime = delta * Ephemeris.lightTimePerAU
-            jupiter = toEcliptic * PlanetaryTheory.heliocentricJ2000(.jupiter, julianDayTT: jde - lightTime)
+            jupiter = toEcliptic * Ephemeris.PlanetaryTheory.heliocentricJ2000(.jupiter, julianDayTT: jde - lightTime)
             geocentric = jupiter - earth
             let updated = geocentric.length
             let converged = abs(updated - delta) < 1e-9
@@ -92,8 +92,8 @@ public enum JupiterPhysical {
         let deltaS = asin(cosEpsilon0 * sinLatitude + sinEpsilon0 * cosLatitude * sinLongitude)
         let sinDelta0 = sin(delta0)
         let cosDelta0 = cos(delta0)
-        let sunDeclination = asin(
-            AstroMath.clamp(-sinDelta0 * sin(deltaS) - cosDelta0 * cos(deltaS) * cos(alpha0 - alphaS), -1.0, 1.0))
+        let sunTerm: Double = -sinDelta0 * sin(deltaS) - cosDelta0 * cos(deltaS) * cos(alpha0 - alphaS)
+        let sunDeclination = asin(AstroMath.clamp(sunTerm, -1.0, 1.0))
 
         // Steps 11 to 13: the Earth's declination and the central meridians.
         let u = geocentric.y * cosEpsilon0 - geocentric.z * sinEpsilon0
@@ -105,13 +105,14 @@ public enum JupiterPhysical {
         let sinAlpha0Alpha = sin(alpha0 - alpha)
         let cosAlpha0Alpha = cos(alpha0 - alpha)
         let zeta = atan2(sinDelta0 * cosDelta * cosAlpha0Alpha - sinDelta * cosDelta0, cosDelta * sinAlpha0Alpha)
-        let earthDeclination = asin(AstroMath.clamp(-sinDelta0 * sinDelta - cosDelta0 * cosDelta * cosAlpha0Alpha, -1.0, 1.0))
+        let earthTerm: Double = -sinDelta0 * sinDelta - cosDelta0 * cosDelta * cosAlpha0Alpha
+        let earthDeclination = asin(AstroMath.clamp(earthTerm, -1.0, 1.0))
         var omega1 = w1 - AstroMath.degrees(zeta) - systemIPhaseDegreesPerAU * delta
         var omega2 = w2 - AstroMath.degrees(zeta) - systemIIPhaseDegreesPerAU * delta
 
         // Step 14: the phase correction.
-        var phase = AstroMath.degrees(
-            (2 * radius * delta + earthDistance * earthDistance - radius * radius - delta * delta) / (4 * radius * delta))
+        let phaseNumerator: Double = 2 * radius * delta + earthDistance * earthDistance - radius * radius - delta * delta
+        var phase = AstroMath.degrees(phaseNumerator / (4 * radius * delta))
         if sin(longitude - earthLongitude) < 0 { phase = -phase }
         omega1 += phase
         omega2 += phase
@@ -128,19 +129,22 @@ public enum JupiterPhysical {
         let sinEarthLongitude = sin(earthLongitude)
         let cosEarthLongitude = cos(earthLongitude)
         let aberration = AstroMath.radians(aberrationConstant)
-        alpha += aberration * (cosAlpha * cosEarthLongitude * cosEpsilon + sinAlpha * sinEarthLongitude) / cosDelta
-        delta1 += aberration * (
-            cosEarthLongitude * cosEpsilon * (sinEpsilon / cosEpsilon * cosDelta - sinAlpha * sinDelta)
-                + cosAlpha * sinDelta * sinEarthLongitude)
+        let aberrationAlpha: Double = (cosAlpha * cosEarthLongitude * cosEpsilon + sinAlpha * sinEarthLongitude) / cosDelta
+        let tanEpsilon: Double = sinEpsilon / cosEpsilon
+        let aberrationInner: Double = tanEpsilon * cosDelta - sinAlpha * sinDelta
+        let aberrationDelta: Double = cosEarthLongitude * cosEpsilon * aberrationInner
+            + cosAlpha * sinDelta * sinEarthLongitude
+        alpha += aberration * aberrationAlpha
+        delta1 += aberration * aberrationDelta
         let tanDelta = sinDelta / cosDelta
-        let deltaAlpha = (cosEpsilon + sinEpsilon * sinAlpha * tanDelta) * dPsi - cosAlpha * tanDelta * dEpsilon
+        let deltaAlpha: Double = (cosEpsilon + sinEpsilon * sinAlpha * tanDelta) * dPsi - cosAlpha * tanDelta * dEpsilon
         let deltaDelta = sinEpsilon * cosAlpha * dPsi + sinAlpha * dEpsilon
         let alphaApparent = alpha + deltaAlpha
         let deltaApparent = delta1 + deltaDelta
         let sinAlpha0 = sin(alpha0)
         let cosAlpha0 = cos(alpha0)
         let tanDelta0 = sinDelta0 / cosDelta0
-        let deltaAlpha0 = (cosEpsilon + sinEpsilon * sinAlpha0 * tanDelta0) * dPsi - cosAlpha0 * tanDelta0 * dEpsilon
+        let deltaAlpha0: Double = (cosEpsilon + sinEpsilon * sinAlpha0 * tanDelta0) * dPsi - cosAlpha0 * tanDelta0 * dEpsilon
         let deltaDelta0 = sinEpsilon * cosAlpha0 * dPsi + sinAlpha0 * dEpsilon
         let alpha0Apparent = alpha0 + deltaAlpha0
         let delta0Apparent = delta0 + deltaDelta0
