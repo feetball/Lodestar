@@ -59,19 +59,20 @@ extension HelpContent {
     private static let events = HelpTopic(
         topic: .events, category: .sky, title: "Events calendar", systemImage: "calendar",
         summary: "Meteor showers, eclipses, conjunctions and more.",
-        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant"],
+        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant", "meteor camera", "where to point", "meteors per hour"],
         blocks: [
             .paragraph("The events calendar lists what the sky has coming in the next twelve months, with times for your site, so you can plan ahead."),
             .bullets([
                 "It covers meteor showers, lunar and solar eclipses, conjunctions (two bodies close together), oppositions (a planet opposite the Sun), greatest elongations (Mercury or Venus farthest from the Sun), supermoons, equinoxes and solstices.",
                 "A meteor shower shows its hourly rate (ZHR) and how high its radiant is, the point the meteors seem to come from. ZHR is for a perfectly dark sky with the radiant overhead, so real counts are lower.",
+                "A meteor shower also has a **Camera** card. It says where to point the camera, high in the dark sky about 40\u{00B0} from the radiant and away from the Moon, and about how many meteors to expect in the frame of your lens from **Settings** \u{25B8} **Camera & Lens**. It is worked out for the time of the night when the radiant is highest. **Aim camera there** makes that place a target and opens the Aim screen; **Aim at the radiant** stays in the actions at the top.",
             ]),
             .steps([
                 "On the **Tonight** tab, find the **Upcoming** card and tap **Calendar**.",
                 "Tap a chip such as **Meteor Showers** or **Eclipses** to narrow the list. **Visible from here only** hides what you cannot see from your site.",
                 "Tap an event for when and where to look and how to photograph it. The **Aim at \u{2026}** buttons send it to the Aim screen. **Show in Sky chart** opens the Sky tab at the time of the event.",
             ]),
-            .tip("For a meteor shower, aim about 40\u{00B0} away from the radiant, not at it. Meteors then draw long trails across the frame."),
+            .tip("For a meteor shower, aim about 40\u{00B0} away from the radiant, not at it. Meteors then draw long trails across the frame. Use your widest lens, the NPF exposure and continuous shooting, and keep the radiant in or near the edge of the frame."),
             .caution("Never point a camera at the Sun without a certified solar filter. On a solar eclipse page, Lodestar asks you to confirm the filter before it aims at the Sun."),
         ],
         related: [.tonight, .skyChart])
