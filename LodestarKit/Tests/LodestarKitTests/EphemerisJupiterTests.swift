@@ -73,6 +73,42 @@ final class EphemerisJupiterTests: XCTestCase {
         assertNear(1.48, callisto.y, 0.02, "Callisto Y")
     }
 
+    func testGalileanMoonsAgreeWithJplHorizons() {
+        // JPL Horizons vector tables (jup365 satellites, DE441 Jupiter, Sun and Earth; queried 2026-11-19) turned into
+        // Jupiter's axes (X west along the equator of the IAU 2015 pole, Y north) as seen from the geocentre: the four
+        // moons 2615 s of light-time before 2026-11-19 00:42:15.8 UTC, in Jupiter radii (equatorial 71 492 km).
+        let truth = [(0.889, 0.027), (-2.349, -0.111), (4.544, 0.062), (-20.011, -0.028)]
+        let state = GalileanMoons.positions(at: JulianDate(date: utc("2026-11-19T00:42:15.8Z")))
+        for (index, moon) in state.moons.enumerated() {
+            assertNear(truth[index].0, moon.x, 0.12, "\(moon.moon) X")
+            assertNear(truth[index].1, moon.y, 0.15, "\(moon.moon) Y")
+        }
+    }
+
+    func testGalileanMoonEventsAgreeWithJplHorizons() {
+        // The same Horizons vectors give the contacts of the phenomena (transit: the centre inside the disc in front;
+        // shadow transit: the centre of the shadow on the visible hemisphere; occultation and eclipse likewise), found
+        // on a 2-minute grid and quoted at the middle of the step, observer time. The low-accuracy method agrees to
+        // about 2 minutes for Io and Europa and 6 for Callisto (139 events in three six-day windows from 2026-11-19 to
+        // 2027-02-16: rms 1.8 minutes, worst 6 minutes), the basis of `GalileanMoons.accuracyMinutes`.
+        let truth: [(GalileanMoon, GalileanPhenomenon, GalileanEdge, String)] = [
+            (.io, .transit, .end, "2026-11-19T00:49:15Z"),
+            (.io, .eclipse, .start, "2026-11-19T18:27:10Z"),
+            (.io, .occultation, .start, "2026-11-19T19:43:09Z"),
+            (.europa, .shadowTransit, .start, "2026-11-20T11:45:04Z"),
+            (.europa, .transit, .start, "2026-11-20T14:19:03Z"),
+            (.io, .shadowTransit, .start, "2026-11-20T15:47:03Z"),
+            (.io, .transit, .start, "2026-11-20T17:01:03Z"),
+            (.ganymede, .eclipse, .start, "2026-11-21T23:12:53Z"),
+        ]
+        let events = GalileanMoons.events(from: utc("2026-11-19T00:00:00Z"), to: utc("2026-11-23T00:00:00Z"))
+        for (moon, phenomenon, edge, expected) in truth {
+            let nearest = events.filter { $0.moon == moon && $0.phenomenon == phenomenon && $0.edge == edge }
+                .map { abs($0.date.timeIntervalSince(utc(expected))) }.min()
+            XCTAssertTrue((nearest ?? .infinity) <= 6.5 * 60, "\(moon) \(phenomenon) \(edge): \(nearest ?? -1) s from \(expected)")
+        }
+    }
+
     func testMoonOffsetsStayOnTheirOrbits() {
         let radii = [5.9057, 9.3966, 14.9883, 26.3627]
         for day in 0..<40 {
@@ -175,18 +211,17 @@ final class EphemerisJupiterTests: XCTestCase {
         }
     }
 
-    func testGreatRedSpotTransitsMatchPublishedTimesForApril2026() {
+    func testCentralMeridianAgreesWithPublishedGreatRedSpotTransitTimes() {
         // Flandrau Science Center, Tucson (MST = UTC-7): meridian transit 2026-04-05 20:18, 04-07 21:57, 04-10 19:28
-        // and 05-30 21:03 local time (to the minute).
-        let published = ["2026-04-06T03:18:00Z", "2026-04-08T04:57:00Z", "2026-04-11T02:28:00Z", "2026-05-31T04:03:00Z"]
-        for text in published {
-            let expected = utc(text)
-            let transits = GreatRedSpot.reference.transits(from: expected.addingTimeInterval(-3 * 3600),
-                                                           to: expected.addingTimeInterval(3 * 3600))
-            XCTAssertEqual(transits.count, 1, text)
-            guard let transit = transits.first else { continue }
-            let seconds = abs(transit.date.timeIntervalSince(expected))
-            XCTAssertTrue(seconds <= 180, "\(text): \(transit.date) is \(seconds) s away")
+        // and 05-30 21:03 local time (to the minute). The table's own longitude for the spot is not stated (it is not
+        // Sky & Telescope's 91° on June 1: that would put the transits 5 to 10 minutes later), so the check is that the
+        // System II central meridian stands at one longitude, drifting slowly, at the four instants: 84.4°, 84.4°, 84.7°
+        // and 85.0° (the spot's drift of about 0.4° a month in their table).
+        let published = [("2026-04-06T03:18:00Z", 84.4), ("2026-04-08T04:57:00Z", 84.4), ("2026-04-11T02:28:00Z", 84.7),
+                         ("2026-05-31T04:03:00Z", 85.0)]
+        for (text, longitude) in published {
+            let meridian = JupiterPhysical.state(at: JulianDate(date: utc(text))).systemIILongitude
+            assertNear(longitude, meridian, 0.3, text)
         }
     }
 
