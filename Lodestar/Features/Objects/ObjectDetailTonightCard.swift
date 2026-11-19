@@ -38,7 +38,9 @@ struct ObjectDetailTonightCard: View {
         darknessRows(for: night)
         if night.appliesSkyline {
             Label {
-                Text("Skyline applied: the object rises when it clears your skyline and sets when it sinks behind it.")
+                Text("Skyline applied: the object rises when it clears your skyline and sets when it sinks behind it."
+                     + " Hours above your skyline count the dark time the object is at least"
+                     + " \(Int(ObjectsTonight.minimumAltitude))\u{00B0} high.")
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
                 Image(systemName: "mountain.2")
@@ -101,9 +103,18 @@ struct ObjectDetailTonightCard: View {
             } else if object.category != .sun, night.appliesSkyline {
                 InfoRow(label: "Highest in the dark", value: "Behind the skyline")
             }
+            if object.category != .sun, let unobstructed = night.unobstructed {
+                InfoRow(label: "Above your skyline", value: skylineHoursText(unobstructed))
+            }
         } else {
             InfoRow(label: "Dark sky", value: "No astronomical darkness tonight")
         }
+    }
+
+    /// The stretches of the dark above the skyline with their total, such as "21:40 – 01:10 (3.5 h)".
+    private func skylineHoursText(_ unobstructed: UnobstructedVisibility) -> String {
+        guard !unobstructed.intervals.isEmpty else { return "None tonight" }
+        return "\(TonightFormat.windows(unobstructed.intervals, in: timeZone)) (\(ObjectsFormat.hours(unobstructed.hours)))"
     }
 
     private func highestText(_ best: ObjectDetailPeak) -> String {

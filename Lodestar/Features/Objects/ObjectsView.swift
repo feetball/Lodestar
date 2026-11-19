@@ -20,6 +20,9 @@ private struct ObjectsSearchKey: Equatable {
 private struct ObjectsTrackingKey: Equatable {
     let observer: Observer?
     let skyline: HorizonProfile?
+    let timeZone: TimeZone?
+    /// Whether the list needs tonight's hours (to order or filter by them).
+    let wantsTonight: Bool
     let catalogID: ObjectIdentifier?
     let catalogue: ObjectsCatalogueFilter
     let extraIDs: [String]
@@ -43,6 +46,7 @@ struct ObjectsView: View {
     @AppStorage("lodestar.objects.hideFaint") private var hidesFaintObjects = false
     @AppStorage("lodestar.objects.catalogue") private var catalogueFilter = ObjectsCatalogueFilter.all
     @AppStorage("lodestar.objects.popularOnly") private var showsOnlyPopular = false
+    @AppStorage("lodestar.objects.visibleTonightOnly") private var showsOnlyVisibleTonight = false
 
     @State private var query = ""
     @State private var searchOutcome = ObjectsSearchOutcome.empty
@@ -115,6 +119,8 @@ struct ObjectsView: View {
         let favorites = Set(app.settings.favoriteObjectIDs)
         let timeZone = app.observerContext?.timeZone ?? .autoupdatingCurrent
         let showsProminence = catalogueFilter != .all || sortOrder == .prominence || grouping == .prominence
+        // The rows say how many hours tonight only while the list is ordered or filtered by them.
+        let tonight = options.needsTonightHours ? positions.tonight : [:]
         return List {
             if !isShowingResults {
                 Section {
@@ -138,7 +144,7 @@ struct ObjectsView: View {
                 Section {
                     ForEach(section.objects) { object in
                         row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone,
-                            showsProminence: showsProminence)
+                            showsProminence: showsProminence, tonight: tonight[object.id])
                     }
                     // Favorite comets and asteroids without a current orbit stay in the list.
                     ForEach(section.unavailable, id: \.self) { id in
@@ -162,13 +168,13 @@ struct ObjectsView: View {
     }
 
     private func row(for object: CelestialObject, isFavorite: Bool, timeZone: TimeZone,
-                      showsProminence: Bool) -> some View {
+                      showsProminence: Bool, tonight: UnobstructedVisibility?) -> some View {
         Button {
             path.append(object)
         } label: {
             HStack(spacing: 8) {
-                ObjectRow(object: object, position: positions.position(for: object.id), isFavorite: isFavorite,
-                          timeZone: timeZone, showsProminence: showsProminence)
+                ObjectRow(object: object, position: positions.position(for: object.id), tonight: tonight,
+                          isFavorite: isFavorite, timeZone: timeZone, showsProminence: showsProminence)
                 // The system's disclosure indicator is grey, which is not night-safe.
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
@@ -228,6 +234,7 @@ struct ObjectsView: View {
                            message: "No objects match the current filters.") {
                 Button("Reset Filters") {
                     showsOnlyAboveHorizon = false
+                    showsOnlyVisibleTonight = false
                     hidesFaintObjects = false
                     showsOnlyPopular = false
                     catalogueFilter = .all
@@ -246,8 +253,10 @@ struct ObjectsView: View {
                 Label("Custom Target", systemImage: "plus")
             }
             ObjectsOptionsMenu(grouping: $grouping, sortOrder: $sortOrder,
-                               showsOnlyAboveHorizon: $showsOnlyAboveHorizon, hidesFaintObjects: $hidesFaintObjects,
-                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized, hasLocation: app.observerContext != nil)
+                               showsOnlyAboveHorizon: $showsOnlyAboveHorizon,
+                               showsOnlyVisibleTonight: $showsOnlyVisibleTonight, hidesFaintObjects: $hidesFaintObjects,
+                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized,
+                               hasLocation: app.observerContext != nil)
                 .disabled(isSearching)
             HelpButton(topic: .objects)
         }
@@ -258,7 +267,7 @@ struct ObjectsView: View {
     private var options: ObjectsListOptions {
         ObjectsListOptions(grouping: grouping, sortOrder: sortOrder, showsOnlyAboveHorizon: showsOnlyAboveHorizon,
                            hidesFaintObjects: hidesFaintObjects, catalogue: catalogueFilter,
-                           showsOnlyPopular: showsOnlyPopular)
+                           showsOnlyPopular: showsOnlyPopular, showsOnlyVisibleTonight: showsOnlyVisibleTonight)
     }
 
     /// The site's recorded skyline, when it has one.
@@ -291,7 +300,8 @@ struct ObjectsView: View {
         }
         return ObjectsListBuilder.sections(options: options, catalog: catalog, index: index,
                                            favoriteIDs: app.settings.favoriteObjectIDs,
-                                           recentIDs: app.settings.recentObjectIDs, positions: positions.positions)
+                                           recentIDs: app.settings.recentObjectIDs, positions: positions.positions,
+                                           tonight: positions.tonight)
     }
 
     /// Favorites, recents and search results that the browse listing does not include, whose positions are
@@ -323,6 +333,8 @@ struct ObjectsView: View {
     private var trackingKey: ObjectsTrackingKey {
         ObjectsTrackingKey(observer: app.observerContext?.observer,
                            skyline: skyline,
+                           timeZone: app.observerContext?.timeZone,
+                           wantsTonight: options.needsTonightHours,
                            catalogID: catalogID,
                            catalogue: catalogueFilter,
                            extraIDs: offListObjects.map(\.id),
@@ -357,11 +369,12 @@ struct ObjectsView: View {
     /// Keeps positions fresh while the Objects tab is showing; other tabs do not need them.
     private func trackPositions() async {
         guard app.selectedTab == .objects else { return }
-        guard let observer = app.observerContext?.observer else {
+        guard let context = app.observerContext else {
             positions.clear()
             return
         }
-        await positions.keepFresh(observer: observer, skyline: skyline, clock: app.clock) {
+        await positions.keepFresh(observer: context.observer, skyline: skyline, timeZone: context.timeZone,
+                                  clock: app.clock, wantsTonight: options.needsTonightHours) {
             (app.catalog.catalog?.listedObjects ?? []) + offListObjects + catalogueObjects
         }
     }

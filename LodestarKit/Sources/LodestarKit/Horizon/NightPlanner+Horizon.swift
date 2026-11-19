@@ -78,9 +78,12 @@ extension NightPlanner {
 
     // MARK: Implementation
 
-    private static func visibilityOverHorizon(of position: (SkyFrame) -> HorizontalCoordinate, observer: Observer,
-                                              night: DateInterval, darkness: [DateInterval],
-                                              minimumAltitude: Double, horizon: HorizonProfile) -> TargetVisibility {
+    // `NightPlanner.visibility(..., horizon: nil)` in `NightPlanner+Visibility.swift` calls these when a skyline is
+    // given.
+
+    static func visibilityOverHorizon(of position: (SkyFrame) -> HorizontalCoordinate, observer: Observer,
+                                      night: DateInterval, darkness: [DateInterval],
+                                      minimumAltitude: Double, horizon: HorizonProfile) -> TargetVisibility {
         withoutActuallyEscaping(position) { position in
             HorizonVisibility(profile: horizon).targetVisibility(
                 HorizonFunctionTrack { position(SkyFrame(date: $0, observer: observer)) },
@@ -88,19 +91,19 @@ extension NightPlanner {
         }
     }
 
-    private static func visibilityOverHorizon(of body: SolarSystemBody, observer: Observer, night: DateInterval,
-                                              darkness: [DateInterval], minimumAltitude: Double,
-                                              horizon: HorizonProfile) -> TargetVisibility {
+    static func visibilityOverHorizon(of body: SolarSystemBody, observer: Observer, night: DateInterval,
+                                      darkness: [DateInterval], minimumAltitude: Double,
+                                      horizon: HorizonProfile) -> TargetVisibility {
         let offset = body == .sun ? RiseSetCalculator.sunHorizonAltitude - RiseSetCalculator.standardHorizonAltitude : 0
         return HorizonVisibility(profile: horizon).targetVisibility(
             HorizonBodyTrack(frames: HorizonSkyFrames(observer: observer), body: body),
             night: night, darkness: darkness, offset: offset, minimumAltitude: minimumAltitude)
     }
 
-    private static func visibilityOverHorizon(ofFixed targets: [EquatorialCoordinate],
-                                              properMotions: [ProperMotion?], observer: Observer,
-                                              night: DateInterval, darkness: [DateInterval],
-                                              minimumAltitude: Double, horizon: HorizonProfile) -> [TargetVisibility] {
+    static func visibilityOverHorizon(ofFixed targets: [EquatorialCoordinate],
+                                      properMotions: [ProperMotion?], observer: Observer,
+                                      night: DateInterval, darkness: [DateInterval],
+                                      minimumAltitude: Double, horizon: HorizonProfile) -> [TargetVisibility] {
         let visibility = HorizonVisibility(profile: horizon)
         let frames = HorizonSkyFrames(observer: observer)
         return targets.indices.map { index in

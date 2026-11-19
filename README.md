@@ -23,8 +23,9 @@ tilt the tripod head until it is in your frame.
   phone lying flat on top of the camera.
 - **Objects** — search (names, Messier/NGC/IC/HR/HD/HIP numbers, Greek-letter star names in any
   spelling) or browse by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters, Special
-  (Milky Way core, celestial poles). Sort by name, brightness, altitude or rise time; favourites,
-  recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
+  (Milky Way core, celestial poles). Sort by name, brightness, altitude, rise time or the hours an
+  object is visible tonight above your recorded skyline, and filter to objects visible for at least
+  an hour tonight; favourites, recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
   time to its meridian transit, its rise/transit/set, an altitude chart over the night with twilight
   shading, how it fits your frame, and the longest exposure before stars trail (NPF and 500 rules).
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
@@ -35,7 +36,8 @@ tilt the tripod head until it is in your frame.
   open the page that belongs to them.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
-  targets of the night, and a polar-scope clock for star trackers.
+  targets of the night (with a recorded skyline, ranked by the hours they stay clear of it), and a
+  polar-scope clock for star trackers.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when

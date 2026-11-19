@@ -38,6 +38,10 @@ struct TonightTarget: Identifiable, Sendable {
     /// The line under the name in place of the catalog description: a comet's or asteroid's magnitude estimate and
     /// elongation.
     var note: String?
+    /// With a recorded skyline, the hours of darkness the object is above it and at least
+    /// `TonightCalculator.minimumTargetAltitude` high (the same number as `hoursAboveMinimum`, named for the skyline);
+    /// `nil` for an open horizon.
+    var unobstructedHours: Double?
 
     var id: String { object.id }
 }

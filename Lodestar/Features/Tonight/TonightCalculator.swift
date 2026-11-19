@@ -7,6 +7,10 @@ enum TonightCalculator {
     static let minimumTargetAltitude = NightPlanner.defaultMinimumAltitude
     /// The most targets the list shows.
     static let targetLimit = 12
+    /// The ranking bonus per hour a target is clear of the site's skyline (only with a skyline).
+    static let clearHoursWeight = 0.1
+    /// The hours of clearance beyond which the bonus stops growing.
+    static let clearHoursCap = 6.0
 
     /// Plans the night that `input` asks for: twilight, Moon, Milky Way, planets and the best targets.
     static func report(for input: TonightInput) -> TonightReport {
@@ -69,7 +73,13 @@ enum TonightCalculator {
                                 movingTargets: [TonightTarget]) -> TonightTargetsOutcome {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
-        return .ranked(movingTargets + rankedTargets(in: catalog, summary: summary, skyline: skyline))
+        // With a skyline the hours of the comets and asteroids are the hours above it too.
+        let moving = skyline == nil ? movingTargets : movingTargets.map { target -> TonightTarget in
+            var target = target
+            target.unobstructedHours = target.hoursAboveMinimum
+            return target
+        }
+        return .ranked(moving + rankedTargets(in: catalog, summary: summary, skyline: skyline))
     }
 
     /// The listed deep-sky objects that climb to at least `minimumTargetAltitude` in the dark, best first, at
@@ -100,7 +110,9 @@ enum TonightCalculator {
             if skyline != nil, visibility.intervalsAboveMinimum.isEmpty { continue }
             guard let peak = visibility.maxAltitudeDuringDarkness, peak >= minimumTargetAltitude,
                   visibility.bestTime != nil else { continue }
-            candidates.append((object, visibility, peak, score(of: object, peakAltitude: peak)))
+            // The hours clear of the skyline count only when there is a skyline; an open horizon ranks as it always did.
+            let clearHours: Double? = skyline == nil ? nil : visibility.unobstructedHours
+            candidates.append((object, visibility, peak, score(of: object, peakAltitude: peak, clearHours: clearHours)))
         }
         candidates.sort { lhs, rhs in
             lhs.score != rhs.score ? lhs.score > rhs.score : lhs.object.id < rhs.object.id
@@ -111,7 +123,8 @@ enum TonightCalculator {
             return TonightTarget(
                 object: candidate.object, peakAltitude: candidate.peak, peakTime: time,
                 peakAzimuth: frame.horizontal(of: candidate.object, refraction: false).azimuth,
-                hoursAboveMinimum: candidate.visibility.hoursAboveMinimum)
+                hoursAboveMinimum: candidate.visibility.hoursAboveMinimum,
+                unobstructedHours: skyline == nil ? nil : candidate.visibility.unobstructedHours)
         }
     }
 
@@ -123,13 +136,16 @@ enum TonightCalculator {
     }
 
     /// Rates an object for a wide-field camera: higher in the dark is better, and so are brighter and larger.
-    /// Each part runs from 0 to 1; brightness counts most.
-    private static func score(of object: CelestialObject, peakAltitude: Double) -> Double {
+    /// Each part runs from 0 to 1; brightness counts most. With a skyline, `clearHours` (the hours above it in the
+    /// dark) adds `clearHoursWeight` per hour up to `clearHoursCap` hours, at most 0.6, so that a target that stays
+    /// clear of the trees and ridges for hours outranks one that only peeks over them.
+    static func score(of object: CelestialObject, peakAltitude: Double, clearHours: Double? = nil) -> Double {
         let altitude = AstroMath.clamp((peakAltitude - minimumTargetAltitude) / (90 - minimumTargetAltitude), 0, 1)
         // Magnitude 3 and brighter is full marks, magnitude 11 and fainter none.
         let brightness = object.magnitude.flatMap { $0.isFinite ? AstroMath.clamp((11 - $0) / 8, 0, 1) : nil } ?? 0
         // 5′ is a speck, 2° or more a big target for a wide lens.
         let size = object.angularSize.map { AstroMath.clamp(log10($0.majorArcminutes / 5) / 1.4, 0, 1) } ?? 0
-        return altitude + 1.5 * brightness + 0.8 * size
+        let clearance = clearHours.flatMap { $0.isFinite ? clearHoursWeight * min($0, clearHoursCap) : nil } ?? 0
+        return altitude + 1.5 * brightness + 0.8 * size + clearance
     }
 }
