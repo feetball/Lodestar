@@ -13,6 +13,9 @@ struct ObjectRow: View {
     let object: CelestialObject
     /// Where the object is now; `nil` while positions are not known.
     var position: ObjectSkyPosition?
+    /// Tonight's hours above the skyline, shown at the end of the description when the list is ordered or filtered by
+    /// them; `nil` otherwise.
+    var tonight: UnobstructedVisibility?
     var isFavorite = false
     /// The observer's time zone, for rising times.
     var timeZone: TimeZone = .current
@@ -36,8 +39,9 @@ struct ObjectRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ObjectsFormat.spokenSummary(of: object, position: position, isFavorite: isFavorite,
-                                                        in: timeZone, showsProminence: showsProminence))
+        .accessibilityLabel(ObjectsFormat.spokenSummary(of: object, position: position, tonight: tonight,
+                                                        isFavorite: isFavorite, in: timeZone,
+                                                        showsProminence: showsProminence))
     }
 
     /// At the largest text sizes nothing is cut: every line wraps instead.
@@ -48,11 +52,13 @@ struct ObjectRow: View {
     private var names: some View {
         VStack(alignment: .leading, spacing: 2) {
             nameLine
-            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude, position: position))
+            Text(ObjectsFormat.subtitle(of: object, magnitude: position?.magnitude, position: position,
+                                        tonight: tonight))
                 .font(.footnote)
                 .foregroundStyle(palette.secondaryText)
-                // The kind, magnitude, elongation and warnings of a comet or an asteroid take up to three lines.
-                .lineLimit(linesWrap ? nil : (object.smallBody == nil ? 1 : 3))
+                // The kind, magnitude, elongation and warnings of a comet or an asteroid take up to three lines, and
+                // the hours tonight make room for a second line, so that they are not cut off.
+                .lineLimit(linesWrap ? nil : (object.smallBody == nil ? (tonight == nil ? 1 : 2) : 3))
             if let line = ObjectsFormat.catalogueLine(of: object, showsProminence: showsProminence) {
                 Text(line)
                     .font(.caption)

@@ -52,7 +52,8 @@ private struct SettingsCameraSheets: ViewModifier {
 /// Settings ▸ Camera & Lens: the cameras and lenses the photographer uses, one of them active. The active profile gives
 /// the framing rectangle on the Aim screen and the sky chart and the numbers of the exposure tools. Tap a profile to use
 /// it, the pencil to edit it, swipe it to delete it; "Add Preset…" starts from a smart telescope or a plain camera and
-/// "From a Photo…" reads the camera and lens from the EXIF data of a picture.
+/// "From a Photo…" reads the camera and lens from the EXIF data of a picture. The filter in front of the sensor, which
+/// relaxes the Moon warnings for emission nebulae, is one setting for all profiles.
 struct SettingsCameraSection: View {
     @Environment(AppModel.self) private var app
     @Binding var presentation: SettingsCameraPresentation
@@ -68,7 +69,8 @@ struct SettingsCameraSection: View {
             title: "Camera & Lens",
             footer: "Describe the camera on the tripod, not the phone. The active profile gives the framing rectangle on "
                 + "the Aim screen and the sky chart, and the numbers of the exposure tools. A fisheye lens draws a "
-                + "curved frame. Exposure rules use the real focal length, as for any lens.") {
+                + "curved frame. Exposure rules use the real focal length, as for any lens. Narrowband filters make "
+                + "emission nebulae usable under moonlight; Lodestar relaxes its Moon warnings for them.") {
             ForEach(settings.cameraProfiles) { profile in
                 CameraProfileRow(
                     profile: profile,
@@ -102,6 +104,13 @@ struct SettingsCameraSection: View {
                 SettingsCaption("You have reached the limit of \(AppSettings.maximumCameraProfiles) profiles.")
             }
             SettingsFieldOfViewReadout(setup: app.lensSetup)
+            VStack(alignment: .leading, spacing: 4) {
+                SettingsMenuPicker(title: "Filter", selection: $store.settings.imagingFilter,
+                                   options: ImagingFilter.allCases.map {
+                                       SettingsMenuOption(title: $0.displayName, value: $0)
+                                   })
+                SettingsCaption(store.settings.imagingFilter.summary)
+            }
             SettingsToggleRow(
                 title: "Camera preview",
                 caption: "Shows the iPhone's camera behind the sky on the Aim screen. Lodestar asks for camera access "
