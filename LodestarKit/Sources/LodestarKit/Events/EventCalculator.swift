@@ -1,14 +1,16 @@
 import Foundation
 
 /// The astronomical events calendar: meteor shower maxima, conjunctions, oppositions, greatest elongations, the
-/// Earth's apsides, equinoxes and solstices, special full Moons and lunar and solar eclipses, computed offline from the
-/// kit's ephemerides.
+/// Earth's apsides, equinoxes and solstices, special full Moons, lunar and solar eclipses, the stations of the planets
+/// and, for the first days of the interval, the Great Red Spot's transits and the Galilean moons' phenomena, computed
+/// offline from the kit's ephemerides.
 ///
 /// Every search is bounded: intervals longer than `maximumSpanDays` (about ten years) are cut short, dates outside the
 /// years 1 to 4001 give nothing, and the work grows with the length of the interval. Cost of one year in an optimized build
 /// on a desktop: about 0.1 s without an observer and 0.2 s with one (the conjunctions take half of it; the visibility of an
-/// event a fraction of a millisecond); a debug build needs about 1.6 s. Nothing is cached between calls. Run it on a
-/// background thread and keep the result.
+/// event a fraction of a millisecond); a debug build needs about 1.6 s. The stations add about 30 ms a year; the Great
+/// Red Spot and moon events of `EventOptions.jupiterEventDays` days about 30 ms a day. Nothing is cached between
+/// calls. Run it on a background thread and keep the result.
 public enum EventCalculator {
     /// The longest interval, in days, that `events(from:to:observer:options:)` searches; longer intervals are cut at
     /// this length.
@@ -49,6 +51,19 @@ public enum EventCalculator {
             }
             if kinds.contains(.solarEclipse) {
                 found.append(contentsOf: SolarEclipseFinder.events(from: from, to: end, observer: observer, phases: phases))
+            }
+        }
+
+        if kinds.contains(.planetStation) { found.append(contentsOf: PlanetStations.events(from: from, to: end)) }
+        let jupiterEnd = min(end, from.addingTimeInterval(options.jupiterEventDays * JulianDate.secondsPerDay))
+        if options.jupiterEventDays > 0, kinds.contains(.greatRedSpotTransit) {
+            for transit in options.greatRedSpot.transits(from: from, to: jupiterEnd) {
+                found.append(AstronomicalEvent(date: transit.date, details: .greatRedSpotTransit(transit), visibility: nil))
+            }
+        }
+        if options.jupiterEventDays > 0, kinds.contains(.jupiterMoonEvent) {
+            for moonEvent in GalileanMoons.events(from: from, to: jupiterEnd) {
+                found.append(AstronomicalEvent(date: moonEvent.date, details: .jupiterMoonEvent(moonEvent), visibility: nil))
             }
         }
 
