@@ -101,6 +101,9 @@ struct ObjectDetailNight: Sendable {
     /// Whether the site's recorded skyline decided `events` and `bestInDarkness`: then a rise is the object clearing
     /// the skyline and a set is it sinking behind it.
     let appliesSkyline: Bool
+    /// With a recorded skyline, the stretches of the dark in which the object is above it and at least
+    /// `ObjectsTonight.minimumAltitude` high; `nil` without a skyline or without darkness.
+    let unobstructed: UnobstructedVisibility?
 
     /// When this night is over and "tonight" means the next one.
     var expiry: Date { twilight.sunrise ?? interval.end }
