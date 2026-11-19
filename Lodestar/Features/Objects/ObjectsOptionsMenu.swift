@@ -5,17 +5,18 @@ struct ObjectsOptionsMenu: View {
     @Binding var grouping: ObjectsGrouping
     @Binding var sortOrder: ObjectsSortOrder
     @Binding var showsOnlyAboveHorizon: Bool
+    @Binding var showsOnlyVisibleTonight: Bool
     @Binding var hidesFaintObjects: Bool
     @Binding var showsOnlyPopular: Bool
     /// Filled when any option differs from the default list.
     let isCustomized: Bool
-    /// The horizon filter and the altitude and rise-time orders need an observer.
+    /// The horizon and tonight filters and the altitude, rise-time and hours-tonight orders need an observer.
     let hasLocation: Bool
 
     /// The order the list is really in: without a location the orders that need the sky's positions fall back to name
     /// order (see `ObjectsListBuilder.sections`), so the menu checks that one instead of the unusable choice.
     private var shownSortOrder: Binding<ObjectsSortOrder> {
-        Binding(get: { !hasLocation && sortOrder.needsSkyPositions ? .name : sortOrder },
+        Binding(get: { !hasLocation && sortOrder.needsObserver ? .name : sortOrder },
                 set: { sortOrder = $0 })
     }
 
@@ -34,7 +35,7 @@ struct ObjectsOptionsMenu: View {
                 Picker("Sort By", selection: shownSortOrder) {
                     ForEach(ObjectsSortOrder.allCases) { option in
                         Label(option.title, systemImage: option.systemImage)
-                            .disabled(!hasLocation && option.needsSkyPositions)
+                            .disabled(!hasLocation && option.needsObserver)
                             .tag(option)
                     }
                 }
@@ -44,6 +45,10 @@ struct ObjectsOptionsMenu: View {
             Section("Filters") {
                 Toggle(isOn: $showsOnlyAboveHorizon) {
                     Label("Above Horizon Now", systemImage: "arrow.up.right")
+                }
+                .disabled(!hasLocation)
+                Toggle(isOn: $showsOnlyVisibleTonight) {
+                    Label("Visible \u{2265} 1 h Tonight", systemImage: "moon.stars")
                 }
                 .disabled(!hasLocation)
                 Toggle(isOn: $hidesFaintObjects) {

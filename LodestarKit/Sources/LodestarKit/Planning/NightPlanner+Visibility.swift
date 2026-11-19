@@ -16,11 +16,21 @@ extension NightPlanner {
     ///   - summary: The night, from `summary(nightStartingOn:observer:timeZone:)`.
     ///   - darkness: Which dark intervals of the night to count.
     ///   - minimumAltitude: The altitude in degrees from which the target is usable.
+    ///   - horizon: The site's skyline, or `nil` (the default) for a flat horizon. With a skyline the target counts
+    ///     only while it is above the skyline as well: `TargetVisibility.intervalsAboveMinimum` (also
+    ///     `unobstructedIntervals`) are the dark stretches above both, and rise and set are clearing and sinking
+    ///     behind the skyline (see the `Horizon` files). The cost is a few hundred position evaluations.
     public static func visibility(of position: (SkyFrame) -> HorizontalCoordinate, during summary: NightSummary,
                                   darkness: DarknessKind = .astronomical,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> TargetVisibility {
-        visibility(of: position, observer: summary.observer, night: summary.night,
-                   darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> TargetVisibility {
+        if let horizon {
+            return visibilityOverHorizon(of: position, observer: summary.observer, night: summary.night,
+                                         darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude,
+                                         horizon: horizon)
+        }
+        return visibility(of: position, observer: summary.observer, night: summary.night,
+                          darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
     }
 
     /// How well a target, described by a position function, can be observed during `interval`, which
@@ -29,9 +39,14 @@ extension NightPlanner {
     /// it is meant for spans of up to a few days.
     public static func visibility(of position: (SkyFrame) -> HorizontalCoordinate, observer: Observer,
                                   during interval: DateInterval,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> TargetVisibility {
-        visibility(of: position, observer: observer, night: interval, darkness: [interval],
-                   minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> TargetVisibility {
+        if let horizon {
+            return visibilityOverHorizon(of: position, observer: observer, night: interval, darkness: [interval],
+                                         minimumAltitude: minimumAltitude, horizon: horizon)
+        }
+        return visibility(of: position, observer: observer, night: interval, darkness: [interval],
+                          minimumAltitude: minimumAltitude)
     }
 
     /// How well the Sun, the Moon or a planet can be observed during the dark hours of a night.
@@ -44,19 +59,31 @@ extension NightPlanner {
     ///   - summary: The night, from `summary(nightStartingOn:observer:timeZone:)`.
     ///   - darkness: Which dark intervals of the night to count.
     ///   - minimumAltitude: The altitude in degrees from which the body is usable.
+    ///   - horizon: The site's skyline, or `nil` for a flat horizon; see the position-function overload.
     public static func visibility(of body: SolarSystemBody, during summary: NightSummary,
                                   darkness: DarknessKind = .astronomical,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> TargetVisibility {
-        visibility(of: body, observer: summary.observer, night: summary.night,
-                   darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> TargetVisibility {
+        if let horizon {
+            return visibilityOverHorizon(of: body, observer: summary.observer, night: summary.night,
+                                         darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude,
+                                         horizon: horizon)
+        }
+        return visibility(of: body, observer: summary.observer, night: summary.night,
+                          darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
     }
 
     /// How well the Sun, the Moon or a planet can be observed during `interval`, which stands for both
     /// the night and its dark time. See `visibility(of:during:darkness:minimumAltitude:)`.
     public static func visibility(of body: SolarSystemBody, observer: Observer, during interval: DateInterval,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> TargetVisibility {
-        visibility(of: body, observer: observer, night: interval, darkness: [interval],
-                   minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> TargetVisibility {
+        if let horizon {
+            return visibilityOverHorizon(of: body, observer: observer, night: interval, darkness: [interval],
+                                         minimumAltitude: minimumAltitude, horizon: horizon)
+        }
+        return visibility(of: body, observer: observer, night: interval, darkness: [interval],
+                          minimumAltitude: minimumAltitude)
     }
 
     // MARK: Many fixed targets
@@ -76,21 +103,37 @@ extension NightPlanner {
     ///   - summary: The night, from `summary(nightStartingOn:observer:timeZone:)`.
     ///   - darkness: Which dark intervals of the night to count.
     ///   - minimumAltitude: The altitude in degrees from which a target is usable.
+    ///   - horizon: The site's skyline, or `nil` for a flat horizon; see the position-function overload. With a
+    ///     skyline a thousand targets take about a quarter of a second (11,000 about 3 s on a desktop JVM, the
+    ///     Kotlin twin), three to four times what they cost without one; for the hours alone of a whole catalog,
+    ///     `unobstructedVisibility(ofFixed:properMotions:during:darkness:minimumAltitude:horizon:)` is cheaper.
     /// - Returns: One `TargetVisibility` per target, in the order given.
     public static func visibility(ofFixed targets: [EquatorialCoordinate], properMotions: [ProperMotion?] = [],
                                   during summary: NightSummary, darkness: DarknessKind = .astronomical,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> [TargetVisibility] {
-        visibility(ofFixed: targets, properMotions: properMotions, observer: summary.observer,
-                   night: summary.night, darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> [TargetVisibility] {
+        if let horizon {
+            return visibilityOverHorizon(ofFixed: targets, properMotions: properMotions, observer: summary.observer,
+                                         night: summary.night, darkness: summary.darkness(darkness),
+                                         minimumAltitude: minimumAltitude, horizon: horizon)
+        }
+        return visibility(ofFixed: targets, properMotions: properMotions, observer: summary.observer,
+                          night: summary.night, darkness: summary.darkness(darkness), minimumAltitude: minimumAltitude)
     }
 
     /// How well each of many fixed targets can be observed during `interval`, which stands for both
     /// the night and its dark time. See `visibility(ofFixed:properMotions:during:darkness:minimumAltitude:)`.
     public static func visibility(ofFixed targets: [EquatorialCoordinate], properMotions: [ProperMotion?] = [],
                                   observer: Observer, during interval: DateInterval,
-                                  minimumAltitude: Double = defaultMinimumAltitude) -> [TargetVisibility] {
-        visibility(ofFixed: targets, properMotions: properMotions, observer: observer, night: interval,
-                   darkness: [interval], minimumAltitude: minimumAltitude)
+                                  minimumAltitude: Double = defaultMinimumAltitude,
+                                  horizon: HorizonProfile? = nil) -> [TargetVisibility] {
+        if let horizon {
+            return visibilityOverHorizon(ofFixed: targets, properMotions: properMotions, observer: observer,
+                                         night: interval, darkness: [interval], minimumAltitude: minimumAltitude,
+                                         horizon: horizon)
+        }
+        return visibility(ofFixed: targets, properMotions: properMotions, observer: observer, night: interval,
+                          darkness: [interval], minimumAltitude: minimumAltitude)
     }
 
     // MARK: Implementation
