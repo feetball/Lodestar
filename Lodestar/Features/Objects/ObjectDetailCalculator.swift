@@ -75,6 +75,12 @@ enum ObjectDetailCalculator {
         } ?? RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: interval)
         let samples = altitudeSamples(of: object, observer: observer, over: chartRange)
         let darkness = twilight.astronomicalNight
+        // With a skyline, the stretches of the dark in which the object is above it and high enough to shoot.
+        var unobstructed: UnobstructedVisibility?
+        if let visibility, let darkness {
+            unobstructed = ObjectsTonight.visibility(of: object, observer: observer, darkness: darkness,
+                                                     skyline: visibility.profile)
+        }
         return ObjectDetailNight(
             interval: interval,
             chartRange: chartRange,
@@ -89,19 +95,14 @@ enum ObjectDetailCalculator {
             hourTicks: hourTicks(in: chartRange, calendar: context.calendar),
             bestInDarkness: bestPoint(of: object, observer: observer, samples: samples, darkness: darkness,
                                       transit: events.transit, visibility: visibility),
-            appliesSkyline: visibility != nil)
+            appliesSkyline: visibility != nil,
+            unobstructed: unobstructed)
     }
 
     /// The twilight of the night that contains `date`: the one that began at noon yesterday while it is still
     /// before sunrise, otherwise the one that begins at noon today.
     private static func currentTwilight(context: ObserverContext, date: Date) -> NightTwilight {
-        let yesterday = context.calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400)
-        let previous = TwilightCalculator.night(startingOn: yesterday, observer: context.observer,
-                                                timeZone: context.timeZone)
-        if date < previous.interval.end, date < (previous.sunrise ?? previous.interval.end) {
-            return previous
-        }
-        return TwilightCalculator.night(startingOn: date, observer: context.observer, timeZone: context.timeZone)
+        ObjectsTonight.twilight(observer: context.observer, timeZone: context.timeZone, date: date)
     }
 
     private static func apparentAltitude(of object: CelestialObject, observer: Observer, at date: Date) -> Double {

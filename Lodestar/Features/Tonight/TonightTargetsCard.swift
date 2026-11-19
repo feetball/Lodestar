@@ -41,7 +41,8 @@ struct TonightTargetsCard: View {
                 TonightNote(text: SmallBodyText.targetsNote, style: .footnote)
             }
             if appliesSkyline {
-                TonightSkylineNote(detail: "targets hidden behind the skyline are left out.")
+                TonightSkylineNote(detail: "targets hidden behind the skyline are left out, and targets that stay clear"
+                                   + " of it longer rank higher.")
             }
         case .noDarkness:
             TonightNote(text: "There is no astronomical darkness on this night, so there is nothing to rank.")
@@ -144,12 +145,13 @@ private struct TonightTargetRow: View {
         return TonightFormat.designation(of: object).map { "\(name)\u{00A0}\u{00B7} \($0)" } ?? name
     }
 
-    /// "Best 23:40 facing SE · 7h 12m above 20°".
+    /// "Best 23:40 facing SE · 7h 12m above 20°"; with a skyline "Best 23:40 facing SE · 3.5 h clear of your skyline".
     private var timing: String {
         let minimum = Int(TonightCalculator.minimumTargetAltitude)
         let best = TonightFormat.solid("Best \(AppFormat.time(target.peakTime, in: timeZone))") + " "
             + TonightFormat.solid(TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
-        let above = "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
+        let above = target.unobstructedHours.map { "\(ObjectsFormat.hours($0)) clear of your skyline" }
+            ?? "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
         // A wrapped line breaks after the dot, not between "8h 14m" and a lone "above 20°". At accessibility sizes the
         // text column is too narrow for the whole phrase in one piece, so it may break at its spaces there.
         return TonightFormat.dotted([best, dynamicTypeSize.isAccessibilitySize ? above : TonightFormat.solid(above)])
@@ -163,8 +165,12 @@ private struct TonightTargetRow: View {
         parts.append("highest \(AngleFormatter.formatDegrees(target.peakAltitude, decimals: 0))"
                      + " at \(AppFormat.time(target.peakTime, in: timeZone))"
                      + ", " + TonightFormat.spokenFacing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
-        parts.append("\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above"
-                     + " \(Int(TonightCalculator.minimumTargetAltitude)) degrees")
+        if let clear = target.unobstructedHours {
+            parts.append("\(ObjectsFormat.hours(clear, spoken: true)) clear of your skyline")
+        } else {
+            parts.append("\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above"
+                         + " \(Int(TonightCalculator.minimumTargetAltitude)) degrees")
+        }
         if let moon = target.moon {
             parts.append(ObjectMoonText.chip(moon))
         }
