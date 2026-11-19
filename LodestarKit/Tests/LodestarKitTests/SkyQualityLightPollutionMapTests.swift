@@ -62,16 +62,17 @@ final class SkyQualityLightPollutionMapTests: XCTestCase {
 
     func testDecoderRoundTripsASyntheticGrid() throws {
         let cells = Support.cells { row, column in
-            if row < 600 { return (column / 5 + row / 100) % 16 }
+            if row < 400 { return (column / 5 + row / 100) % 16 }
             if row < 900 { return 3 }
-            if row < 1200 { return (column + row) % 2 * 9 }
+            if row < 1000 { return (column + row) % 2 * 9 }
+            if row < 1200 { return 11 }
             return (100..<3500).contains(column) ? 15 : 0
         }
         let blob = Support.encode(cells)
         XCTAssertLessThan(blob.count, cells.count / 4)
         let map = try LightPollutionMap.parse(blob)
         XCTAssertEqual(map.levels, cells)
-        for row in [0, 1, 599, 600, 899, 900, 1000, 1199, 1200, 1799] {
+        for row in [0, 1, 399, 400, 899, 900, 999, 1000, 1199, 1200, 1799] {
             for column in [0, 1, 99, 100, 3499, 3500, 3599, 1234] {
                 XCTAssertEqual(Int(cells[row * 3600 + column]), map.level(at: Support.centre(row: row, column: column)),
                                "\(row), \(column)")
