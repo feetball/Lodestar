@@ -14,6 +14,8 @@ struct SkyChartView: View {
     @State private var model = SkyChartModel()
     @State private var isShowingLayers = false
     @State private var isShowingDateSheet = false
+    /// The glow ring of the observer's place, worked out off the main actor when the setting is on.
+    @State private var glowRing: HorizonGlowRing?
     @AppStorage("skyChart.rotatesToHeading") private var rotatesToHeading = false
     @AppStorage("skyChart.showsStarNames") private var showsStarNames = true
     @AppStorage("skyChart.showsAltitudeGrid") private var showsAltitudeGrid = true
@@ -56,6 +58,13 @@ struct SkyChartView: View {
                 model.update(catalog: catalog, inputs: newInputs)
             }
             .overlay { layersMenu }
+            .task(id: GlowRingRequest(location: observer.location, isOn: app.settings.showHorizonGlow)) {
+                guard app.settings.showHorizonGlow else {
+                    glowRing = nil
+                    return
+                }
+                glowRing = await SkyQualityMapStore.shared.glowRing(at: observer.location)
+            }
         } else {
             NeedsLocationView()
         }
@@ -146,7 +155,8 @@ struct SkyChartView: View {
                                     starNames: showsStarNames,
                                     altitudeGrid: showsAltitudeGrid,
                                     cameraView: showsCameraView,
-                                    fixedCameraFrame: fixesCameraFrame)
+                                    fixedCameraFrame: fixesCameraFrame,
+                                    horizonGlow: settings.showHorizonGlow ? glowRing : nil)
     }
 
     /// What the scene depends on. The chart's instant is rounded, so the 1 Hz clock does not rebuild it every second.
@@ -178,5 +188,16 @@ private struct SkyChartResetZoomButton: View {
         }
         .tint(model.zoom != 1 || model.pan != .zero ? palette.accent : palette.tertiaryText)
         .accessibilityLabel("Reset zoom")
+    }
+}
+
+/// What restarts the work of the glow ring: another place (to about a kilometre) or the setting switched on or off.
+private struct GlowRingRequest: Equatable {
+    let key: SkyQualityKey?
+    let isOn: Bool
+
+    init(location: GeographicLocation, isOn: Bool) {
+        key = SkyQualityKey(location)
+        self.isOn = isOn
     }
 }

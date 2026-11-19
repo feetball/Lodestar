@@ -14,6 +14,8 @@ tilt the tripod head until it is in your frame.
   closer, optional spoken guidance ("Pan right 12, tilt up 3 … Almost there … On target") for when
   the phone is above eye level, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
   With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
+  A time bar previews the sky at a later (or earlier) time, up to 48 hours either way, so you can frame the Milky
+  Way core or a planet for 2 am at 9 pm and lock the head; the phone's pointing stays live.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Syncing waits until the phone has been held still, each
@@ -24,10 +26,14 @@ tilt the tripod head until it is in your frame.
   phone lying flat on top of the camera.
 - **Objects** — search (names, Messier/NGC/IC/HR/HD/HIP numbers, Greek-letter star names in any
   spelling) or browse by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters, Special
-  (Milky Way core, celestial poles). Sort by name, brightness, altitude or rise time; favourites,
-  recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
+  (Milky Way core, celestial poles). Sort by name, brightness, altitude, rise time or the hours an
+  object is visible tonight above your recorded skyline, and filter to objects visible for at least
+  an hour tonight; favourites, recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
   time to its meridian transit, its rise/transit/set, an altitude chart over the night with twilight
-  shading, how it fits your frame, and the longest exposure before stars trail (NPF and 500 rules).
+  shading, how it fits your frame, the longest exposure before stars trail (NPF and 500 rules) and
+  how much the Moon will matter. That advice is filter-aware: set a light-pollution or narrowband
+  filter in *Settings ▸ Camera & Lens* and it is relaxed for emission nebulae, planetary nebulae and
+  supernova remnants. Tonight's best targets weigh the Moon the same way.
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
   objects, your camera's live pointing, tap-to-identify, time travel and zoom up to 15×. **Plan your
   framing** holds your camera's frame in the middle of the chart so you can move the sky under it and
@@ -36,7 +42,11 @@ tilt the tripod head until it is in your frame.
   open the page that belongs to them.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
-  targets of the night, and a polar-scope clock for star trackers.
+  targets of the night (with a recorded skyline, ranked by the hours they stay clear of it), and a
+  polar-scope clock for star trackers. A **Sky quality** card estimates the
+  Bortle class of the site offline from satellite night-light imagery, points to the darkest direction and
+  scores the night for imaging (dark hours, Moon, sky brightness and, when the forecast is on, clouds); the
+  same estimate shows on every site, and the sky chart can draw a thin glow ring on the horizon.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
@@ -49,7 +59,9 @@ tilt the tripod head until it is in your frame.
   Moon by the Looney 11 rule, adjusted for phase and height, with the Moon's size in pixels. The pages of the Sun,
   Moon and planets show their size in pixels too.
 - **Real skyline** — sweep the phone along the horizon to record trees, buildings and mountains; rise and set
-  times, Tonight and the charts then use the site's own skyline.
+  times, Tonight and the charts then use the site's own skyline. Optionally, a **terrain horizon** worked out from
+  elevation data (AWS Open Data, downloaded for a saved site only when you ask) stands in where you have not
+  recorded a skyline and fills the stretches a partial sweep left open.
 - **Comets and asteroids** — 216 bright asteroids built in and, optionally, the daily comet file: brightness
   estimates, elongation warnings, a Bright Comets list, and the direction of a comet's ion tail with the camera
   tilt that lays it along the frame.
@@ -58,8 +70,9 @@ tilt the tripod head until it is in your frame.
   an always-available Stop, with altitude limits, a meridian countdown that warns before the mount has to flip,
   and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
-  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast (MET
-  Norway, location rounded to about 10 km).
+  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast with dew,
+  wind, fog and temperature (MET Norway, location rounded to about 10 km) and terrain horizons (elevation tiles from
+  AWS Open Data, only when you ask a site for one).
 - **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
@@ -70,8 +83,8 @@ tilt the tripod head until it is in your frame.
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
 - **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected.
-  The optional online data downloads from CelesTrak, the Minor Planet Center and MET Norway only when you turn it
-  on, and a GoTo mount is reached over the local network only.
+  The optional online data downloads from CelesTrak, the Minor Planet Center, MET Norway and AWS Open Data only
+  when you turn it on, and a GoTo mount is reached over the local network only.
 
 ## Requirements
 
@@ -194,8 +207,10 @@ Lodestar has no accounts, analytics, ads or tracking, and it never collects your
 and camera data are processed on the device. The network is used by Apple (map tiles in the site picker,
 and the geocoding service, which receives a site's coordinates to look up its time zone while you add or
 edit a site) and by the optional downloads in Settings ▸ Online Data, which are off until switched on:
-CelesTrak, the Minor Planet Center and MET Norway see the IP address, and MET Norway also the location
-rounded to about 10 km. GoTo mount control talks to the mount on the local network only. See
+CelesTrak, the Minor Planet Center, MET Norway and the AWS Open Data tile server see the IP address; MET
+Norway also sees the location rounded to about 10 km, and the tile server which 1° elevation tiles you ask for
+(where a site is to within about 100 km), only when you ask a site for its terrain horizon. GoTo mount control
+talks to the mount on the local network only. See
 `docs/privacy.md` and `Lodestar/Resources/PrivacyInfo.xcprivacy`.
 
 ## Data and credits
@@ -203,5 +218,6 @@ rounded to about 10 km. GoTo mount control talks to the mount on the local netwo
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation
 figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025
 (public domain). Planetary theory VSOP87 (Bretagnon & Francou); Pluto and lunar theory after
-J. Meeus. Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
+J. Meeus. Night lights: NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP). Optional terrain elevation data: AWS Open Data Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S.
+Geological Survey, and national surveys). Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
 and [Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.

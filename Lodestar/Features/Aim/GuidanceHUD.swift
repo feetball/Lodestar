@@ -57,6 +57,7 @@ private struct AimHUDLayout: View {
             levelGaugeSlot
             MountAimStrip(model: model, sheet: $sheet)
             AimReadout(model: model, sheet: $sheet, isActive: isActive)
+            AimTimeBar(model: model, sheet: $sheet)
             AimControlsBar(model: model, sheet: $sheet)
         }
     }
@@ -86,6 +87,7 @@ private struct AimHUDLayout: View {
                 Spacer(minLength: 0)
                 MountAimStrip(model: model, sheet: $sheet)
                 AimReadout(model: model, sheet: $sheet, isActive: isActive)
+                AimTimeBar(model: model, sheet: $sheet)
             }
             .frame(maxWidth: Self.wideReadoutWidth)
             Spacer(minLength: 0)

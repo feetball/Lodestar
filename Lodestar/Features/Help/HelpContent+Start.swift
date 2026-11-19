@@ -9,7 +9,7 @@ extension HelpContent {
             .paragraph("Lodestar turns an iPhone clamped to your camera into a finder for the night sky. Do the first three steps once. After that, each night you only align and pick a target."),
             .steps([
                 "**Mount the phone.** Clamp it firmly to the camera, then choose how it sits in **Settings** \u{25B8} **Mount**.",
-                "**Enter your camera and lens** in **Settings** \u{25B8} **Camera & Lens**. Lodestar draws the outline of your frame from them, and the exposure tools use them to work out the longest exposure before stars trail.",
+                "**Enter your camera and lens** in **Settings** \u{25B8} **Camera & Lens**. Lodestar draws the outline of your frame from them, and the exposure tools use them to work out the longest exposure before stars trail. If you shoot through a light-pollution or narrowband filter, choose it under **Filter** there too: Lodestar then relaxes its Moon warnings for emission nebulae.",
                 "**Set where you are.** Allow location access (approximate is fine) or choose a site in **Settings** \u{25B8} **Location**. **Add Site\u{2026}** lets you pick a place on the map or type coordinates.",
                 "**Align on a star.** On the Aim tab, tap **Align** and choose a bright star or planet. Center it in your camera\u{2019}s viewfinder or live view, then tap **Centered \u{2014} Sync**.",
                 "**Pick a target and follow the arrow.** Tap **Target** and choose something from **Quick picks**, or search. Turn the tripod head the way the arrow points. When the screen says **In your frame** with a check mark, fine-tune in your camera\u{2019}s live view.",
@@ -39,7 +39,8 @@ extension HelpContent {
     private static let aimScreen = HelpTopic(
         topic: .aimScreen, category: .aiming, title: "The Aim screen", systemImage: "scope",
         summary: "What the Aim screen shows and what its buttons do.",
-        keywords: ["arrow", "guidance", "chips", "status", "icons", "hud", "roll", "crosshair", "readout", "buttons", "spoken", "voice", "speech", "watch"],
+        keywords: ["arrow", "guidance", "chips", "status", "icons", "hud", "roll", "crosshair", "readout", "buttons", "preview",
+                   "time travel", "later", "clock", "spoken", "voice", "speech", "watch"],
         blocks: [
             .paragraph("The Aim tab shows the sky where your camera points and leads you to the target."),
             .bullets([
@@ -51,7 +52,8 @@ extension HelpContent {
                 "**On your Apple Watch**, open Lodestar and swipe to its **Aim** page: a large arrow, the pan and tilt in degrees, the distance and the target, a check mark and a tap when you are on target, and red only when the phone is in night mode. It shows **Waiting for iPhone\u{2026}** when the phone is not aiming or out of reach. **Show aiming on the watch** in **Settings** \u{25B8} **Feedback** turns it off.",
                 "**Chips** (small labels) along the top: **Compass good**, **Compass fair** or **Compass poor** (or **Gyro lock**), **Magnetic interference**, **Not aligned**, **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts** or **Alignment 3 h old**, **Virtual sky**, **Approx. location**, camera notices and Starlink streak warnings.",
                 "**The level gauge**, top right, reads **Level** with a check mark when the camera is level.",
-                "**Buttons:** **Target**, **Align**, **Mosaic**, **Camera**, the night button (**Night off**, **Night on** or **Night auto**) and zoom. **Mount** appears once a GoTo mount has connected.",
+                "**Buttons:** **Target**, **Align**, **Mosaic**, **Time**, **Camera**, the night button (**Night off**, **Night on** or **Night auto**) and zoom. **Mount** appears once a GoTo mount has connected.",
+                "**Time** opens a bar to preview the sky at another time, up to 48 hours either way: **\u{2212}1 h**, **\u{2212}15 min**, **+15 min** and **+1 h**, **Now**, and the calendar button for any date and time. The stars, Milky Way, planets, Moon, target marker and arrows then show where they will stand, so you can frame the shot while it is still light and lock the head. Your phone\u{2019}s own pointing stays live. A chip **Preview 02:15** at the top and a line on the card (**Will be at altitude 34\u{00B0} at 02:15**) say what you are looking at; **Daylight at 14:20** warns when the Sun will be up. **Live** returns to now, as does leaving the Aim tab or the app. A satellite cannot be followed while previewing, and **Align** always works on the live sky.",
                 "**No target?** A panel names the planet, bright star or deep-sky object within a few degrees of the middle of the picture. **Aim here** makes it your target; **Choose target** opens the list. The circled \u{00D7} on the card clears the target.",
             ]),
         ],

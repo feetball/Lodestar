@@ -13,6 +13,8 @@ struct SkyChartLayerOptions: Equatable {
     /// The camera's frame stays in the middle of the view and the chart moves under it, for planning a picture,
     /// instead of following where the phone points. Only with `cameraView`.
     var fixedCameraFrame = false
+    /// The ring of light-pollution glow just inside the horizon, or `nil` for none.
+    var horizonGlow: HorizonGlowRing?
 }
 
 /// Builders for the simple shapes the chart draws.

@@ -66,25 +66,40 @@ public struct AngularSize: Hashable, Codable, Sendable, CustomStringConvertible 
         try container.encodeIfPresent(positionAngle, forKey: .positionAngle)
     }
 
-    /// The size for display, for example "178′ × 70′", "8.4′" or "36″".
+    /// The size for display in degrees, arcminutes and arcseconds, for example "2° 58′ × 1° 10′",
+    /// "8′ 24″" or "36″".
     ///
-    /// Sizes are rounded to whole arcminutes from 10′ up and to a tenth below that. Sizes below one
-    /// arcminute (that do not round up to 60″) are given in arcseconds. Both axes use the unit of the
-    /// major axis, and a minor axis that prints like the major one is left out.
+    /// Each axis is written in its two largest units: degrees and whole arcminutes from 1° up,
+    /// arcminutes and whole arcseconds from 1′ up, and arcseconds below that (to a tenth under 10″).
+    /// A trailing unit that is zero is left out ("2°", "25′"), and a smaller unit that follows a
+    /// larger one has two digits ("1° 05′", "8′ 04″"), like the declination on the Now card. Rounding
+    /// happens once, at the smallest unit shown, so 59′ 59.6″ is "1°". The axes choose their units
+    /// separately, and a minor axis that prints like the major one is left out.
     public var description: String {
-        let inArcseconds = (majorArcminutes * 60).rounded() < 60
-        let major = Self.format(majorArcminutes, inArcseconds: inArcseconds)
+        let major = Self.format(majorArcminutes)
         guard let minorArcminutes else { return major }
-        let minor = Self.format(minorArcminutes, inArcseconds: inArcseconds)
+        let minor = Self.format(minorArcminutes)
         return minor == major ? major : "\(major) × \(minor)"
     }
 
-    private static func format(_ arcminutes: Double, inArcseconds: Bool) -> String {
-        if inArcseconds {
-            let seconds = arcminutes * 60
-            return (seconds < 10 ? CatalogFormat.trimmedOneDecimal(seconds) : String(Int(seconds.rounded()))) + "″"
+    private static func format(_ arcminutes: Double) -> String {
+        if arcminutes >= 60 {
+            let total = Int(arcminutes.rounded())
+            return units(total / 60, "°", total % 60, "′")
         }
-        let text = arcminutes < 10 ? CatalogFormat.trimmedOneDecimal(arcminutes) : String(Int(arcminutes.rounded()))
-        return text + "′"
+        let arcseconds = arcminutes * 60
+        if arcseconds < 10 {
+            return CatalogFormat.trimmedOneDecimal(arcseconds) + "″"
+        }
+        let total = Int(arcseconds.rounded())
+        if total >= 3600 { return "1°" }
+        return total >= 60 ? units(total / 60, "′", total % 60, "″") : "\(total)″"
+    }
+
+    /// A larger unit and the smaller one that follows it ("2° 58′"), or only the larger when the
+    /// smaller is zero.
+    private static func units(_ larger: Int, _ largerMark: String, _ smaller: Int, _ smallerMark: String) -> String {
+        guard smaller > 0 else { return "\(larger)\(largerMark)" }
+        return "\(larger)\(largerMark) \(smaller < 10 ? "0" : "")\(smaller)\(smallerMark)"
     }
 }

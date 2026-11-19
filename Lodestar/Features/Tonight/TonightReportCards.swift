@@ -9,6 +9,7 @@ struct TonightReportCards: View {
             TonightTimelineCard(report: report)
             TonightCloudCard(place: report.summary.observer.location, night: report.timeline.range,
                              timeZone: report.timeZone)
+            TonightSkyQualityCard(summary: report.summary, night: report.timeline.range)
             TonightSunCard(summary: report.summary, timeZone: report.timeZone)
             TonightMoonCard(summary: report.summary, timeZone: report.timeZone, appliesSkyline: report.appliesSkyline)
             TonightMilkyWayCard(summary: report.summary, timeZone: report.timeZone,
