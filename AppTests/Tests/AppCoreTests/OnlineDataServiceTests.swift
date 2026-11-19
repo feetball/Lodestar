@@ -524,7 +524,8 @@ final class OnlineDataServiceTests: XCTestCase {
         let box = OnlineDataServiceTestsBox()
         defer { box.remove() }
         let expires = box.attempt.addingTimeInterval(3600)
-        try box.save(.forecast, forecastJSON, savedAt: savedEarly, expires: expires, key: place)
+        // Saved at the attempt: a server's Expires holds back a request for at most a day after the save.
+        try box.save(.forecast, forecastJSON, savedAt: box.attempt, expires: expires, key: place)
         box.block(.clouds)
         var service: OnlineDataService! = box.makeService()
         service.locationProvider = { self.dallas() }
