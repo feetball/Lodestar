@@ -22,9 +22,9 @@ tilt the tripod head until it is in your frame.
 - **Objects** — search (names, Messier/NGC/IC/HR/HD/HIP numbers, Greek-letter star names in any
   spelling) or browse by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters, Special
   (Milky Way core, celestial poles). Sort by name, brightness, altitude or rise time; favourites,
-  recents and custom RA/Dec targets. Each object shows where it is now, its rise/transit/set, an
-  altitude chart over the night with twilight shading, how it fits your frame, and the longest
-  exposure before stars trail (NPF and 500 rules).
+  recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
+  time to its meridian transit, its rise/transit/set, an altitude chart over the night with twilight
+  shading, how it fits your frame, and the longest exposure before stars trail (NPF and 500 rules).
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
   objects, your camera's live pointing, tap-to-identify, time travel and zoom up to 15×. **Plan your
   framing** holds your camera's frame in the middle of the chart so you can move the sky under it and
@@ -46,7 +46,8 @@ tilt the tripod head until it is in your frame.
   tilt that lays it along the frame.
 - **GoTo mounts** — connect over Wi-Fi to OnStep/LX200, Celestron NexStar and SynScan, ASCOM Alpaca and the
   Sky-Watcher AZ-GTi / Star Adventurer GTi (with home position and star alignment); Go to, Sync, nudge arrows and
-  an always-available Stop, with altitude limits and a built-in simulated mount to try it without hardware.
+  an always-available Stop, with altitude limits, a meridian countdown that warns before the mount has to flip,
+  and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
   Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast (MET
   Norway, location rounded to about 10 km).

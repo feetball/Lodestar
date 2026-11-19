@@ -38,10 +38,12 @@ enum ObjectDetailCalculator {
             illuminatedFraction = state.illuminatedFraction
             moonPhase = body == .moon ? MoonPhaseCalculator.info(at: date) : nil
         }
+        let equatorial = frame.apparentEquatorial(of: object)
+        let smallBody = object.smallBody.flatMap { SmallBodyDetail.compute($0, frame: frame) }
         return ObjectDetailCurrent(
             date: date,
             horizontal: horizontal,
-            equatorial: frame.apparentEquatorial(of: object),
+            equatorial: equatorial,
             magnitude: frame.currentMagnitude(of: object),
             angularSize: frame.currentAngularSize(of: object),
             distance: distance,
@@ -49,7 +51,9 @@ enum ObjectDetailCalculator {
             moonPhase: moonPhase,
             isBehindSkyline: isBehindSkyline,
             isSmallBody: object.smallBody != nil,
-            smallBody: object.smallBody.flatMap { SmallBodyDetail.compute($0, frame: frame) })
+            smallBody: smallBody,
+            meridian: ObjectDetailMeridian.of(object, observer: observer, date: date, apparent: equatorial,
+                                              isEvaluable: object.smallBody == nil || smallBody != nil))
     }
 
     // MARK: Tonight
