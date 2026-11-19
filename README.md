@@ -13,6 +13,8 @@ tilt the tripod head until it is in your frame.
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
   closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
   With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
+  A time bar previews the sky at a later (or earlier) time, up to 48 hours either way, so you can frame the Milky
+  Way core or a planet for 2 am at 9 pm and lock the head; the phone's pointing stays live.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Syncing waits until the phone has been held still, each
@@ -40,7 +42,10 @@ tilt the tripod head until it is in your frame.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night (with a recorded skyline, ranked by the hours they stay clear of it), and a
-  polar-scope clock for star trackers.
+  polar-scope clock for star trackers. A **Sky quality** card estimates the
+  Bortle class of the site offline from satellite night-light imagery, points to the darkest direction and
+  scores the night for imaging (dark hours, Moon, sky brightness and, when the forecast is on, clouds); the
+  same estimate shows on every site, and the sky chart can draw a thin glow ring on the horizon.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
@@ -64,9 +69,9 @@ tilt the tripod head until it is in your frame.
   an always-available Stop, with altitude limits, a meridian countdown that warns before the mount has to flip,
   and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
-  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, tonight's cloud forecast (MET
-  Norway, location rounded to about 10 km) and terrain horizons (elevation tiles from AWS Open Data, only when you
-  ask a site for one).
+  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast with dew,
+  wind, fog and temperature (MET Norway, location rounded to about 10 km) and terrain horizons (elevation tiles from
+  AWS Open Data, only when you ask a site for one).
 - **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
@@ -211,6 +216,6 @@ talks to the mount on the local network only. See
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation
 figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025
 (public domain). Planetary theory VSOP87 (Bretagnon & Francou); Pluto and lunar theory after
-J. Meeus. Optional terrain elevation data: AWS Open Data Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S.
+J. Meeus. Night lights: NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP). Optional terrain elevation data: AWS Open Data Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S.
 Geological Survey, and national surveys). Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
 and [Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.

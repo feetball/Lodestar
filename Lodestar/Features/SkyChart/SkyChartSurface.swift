@@ -452,6 +452,9 @@ struct SkyChartSurface: View {
         if let skyline = content.scene.skyline {
             parts.append("The ground below the \(HorizonText.spokenName(app.observerContext?.horizonSource)) is shaded; it rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
         }
+        if let glow = layers.horizonGlow {
+            parts.append(glow.spokenSummary)
+        }
         if let mosaic = MosaicDisplay.current {
             parts.append(mosaicDescription(mosaic))
         }

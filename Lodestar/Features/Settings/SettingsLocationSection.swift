@@ -166,6 +166,14 @@ private struct SettingsDeviceLocationRow: View {
     let onSelect: () -> Void
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            selectButton
+            SkyQualityLine(location: app.location.stableLocation)
+                .padding(.leading, 36)
+        }
+    }
+
+    private var selectButton: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
                 SettingsSelectionMark(isSelected: isSelected)
@@ -214,6 +222,14 @@ private struct SettingsSavedSiteRow: View {
     let onEdit: () -> Void
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            buttons
+            SkyQualityLine(location: site.location)
+                .padding(.leading, 36)
+        }
+    }
+
+    @ViewBuilder private var buttons: some View {
         if dynamicTypeSize.isAccessibilitySize {
             // At the largest text sizes the two icon buttons would leave the text a column of a few letters, so they
             // move to their own line under the text.

@@ -64,6 +64,14 @@ private struct AimScreen: View {
             .onChange(of: app.selectedTab == .aim, initial: true) { _, isShowing in
                 model.useCameraZoom(isShowing: isShowing)
             }
+            // A preview never outlives the tab or the app being in front: coming back finds the live sky.
+            .onChange(of: isActive) { _, isNowActive in
+                if !isNowActive { model.leave() }
+            }
+            // A satellite moves too fast to look ahead at: following one ends the preview.
+            .onChange(of: model.satelliteSource?.id) { _, id in
+                if id != nil { model.endPreview() }
+            }
             .task(id: WorkKey(skyInputs: skyInputs, isActive: isActive)) {
                 guard isActive else { return }
                 await model.keepSkyCurrent(skyInputs)
@@ -81,6 +89,7 @@ private struct AimScreen: View {
             }
             .onDisappear {
                 model.stopFeedback()
+                model.leave()
             }
     }
 
@@ -121,6 +130,10 @@ private struct AimScreen: View {
             MountAimSheet(model: model)
                 .presentationDetents([.fraction(0.5), .large])
                 .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.5)))
+                .sheetDragIndicator(app.palette)
+        case .previewTime:
+            AimPreviewTimeSheet(model: model)
+                .presentationDetents([.medium, .large])
                 .sheetDragIndicator(app.palette)
         case .help:
             HelpSheet(topic: .aimScreen)

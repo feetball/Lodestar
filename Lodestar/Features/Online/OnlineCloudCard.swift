@@ -25,7 +25,8 @@ enum CloudCardText {
 }
 
 /// "Clouds tonight": the hourly cloud cover from dusk to dawn of the night shown, total and the low, medium and high
-/// layers, as a compact strip with a summary of the clear spells. Appears only while the Cloud forecast is switched on.
+/// layers, as a compact strip with a summary of the clear spells, and under it the night's dew, wind, fog and
+/// temperature with an hourly table (see `CloudConditions`). Appears only while the Cloud forecast is switched on.
 /// `night` is the Tonight screen's own night (sunset to sunrise) at `place`.
 struct TonightCloudCard: View {
     let place: GeographicLocation
@@ -104,6 +105,7 @@ private struct CloudForecastContent: View {
             if slots.contains(where: { $0.seconds > 3601 }) {
                 TonightNote(text: CloudCardText.coarse, style: .footnote)
             }
+            CloudConditions(slots: slots, timeZone: timeZone)
         }
         TonightNote(text: CloudCardText.footnote(issuedText: issuedText(timeText: timeText)), style: .footnote)
     }

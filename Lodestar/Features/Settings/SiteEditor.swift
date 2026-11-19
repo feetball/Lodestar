@@ -142,6 +142,7 @@ struct SiteEditor: View {
                                 errorMessage: "Not a longitude between 180\u{00B0} W and 180\u{00B0} E.")
             SettingsNumberField(title: "Elevation", unit: "m", value: $draft.elevation,
                                 range: GeographicLocation.elevationRange, fractionDigits: 0)
+            SkyQualityLine(location: draft.location)
             NavigationLink {
                 MapSitePicker(initialLocation: draft.location,
                               fallbackCenter: app.observerContext?.location) { picked in

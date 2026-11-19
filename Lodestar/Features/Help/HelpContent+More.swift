@@ -45,7 +45,7 @@ extension HelpContent {
                 "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",
                 "**Comets** join the object list, the sky chart and Aim. About 164 KB from the Minor Planet Center.",
-                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
+                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover, dew, wind, fog and temperature on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
                 "**Terrain horizons** work out the skyline of the hills around a saved site from elevation data. Nothing downloads until you ask in the site\u{2019}s editor: up to four tiles of about 11 MB each from AWS Open Data, deleted after the calculation. The tile server sees which 1\u{00B0} tiles you request, which is where the site is to within about 100 km.",
             ]),
             .tip("**Update now** refreshes a feed. CelesTrak answers repeated requests for unchanged data with an error, so the satellite lists wait at least two hours between requests. When it is too soon, the button is grayed out and says when the next update is possible."),
