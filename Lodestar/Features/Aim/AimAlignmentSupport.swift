@@ -16,6 +16,8 @@ struct AimAlignmentRow: Identifiable {
     let candidate: AimAlignmentCandidate
     /// Degrees from the camera's boresight; `nil` while the sensors deliver nothing.
     let separation: Double?
+    /// The alignment point nearest to the candidate; `nil` while there are no points.
+    var nearest: AlignmentPointSeparation?
 
     var id: String { candidate.id }
 }

@@ -31,6 +31,8 @@ struct MountDriverDetail: Hashable, Sendable {
     var startAxis2Degrees: Double?
     /// Why tracking stopped by itself: a limit.
     var trackingStopReason: MountError?
+    /// How far past the meridian the driver lets the right ascension axis turn, degrees (equatorial set-up).
+    var meridianLimitDegrees: Double?
 
     /// The mount was probably not at its home position when it was switched on, or was turned since: an axis stood more than
     /// this many degrees from zero at the start.
@@ -62,5 +64,6 @@ struct MountDriverDetail: Hashable, Sendable {
         startAxis1Degrees = driver.startupAxisAngles?.axis1Degrees
         startAxis2Degrees = driver.startupAxisAngles?.axis2Degrees
         trackingStopReason = driver.trackingStopReason
+        meridianLimitDegrees = mode == .equatorial ? driver.configuration.limits.meridianOverlapDegrees : nil
     }
 }
