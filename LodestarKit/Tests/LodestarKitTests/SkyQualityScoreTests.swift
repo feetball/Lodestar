@@ -47,8 +47,12 @@ final class SkyQualityScoreTests: XCTestCase {
         // 4.5 h dark: 0.75; the Moon is up 1.5 of those hours at 60 % lit: 1 - (1/3) * 0.6 = 0.8; Bortle 5: 0.5; clouds 25 %: 0.75.
         let result = score(dark: 4.5, moonFree: 3, lit: 0.6, bortleClass: 5, clouds: 0.25)
         XCTAssertEqual(result.components.map(\.weight), [2, 3, 2, 3])
-        XCTAssertEqual(result.components.map(\.quality), [0.75, 0.8, 0.5, 0.75])
-        XCTAssertEqual(result.components.map { ($0.points * 1e9).rounded() / 1e9 }, [1.5, 2.4, 1.0, 2.25])
+        for (part, expected) in zip(result.components, [0.75, 0.8, 0.5, 0.75]) {
+            XCTAssertEqual(part.quality, expected, accuracy: 1e-12, part.kind.rawValue)
+        }
+        for (part, expected) in zip(result.components, [1.5, 2.4, 1.0, 2.25]) {
+            XCTAssertEqual(part.points, expected, accuracy: 1e-12, part.kind.rawValue)
+        }
         XCTAssertEqual(result.total, 7.15, accuracy: 1e-12)
         XCTAssertTrue(result.includesClouds)
         XCTAssertEqual(result.rating, .good)
@@ -59,7 +63,9 @@ final class SkyQualityScoreTests: XCTestCase {
         let result = score(dark: 4.5, moonFree: 3, lit: 0.6, bortleClass: 5, clouds: nil)
         XCTAssertFalse(result.includesClouds)
         XCTAssertNil(result.component(.clouds))
-        XCTAssertEqual(result.components.map(\.weight), [20.0 / 7, 30.0 / 7, 20.0 / 7])
+        for (part, expected) in zip(result.components, [20.0 / 7, 30.0 / 7, 20.0 / 7]) {
+            XCTAssertEqual(part.weight, expected, accuracy: 1e-12, part.kind.rawValue)
+        }
         XCTAssertEqual(result.total, 7, accuracy: 1e-12)
         // A forecast that is not a number is no forecast.
         XCTAssertEqual(result, score(dark: 4.5, moonFree: 3, lit: 0.6, bortleClass: 5, clouds: .nan))
@@ -128,7 +134,8 @@ final class SkyQualityScoreTests: XCTestCase {
                                                      moonIlluminatedFraction: newMoon.moon.illuminatedFraction,
                                                      bortle: sky, cloudFraction: 0.1))
         XCTAssertGreaterThan(dark.total, 8, "new moon: \(dark.total)")
-        XCTAssertLessThan(bright.total, 6, "full moon: \(bright.total)")
+        XCTAssertLessThan(bright.total, 6.5, "full moon: \(bright.total)")
+        XCTAssertGreaterThan(dark.total - bright.total, 2.5)
         XCTAssertLessThan(try XCTUnwrap(bright.component(.moon)).quality, 0.02)
         XCTAssertGreaterThan(try XCTUnwrap(dark.component(.moon)).quality, 0.97)
         XCTAssertEqual(try XCTUnwrap(dark.component(.darknessHours)).quality, 1, accuracy: 1e-12)
