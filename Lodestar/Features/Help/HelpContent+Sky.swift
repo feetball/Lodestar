@@ -6,7 +6,7 @@ extension HelpContent {
     private static let objects = HelpTopic(
         topic: .objects, category: .sky, title: "Finding objects", systemImage: "sparkles",
         summary: "Search, browse and favorite planets, nebulae and stars.",
-        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets"],
+        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets", "hour angle", "meridian", "transit"],
         blocks: [
             .paragraph("The **Objects** tab is the catalog of what Lodestar can aim at, from planets to faint nebulae. Find a target here, then send it to the Aim screen."),
             .bullets([
@@ -14,7 +14,7 @@ extension HelpContent {
                 "**Browse** by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters and Special (the Milky Way core and the celestial poles). Asteroids, and comets if you switch them on in **Settings** \u{25B8} **Online Data**, are under Solar System.",
                 "**Chips** above the list limit it to one catalog, such as Messier. **The menu** at the top right sorts by name, brightness, altitude, rise time or **Hours Visible Tonight**, and filters with **Above Horizon Now**, **Visible \u{2265} 1 h Tonight**, **Hide Faint** and **Popular Only**. The hours count the dark time an object is above your recorded skyline (a flat horizon without one) and at least 20\u{00B0} high, and each row then ends with \u{201C}3.4 h tonight\u{201D} or, for an object your skyline hides all night, \u{201C}behind skyline\u{201D}.",
                 "**Swipe** a row right to favorite it, or left to aim at it. Favorites and recents are listed first. The **+** button adds a custom target from a right ascension and declination, the sky\u{2019}s coordinates.",
-                "**Tap a row** for the object\u{2019}s page. It shows where the object is now, and when it rises, reaches its highest point and sets, with an altitude chart. With a recorded skyline, **Above your skyline** gives the hours tonight it is clear of it. It also shows how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
+                "**Tap a row** for the object\u{2019}s page. It shows where the object is now, with its hour angle (negative east of the meridian, the line from north to south across the sky, and positive west of it) and when it crosses that line. It also shows when the object rises, reaches its highest point and sets, with an altitude chart. With a recorded skyline, **Above your skyline** gives the hours tonight it is clear of it. Then come how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
             ]),
             .caution("The Sun is listed under Solar System. Never point a camera at it without a certified solar filter."),
         ],
@@ -122,16 +122,20 @@ extension HelpContent {
     private static let trailsAndExposure = HelpTopic(
         topic: .trailsAndExposure, category: .planning, title: "Exposure, star trails and time-lapse", systemImage: "timer",
         summary: "Longest exposure, star trail and time-lapse planners.",
-        keywords: ["npf", "500 rule", "startrails", "timelapse", "interval", "stacking", "shutter", "trailing", "polar alignment", "tools"],
+        keywords: ["npf", "500 rule", "startrails", "timelapse", "interval", "stacking", "shutter", "trailing", "polar alignment", "tools",
+                  "tracker", "drift", "alt-az", "field rotation", "moon exposure", "looney 11", "iso"],
         blocks: [
             .paragraph("Stars drift across the sky, so a long exposure turns them into streaks. These tools help you pick an exposure that keeps stars sharp, or plan star trails and time-lapses on purpose."),
             .bullets([
                 "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse** and **Polar Alignment**.",
                 "The **Exposure Calculator** gives the longest exposure before stars trail. The NPF rule counts your aperture and pixel size, so it suits high-resolution sensors. The 500 rule is simpler but too generous for them.",
+                "Below the result, **Tracked** shows how fast a star tracker drifts when its axis is off the pole, and the longest exposure for the polar alignment error you set. It is the worst case, for a target 90\u{00B0} from the direction of the error.",
+                "**Alt-Az Mount** shows how fast the field turns on an alt-azimuth mount, and the longest exposure at your target\u{2019}s place. Without a target, set the altitude and azimuth yourself. Due east or west the field does not turn.",
+                "**Moon** suggests a shutter time for the Moon from the Looney 11 rule: f/11 at 1/ISO for a full Moon, with more light for a thinner or lower Moon. It uses your aperture and the ISO you pick, and shows how many pixels the Moon spans at your focal length.",
                 "**Star Trails & Time-Lapse** plans how long to shoot for a trail, how to stack short frames, and how many pictures, how much time and how much storage a time-lapse needs.",
                 "**Polar Alignment** shows where the pole star stands against the celestial pole, as a clock position. It helps you aim a star tracker\u{2019}s axis at the pole. The **Tonight** tab has the same clock.",
                 "The planners start from your camera in Settings. Changes you make in a planner stay in that planner.",
-                "Each object\u{2019}s page also shows the longest exposure before stars trail.",
+                "Each object\u{2019}s page also shows the longest exposure before stars trail. The page of the Sun, the Moon or a planet shows how many pixels it spans at your focal length.",
             ]),
             .tip("Stars near the celestial pole move more slowly, so you can expose longer when you aim toward it."),
             .caution("These limits are rules of thumb. Check the stars in your first test frame at full size."),

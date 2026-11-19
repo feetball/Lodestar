@@ -38,10 +38,12 @@ enum ObjectDetailCalculator {
             illuminatedFraction = state.illuminatedFraction
             moonPhase = body == .moon ? MoonPhaseCalculator.info(at: date) : nil
         }
+        let equatorial = frame.apparentEquatorial(of: object)
+        let smallBody = object.smallBody.flatMap { SmallBodyDetail.compute($0, frame: frame) }
         return ObjectDetailCurrent(
             date: date,
             horizontal: horizontal,
-            equatorial: frame.apparentEquatorial(of: object),
+            equatorial: equatorial,
             magnitude: frame.currentMagnitude(of: object),
             angularSize: frame.currentAngularSize(of: object),
             distance: distance,
@@ -49,7 +51,9 @@ enum ObjectDetailCalculator {
             moonPhase: moonPhase,
             isBehindSkyline: isBehindSkyline,
             isSmallBody: object.smallBody != nil,
-            smallBody: object.smallBody.flatMap { SmallBodyDetail.compute($0, frame: frame) })
+            smallBody: smallBody,
+            meridian: ObjectDetailMeridian.of(object, observer: observer, date: date, apparent: equatorial,
+                                              isEvaluable: object.smallBody == nil || smallBody != nil))
     }
 
     // MARK: Tonight
@@ -239,7 +243,19 @@ enum ObjectDetailCalculator {
             tracksStars ? ExposureCalculator.maxExposure(rule: rule, setup: lens, declination: declination) : nil
         }
         return ObjectDetailPhotography(frame: frame, framing: framing,
-                                       npf: exposure(.npf), rule500: exposure(.rule500))
+                                       npf: exposure(.npf), rule500: exposure(.rule500),
+                                       bodySize: bodySize(of: object, size: size, lens: lens))
+    }
+
+    /// How large the disc of a solar-system body is in the frame, from its apparent diameter now.
+    private static func bodySize(of object: CelestialObject, size: AngularSize?,
+                                 lens: LensSetup) -> ObjectDetailBodySize? {
+        guard case .solarSystem = object.position, let size else { return nil }
+        let diameter = size.majorArcminutes / 60
+        return TrackedExposure.pixelSize(angularDiameterDegrees: diameter, setup: lens).map {
+            ObjectDetailBodySize(diameterDegrees: diameter, pixels: $0,
+                                 assumedPixelPitch: lens.pixelPitchMicrometers == nil)
+        }
     }
 
     /// How the Moon affects the object: now while the sky is dark, otherwise at the object's best time tonight.
