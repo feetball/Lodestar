@@ -14,8 +14,12 @@ struct ObserverContext: Equatable, Sendable {
     var horizontalAccuracy: Double?
     /// When the device location was measured (device location only).
     var timestamp: Date?
-    /// The site's recorded skyline, or nil for an open horizon (always nil for the device location).
+    /// The skyline that applies at the site: its recorded skyline, the terrain horizon computed from elevation data, or
+    /// the recorded one with the terrain filling the stretches that were not swept; nil for an open horizon (always nil
+    /// for the device location).
     var horizon: HorizonProfile?
+    /// Where `horizon` comes from; nil when there is none.
+    var horizonSource: HorizonSource?
 
     var location: GeographicLocation { observer.location }
 
@@ -24,5 +28,23 @@ struct ObserverContext: Equatable, Sendable {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         return calendar
+    }
+}
+
+/// Where the skyline of an `ObserverContext` comes from. `label` is how the screens name it.
+enum HorizonSource: Sendable, Hashable {
+    /// The skyline the user recorded by sweeping the phone.
+    case recorded
+    /// The skyline computed from elevation data.
+    case terrain
+    /// The recorded skyline where the sweep reached, the terrain horizon in the stretches it left open.
+    case recordedAndTerrain
+
+    var label: String {
+        switch self {
+        case .recorded: return "Recorded skyline"
+        case .terrain: return "Terrain horizon"
+        case .recordedAndTerrain: return "Recorded + terrain"
+        }
     }
 }

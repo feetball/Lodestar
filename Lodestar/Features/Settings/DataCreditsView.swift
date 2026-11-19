@@ -154,6 +154,30 @@ extension DataCredit {
                 + "licenses its data under CC BY 4.0 and the Norwegian Licence for Open Government Data 2.0. Lodestar "
                 + "shows the cloud-cover values as forecast; the clear-spell summary is its own, and MET Norway does "
                 + "not endorse Lodestar."),
+        DataCredit(
+            id: "terrain-tiles", name: "Terrain Tiles (AWS Open Data)",
+            usedFor: "Terrain horizons (optional download)",
+            author: "Mapzen, a Linux Foundation project, and the surveys credited below",
+            license: "Public domain and open licences, see the attribution page",
+            licenseURL: URL(string: "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"),
+            sourceURL: URL(string: "https://registry.opendata.aws/terrain-tiles/"),
+            notice: "Elevation tiles are downloaded only if you switch on Terrain horizons in Settings \u{25B8} Online "
+                + "Data and ask a site for its terrain horizon. They are deleted after the calculation; only "
+                + "the skyline worked out from them is kept. The tile set is hosted on AWS Open Data and "
+                + "managed by Mapzen, a Linux Foundation project. Its sources require this attribution: "
+                + "ArcticDEM terrain data DEM(s) were created from DigitalGlobe, Inc., imagery and funded "
+                + "under National Science Foundation awards 1043681, 1559691, and 1542736; Australia terrain "
+                + "data \u{00A9} Commonwealth of Australia (Geoscience Australia) 2017; Austria terrain data \u{00A9} "
+                + "offene Daten \u{00D6}sterreichs \u{2013} Digitales Gel\u{00E4}ndemodell (DGM) \u{00D6}sterreich; Canada terrain data "
+                + "contains information licensed under the Open Government Licence \u{2013} Canada; Europe terrain "
+                + "data produced using Copernicus data and information funded by the European Union - EU-DEM "
+                + "layers; Global ETOPO1 terrain data U.S. National Oceanic and Atmospheric Administration; "
+                + "Mexico terrain data source: INEGI, Continental relief, 2016; New Zealand terrain data "
+                + "Copyright 2011 Crown copyright (c) Land Information New Zealand and the New Zealand "
+                + "Government (All rights reserved); Norway terrain data \u{00A9} Kartverket; United Kingdom terrain "
+                + "data \u{00A9} Environment Agency copyright and/or database right 2015. All rights reserved; "
+                + "United States 3DEP (formerly NED) and global GMTED2010 and SRTM terrain data courtesy of "
+                + "the U.S. Geological Survey."),
     ]
 }
 
@@ -171,7 +195,8 @@ struct DataCreditsView: View {
         + "model: WMM2025 by NOAA NCEI and the British Geological Survey (public domain). Planetary theory: "
         + "VSOP87 (Bretagnon & Francou, IMCCE); Pluto and lunar theory after J. Meeus. Optional downloads: "
         + "orbital data: CelesTrak, T. S. Kelso; orbital elements: IAU Minor Planet Center; weather forecast from "
-        + "MET Norway (CC BY 4.0)."
+        + "MET Norway (CC BY 4.0); terrain elevation data from the AWS Open Data Terrain Tiles (SRTM and GMTED2010 "
+        + "courtesy of the U.S. Geological Survey, and the national sources credited under Terrain Tiles)."
 
     private static let bsdLicense = """
         Copyright (c) 2015, Olaf Frohn

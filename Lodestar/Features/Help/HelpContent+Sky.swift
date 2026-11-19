@@ -145,8 +145,9 @@ extension HelpContent {
 
     private static let skyline = HelpTopic(
         topic: .skyline, category: .planning, title: "Record your skyline", systemImage: "mountain.2",
-        summary: "Teach Lodestar where trees and hills hide the sky.",
-        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set"],
+        summary: "Teach Lodestar where trees and hills hide the sky, or let it work out the hills from elevation data.",
+        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set",
+                   "terrain", "elevation", "terrain horizon"],
         blocks: [
             .paragraph("Trees, buildings and hills hide objects long before the true horizon. Record your site\u{2019}s real skyline once. Rise and set times, Tonight, the object pages and the sky chart then use it, and the Aim screen shades the ground below it."),
             .steps([
@@ -156,8 +157,9 @@ extension HelpContent {
                 "The screen shows how much is covered and what is still to sweep. **Start Over** begins again.",
                 "Tap **Done** to save. If the circle is not complete, Lodestar asks what to do with the gaps.",
             ]),
+            .paragraph("**Terrain horizon.** Where you cannot sweep, or have swept only part of the circle, Lodestar can work out the skyline of the hills and mountains from elevation data. Switch on **Terrain horizons** in **Settings** \u{25B8} **Online Data**, edit the saved site and, in its **Terrain Horizon** section, tap **Compute from Elevation Data\u{2026}**. Lodestar asks first, downloads up to four elevation tiles of about 11 MB each, works out the skyline and deletes the tiles. The tile server sees your IP address and which 1\u{00B0} tiles you request. Then the Aim screen, Tonight, the object pages and the sky chart use the terrain horizon wherever you have not recorded a skyline, and in the stretches a partial sweep left open. They say which skyline applies: **Recorded skyline**, **Terrain horizon** or **Recorded + terrain**. The same section offers the ground elevation of the data as the site\u{2019}s elevation, and **Remove Terrain Horizon\u{2026}**."),
             .tip("Record in daylight, when the camera picture shows the skyline. It helps you keep the line on the crosshair."),
-            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again."),
+            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again. The terrain horizon is computed for the saved position, so compute it again after moving a site. It comes from a surface model: ridges narrower than about 30 to 90 m, trees and buildings nearby are not in it."),
         ],
         related: [.tonight, .objects])
 

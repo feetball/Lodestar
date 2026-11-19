@@ -39,6 +39,7 @@ struct SiteEditor: View {
     @State private var isConfirmingDelete = false
     @State private var failureMessage: String?
     @State private var horizonFlow = HorizonFlowState()
+    @State private var terrainModel = TerrainHorizonModel()
 
     /// - Parameters:
     ///   - target: The new site's starting point, or the site to edit.
@@ -70,6 +71,8 @@ struct SiteEditor: View {
                 positionSection
                 timeZoneSection
                 HorizonSiteSection(siteID: existingSite?.id, movedAway: hasMovedAway, flow: $horizonFlow)
+                HorizonTerrainSection(siteID: existingSite?.id, movedAway: hasMovedAway, elevation: $draft.elevation,
+                                      model: terrainModel)
                 if existingSite != nil {
                     deleteSection
                 }
@@ -107,6 +110,8 @@ struct SiteEditor: View {
             }
         }
         .interactiveDismissDisabled(isSaving)
+        // Closing the editor stops a download that is still running.
+        .onDisappear { terrainModel.cancel() }
     }
 
     // MARK: Sections
@@ -274,12 +279,16 @@ struct SiteEditor: View {
         guard let location = draft.location else { return }
         let zone = timeZoneStatus.timeZone ?? TimeZoneResolver.nominalTimeZone(longitude: location.longitude)
         // The skyline is recorded and saved on its own while the editor is open, so the stored one is the current one.
-        let horizon = existingSite.flatMap { existing in
-            app.settings.savedSites.first { $0.id == existing.id }?.horizon
+        let stored = existingSite.flatMap { existing in
+            app.settings.savedSites.first { $0.id == existing.id }
         }
+        let horizon = stored?.horizon
+        // The terrain horizon is computed and saved on its own as well, like the skyline.
+        let terrainHorizon = stored?.terrainHorizon
         guard let site = SavedSite(id: existingSite?.id ?? UUID(), name: draft.name, latitude: location.latitude,
                                    longitude: location.longitude, elevation: location.elevation,
-                                   timeZoneIdentifier: zone.identifier, horizon: horizon) else {
+                                   timeZoneIdentifier: zone.identifier, horizon: horizon,
+                                   terrainHorizon: terrainHorizon) else {
             failureMessage = "This position cannot be saved. Check the latitude, longitude and elevation."
             return
         }
