@@ -449,7 +449,10 @@ struct SkyChartSurface: View {
             parts.append("\(deepSkyCount) deep-sky \(deepSkyCount == 1 ? "object" : "objects") above the horizon are drawn.")
         }
         if let skyline = content.scene.skyline {
-            parts.append("The ground below your recorded skyline is shaded; the skyline rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
+            parts.append("The ground below the \(HorizonText.spokenName(app.observerContext?.horizonSource)) is shaded; it rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
+        }
+        if let glow = layers.horizonGlow {
+            parts.append(glow.spokenSummary)
         }
         if let mosaic = MosaicDisplay.current {
             parts.append(mosaicDescription(mosaic))

@@ -11,7 +11,10 @@
 		<!-- Optional Cloud forecast (off by default): the observing location rounded to 0.1 degree (about 10 km) is the
 		     coordinates of the request to MET Norway (api.met.no), a third party. The developer never receives it and the
 		     app keeps no copy beyond the forecast cached on the device. Declared because the provider can log the request
-		     for longer than the moment it takes to answer it. Not linked to the user, not used for tracking. -->
+		     for longer than the moment it takes to answer it. Not linked to the user, not used for tracking.
+		     The same holds for the optional Terrain horizons (off by default): asking a site for its terrain horizon requests
+		     the 1 degree elevation tiles around it from the AWS Open Data tile server (s3.amazonaws.com), which shows where
+		     the site is to within about 100 km. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypeCoarseLocation</string>

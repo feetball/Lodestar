@@ -26,6 +26,7 @@ struct SkyChartLayersMenu: View {
             SkyChartLayerRow(title: "Constellation names", isOn: $store.settings.showConstellationNames)
             SkyChartLayerRow(title: "Milky Way", isOn: $store.settings.showMilkyWay)
             SkyChartLayerRow(title: "Deep-sky objects", isOn: $store.settings.showDeepSkyObjects)
+            SkyChartLayerRow(title: "Horizon glow", isOn: $store.settings.showHorizonGlow)
             SkyChartLayerRow(title: "Star names", isOn: $showsStarNames)
             SkyChartLayerRow(title: "Altitude grid", isOn: $showsAltitudeGrid)
             SkyChartLayerRow(title: "Camera view", isOn: $showsCameraView)

@@ -25,7 +25,7 @@ struct AimMosaicSheet: View {
     @State private var customHeight = 20.0
     /// Where the camera pointed when the sheet opened (or was told to take it again): the centre of a custom area.
     @State private var customCenter: HorizontalCoordinate?
-    /// The instant the Milky Way arch is worked out for.
+    /// The instant the Milky Way arch is worked out for: the previewed moment while the sky is previewed.
     @State private var snapshotDate = Date()
     @State private var result: Result<AimMosaicPlanResult, AimMosaicProblem>?
     @State private var isPlanning = false
@@ -53,7 +53,7 @@ struct AimMosaicSheet: View {
         .tint(palette.accent)
         .presentationBackground(palette.background)
         .onAppear {
-            snapshotDate = app.clock.now
+            snapshotDate = model.date
             takeCurrentPointing()
         }
         .task(id: request) {

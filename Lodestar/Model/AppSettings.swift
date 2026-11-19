@@ -22,10 +22,14 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
     var timeZoneIdentifier: String?
     /// The recorded skyline (trees, mountains), or nil for an open horizon.
     var horizon: HorizonProfile?
+    /// The skyline of the terrain computed from elevation data (hills, mountains), or nil when none was computed. Unlike
+    /// `horizon` a flat one is kept: it says that the terrain was looked at and is flat. It is used where no skyline was
+    /// recorded, and for the stretches a partial sweep left open.
+    var terrainHorizon: HorizonProfile?
 
     /// Validates the coordinates and trims/limits the name; returns nil for invalid input.
     init?(id: UUID = UUID(), name: String, latitude: Double, longitude: Double, elevation: Double = 0,
-          timeZoneIdentifier: String? = nil, horizon: HorizonProfile? = nil) {
+          timeZoneIdentifier: String? = nil, horizon: HorizonProfile? = nil, terrainHorizon: HorizonProfile? = nil) {
         guard let location = GeographicLocation.validated(latitude: latitude, longitude: longitude, elevation: elevation) else {
             return nil
         }
@@ -37,10 +41,11 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
         self.elevation = location.elevation
         self.timeZoneIdentifier = timeZoneIdentifier.flatMap { TimeZone(identifier: $0) != nil ? $0 : nil }
         self.horizon = horizon.flatMap { $0.isFlat ? nil : $0 }
+        self.terrainHorizon = terrainHorizon
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, latitude, longitude, elevation, timeZoneIdentifier, horizon
+        case id, name, latitude, longitude, elevation, timeZoneIdentifier, horizon, terrainHorizon
     }
 
     /// Decodes and re-validates a stored site; invalid entries throw and are dropped by the caller.
@@ -53,7 +58,8 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
                                    elevation: try c.decodeIfPresent(Double.self, forKey: .elevation) ?? 0,
                                    timeZoneIdentifier: try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier),
                                    // A damaged skyline is dropped rather than losing the site.
-                                   horizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .horizon)) ?? nil) else {
+                                   horizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .horizon)) ?? nil,
+                                   terrainHorizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .terrainHorizon)) ?? nil) else {
             throw DecodingError.dataCorruptedError(forKey: .latitude, in: c, debugDescription: "Invalid site coordinates")
         }
         self = site
@@ -163,6 +169,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var showConstellationNames = true
     var showDeepSkyObjects = true
     var showMilkyWay = true
+    /// A thin ring on the sky chart's horizon that is brighter toward the artificial light.
+    var showHorizonGlow = true
     /// Deep-sky objects drawn in the sky views, up to this `Prominence` level (1 showpieces … 4 everything).
     var deepSkyProminence = 2
     var starMagnitudeLimit: Double = 5.0
@@ -217,6 +225,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
         showMilkyWay = value(.showMilkyWay, d.showMilkyWay)
+        showHorizonGlow = value(.showHorizonGlow, d.showHorizonGlow)
         deepSkyProminence = value(.deepSkyProminence, d.deepSkyProminence)
         starMagnitudeLimit = value(.starMagnitudeLimit, d.starMagnitudeLimit)
         coordinateStyle = value(.coordinateStyle, d.coordinateStyle)
