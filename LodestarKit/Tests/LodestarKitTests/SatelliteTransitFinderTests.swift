@@ -192,41 +192,25 @@ final class SatelliteTransitFinderTests: XCTestCase {
 
     func testNoTransitsWhenTheBodyIsBelowTheHorizon() throws {
         let ground = try satellite()
-        // Boulder, local night: the Sun is below the horizon for the whole window, yet the ISS has passes.
-        let nightStart = Support.iso("2026-11-20T04:00:00Z")
-        let nightEnd = Support.iso("2026-11-20T10:00:00Z")
         let passes = SatellitePassFinder(
-            observer: boulder, interval: DateInterval(start: nightStart, end: nightEnd), minimumAltitude: 3.0
+            observer: boulder, interval: DateInterval(start: from, end: to), minimumAltitude: 3.0
         ).passes(of: ground)
-        XCTAssertFalse(passes.isEmpty)
-        var time = nightStart
-        while time <= nightEnd {
-            XCTAssertLessThan(SkyFrame(date: time, observer: boulder).horizontal(of: .sun, refraction: false).altitude, -10.0)
-            time = time.addingTimeInterval(600)
+        for body in [SolarSystemBody.sun, SolarSystemBody.moon] {
+            // Passes with the body well below the horizon at both ends (it moves a quarter of a degree a minute).
+            let withBodyDown = passes.filter { pass in
+                [pass.rise.date, pass.set.date].allSatisfy {
+                    SkyFrame(date: $0, observer: boulder).horizontal(of: body, refraction: false).altitude < -10.0
+                }
+            }
+            XCTAssertGreaterThanOrEqual(withBodyDown.count, 10, "only \(withBodyDown.count) passes with the \(body) down")
+            for pass in withBodyDown.prefix(10) {
+                let found = SatelliteTransitFinder.transits(
+                    satellite: ground, body: body, observer: boulder, from: pass.rise.date.addingTimeInterval(-300),
+                    to: pass.set.date.addingTimeInterval(300), maxGroundDistanceMeters: 200_000
+                )
+                XCTAssertEqual(found, [])
+            }
         }
-        XCTAssertEqual(
-            SatelliteTransitFinder.transits(
-                satellite: ground, body: .sun, observer: boulder, from: nightStart, to: nightEnd, maxGroundDistanceMeters: 200_000
-            ), []
-        )
-        // The Moon is down in the morning window.
-        let moonStart = Support.iso("2026-11-20T12:00:00Z")
-        let moonEnd = Support.iso("2026-11-20T17:00:00Z")
-        XCTAssertFalse(
-            SatellitePassFinder(
-                observer: boulder, interval: DateInterval(start: moonStart, end: moonEnd), minimumAltitude: 3.0
-            ).passes(of: ground).isEmpty
-        )
-        time = moonStart
-        while time <= moonEnd {
-            XCTAssertLessThan(SkyFrame(date: time, observer: boulder).horizontal(of: .moon, refraction: false).altitude, -5.0)
-            time = time.addingTimeInterval(600)
-        }
-        XCTAssertEqual(
-            SatelliteTransitFinder.transits(
-                satellite: ground, body: .moon, observer: boulder, from: moonStart, to: moonEnd, maxGroundDistanceMeters: 200_000
-            ), []
-        )
     }
 
     func testInvalidRequestsGiveNoTransits() throws {
