@@ -46,6 +46,7 @@ struct AlignmentSheet: View {
                     AimAlignmentSummaryCard(alignment: app.alignment, alignedAt: app.alignedAt,
                                             gyroLock: app.motion.headingSource == .gyroLock,
                                             onRemove: remove(at:), onReset: reset)
+                        .disabled(holdProgress != nil)
                 }
                 .padding(16)
             }
