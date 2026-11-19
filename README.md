@@ -15,8 +15,10 @@ tilt the tripod head until it is in your frame.
   With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
-  least-squares fit with residuals). Optional **Gyro Lock** keeps the heading on the gyroscope so
-  the camera body's magnetism cannot disturb it.
+  least-squares fit with residuals). Syncing waits until the phone has been held still, each
+  reference star shows its distance from the stars already synced (with a warning under 20°), and
+  an alignment that is hours old gets a warning chip. Optional **Gyro Lock** keeps the heading on
+  the gyroscope so the camera body's magnetism cannot disturb it.
 - **Works for any mount** — back camera along the lens (portrait, upside down, landscape) or the
   phone lying flat on top of the camera.
 - **Objects** — search (names, Messier/NGC/IC/HR/HD/HIP numbers, Greek-letter star names in any
