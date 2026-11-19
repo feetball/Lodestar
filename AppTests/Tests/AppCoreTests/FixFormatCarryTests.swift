@@ -66,8 +66,9 @@ final class FixFormatCarryTests: XCTestCase {
     }
 
     func testTheTwoRightAscensionStylesAgreeAtTheTurn() {
-        // The sexagesimal style already carries 23h 59m 59.99s to 00h.
-        let coordinate = EquatorialCoordinate(rightAscension: 359.9996, declination: 0)
+        // 359.9999 degrees are 23h 59m 59.976s, which both styles carry to zero. (359.9996 degrees, 59.904 s, still
+        // read 23h 59m 59.9s in the sexagesimal style, correctly.)
+        let coordinate = EquatorialCoordinate(rightAscension: 359.9999, declination: 0)
         XCTAssertEqual(AppFormat.rightAscension(coordinate, style: .sexagesimal), "00h 00m 00.0s")
         XCTAssertEqual(AppFormat.rightAscension(coordinate, style: .decimal), "0.000" + degree)
     }
