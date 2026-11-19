@@ -15,16 +15,18 @@ tilt the tripod head until it is in your frame.
   With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
-  least-squares fit with residuals). Optional **Gyro Lock** keeps the heading on the gyroscope so
-  the camera body's magnetism cannot disturb it.
+  least-squares fit with residuals). Syncing waits until the phone has been held still, each
+  reference star shows its distance from the stars already synced (with a warning under 20°), and
+  an alignment that is hours old gets a warning chip. Optional **Gyro Lock** keeps the heading on
+  the gyroscope so the camera body's magnetism cannot disturb it.
 - **Works for any mount** — back camera along the lens (portrait, upside down, landscape) or the
   phone lying flat on top of the camera.
 - **Objects** — search (names, Messier/NGC/IC/HR/HD/HIP numbers, Greek-letter star names in any
   spelling) or browse by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters, Special
   (Milky Way core, celestial poles). Sort by name, brightness, altitude or rise time; favourites,
-  recents and custom RA/Dec targets. Each object shows where it is now, its rise/transit/set, an
-  altitude chart over the night with twilight shading, how it fits your frame, and the longest
-  exposure before stars trail (NPF and 500 rules).
+  recents and custom RA/Dec targets. Each object shows where it is now with its hour angle and the
+  time to its meridian transit, its rise/transit/set, an altitude chart over the night with twilight
+  shading, how it fits your frame, and the longest exposure before stars trail (NPF and 500 rules).
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
   objects, your camera's live pointing, tap-to-identify, time travel and zoom up to 15×. **Plan your
   framing** holds your camera's frame in the middle of the chart so you can move the sky under it and
@@ -34,7 +36,8 @@ tilt the tripod head until it is in your frame.
 - **Tonight** — sunset, twilight and darkness windows, the Moon (phase, illumination, rise/set,
   moon-free dark hours), when the Milky Way core is up, which planets are visible, the best
   targets of the night, and a polar-scope clock for star trackers.
-- **Events calendar** — meteor showers (with hourly rates and the radiant's altitude from your site), lunar and
+- **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
+  direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
   and where to look and a button to aim at it.
 - **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
@@ -42,6 +45,11 @@ tilt the tripod head until it is in your frame.
   - **Alignment finder** — when does the Milky Way core, the Moon or any object stand over a ridge or in a gap
     between trees? Pick a point of your recorded skyline (or an azimuth and altitude window), a period, how dark
     it must be and what the Moon may do, and get the matching nights, with the sky chart at that time and Aim.
+- **Exposure calculator** — the longest exposure before stars trail by the NPF, 500, 400 and 300 rules for your
+  camera, lens and target; for a star tracker, the drift and the limit for a polar-alignment error of 0.1° to 5°;
+  for an alt-azimuth mount, the field-rotation rate and the limit at the target's place; and a shutter time for the
+  Moon by the Looney 11 rule, adjusted for phase and height, with the Moon's size in pixels. The pages of the Sun,
+  Moon and planets show their size in pixels too.
 - **Real skyline** — sweep the phone along the horizon to record trees, buildings and mountains; rise and set
   times, Tonight and the charts then use the site's own skyline.
 - **Comets and asteroids** — 216 bright asteroids built in and, optionally, the daily comet file: brightness
@@ -49,7 +57,8 @@ tilt the tripod head until it is in your frame.
   tilt that lays it along the frame.
 - **GoTo mounts** — connect over Wi-Fi to OnStep/LX200, Celestron NexStar and SynScan, ASCOM Alpaca and the
   Sky-Watcher AZ-GTi / Star Adventurer GTi (with home position and star alignment); Go to, Sync, nudge arrows and
-  an always-available Stop, with altitude limits and a built-in simulated mount to try it without hardware.
+  an always-available Stop, with altitude limits, a meridian countdown that warns before the mount has to flip,
+  and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
   Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast (MET
   Norway, location rounded to about 10 km).
@@ -120,7 +129,7 @@ LodestarKit/         Swift package, Foundation only, builds and tests on macOS a
   Catalog/           bundled star/deep-sky/constellation/Milky Way data, search, sorting
   Pointing/          CoreMotion attitude → camera pointing, mounts, star-alignment solver, guidance
   Planning/          night summary, darkness and Moon windows, Milky Way core, best targets, polar scope
-  PhotoTools/        sensor formats, field of view, NPF/500-rule exposure limits
+  PhotoTools/        sensor formats, field of view, NPF/500-rule exposure limits, polar-error drift, field rotation, Moon exposure
   Formatting/        angle/coordinate formatting and robust parsing
   Geomagnetism/      World Magnetic Model 2025 (declination, field strength)
   Resources/         stars.json (9,001 stars), dsos.json (693 objects incl. all 110 Messier),
