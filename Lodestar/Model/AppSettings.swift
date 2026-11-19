@@ -105,6 +105,12 @@ struct AppSettings: Codable, Equatable, Sendable {
     static let maximumRecents = 20
     static let maximumFavorites = 200
 
+    /// The polar-alignment errors the exposure calculator offers, in degrees.
+    static let polarErrorRange: ClosedRange<Double> = 0.1...5
+
+    /// The ISO speeds the exposure calculator offers.
+    static let exposureISORange = 100...12800
+
     var hasCompletedOnboarding = false
 
     // Location
@@ -124,6 +130,12 @@ struct AppSettings: Codable, Equatable, Sendable {
     var focalLength: Double = 24
     var aperture: Double = 2.8
     var pixelPitch: Double?
+
+    // Exposure calculator
+    /// The angle between a tracker's axis and the pole that the Tracked section works with, in degrees.
+    var polarErrorDegrees: Double = 1.0
+    /// The ISO speed of the Moon section.
+    var exposureISO = 100
 
     // Night mode
     var nightMode: NightModeSetting = .automatic
@@ -179,6 +191,8 @@ struct AppSettings: Codable, Equatable, Sendable {
         focalLength = value(.focalLength, d.focalLength)
         aperture = value(.aperture, d.aperture)
         pixelPitch = value(.pixelPitch, d.pixelPitch)
+        polarErrorDegrees = value(.polarErrorDegrees, d.polarErrorDegrees)
+        exposureISO = value(.exposureISO, d.exposureISO)
         nightMode = value(.nightMode, d.nightMode)
         nightIntensity = value(.nightIntensity, d.nightIntensity)
         dimScreenAtNight = value(.dimScreenAtNight, d.dimScreenAtNight)
@@ -214,6 +228,8 @@ struct AppSettings: Codable, Equatable, Sendable {
         focalLength = clamp(focalLength, 4...2000, 24)
         aperture = clamp(aperture, 0.95...32, 2.8)
         if let pitch = pixelPitch { pixelPitch = pitch.isFinite && (0.5...20).contains(pitch) ? pitch : nil }
+        polarErrorDegrees = clamp(polarErrorDegrees, Self.polarErrorRange, 1)
+        exposureISO = min(max(exposureISO, Self.exposureISORange.lowerBound), Self.exposureISORange.upperBound)
         nightIntensity = clamp(nightIntensity, 0.25...1, 0.7)
         nightBrightness = clamp(nightBrightness, 0.01...1, 0.2)
         starMagnitudeLimit = clamp(starMagnitudeLimit, 1...6.5, 5)

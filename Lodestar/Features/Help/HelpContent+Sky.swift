@@ -122,16 +122,20 @@ extension HelpContent {
     private static let trailsAndExposure = HelpTopic(
         topic: .trailsAndExposure, category: .planning, title: "Exposure, star trails and time-lapse", systemImage: "timer",
         summary: "Longest exposure, star trail and time-lapse planners.",
-        keywords: ["npf", "500 rule", "startrails", "timelapse", "interval", "stacking", "shutter", "trailing", "polar alignment", "tools"],
+        keywords: ["npf", "500 rule", "startrails", "timelapse", "interval", "stacking", "shutter", "trailing", "polar alignment", "tools",
+                  "tracker", "drift", "alt-az", "field rotation", "moon exposure", "looney 11", "iso"],
         blocks: [
             .paragraph("Stars drift across the sky, so a long exposure turns them into streaks. These tools help you pick an exposure that keeps stars sharp, or plan star trails and time-lapses on purpose."),
             .bullets([
                 "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse** and **Polar Alignment**.",
                 "The **Exposure Calculator** gives the longest exposure before stars trail. The NPF rule counts your aperture and pixel size, so it suits high-resolution sensors. The 500 rule is simpler but too generous for them.",
+                "Below the result, **Tracked** shows how fast a star tracker drifts when its axis is off the pole, and the longest exposure for the polar alignment error you set. It is the worst case, for a target 90\u{00B0} from the direction of the error.",
+                "**Alt-Az Mount** shows how fast the field turns on an alt-azimuth mount, and the longest exposure at your target\u{2019}s place. Without a target, set the altitude and azimuth yourself. Due east or west the field does not turn.",
+                "**Moon** suggests a shutter time for the Moon from the Looney 11 rule: f/11 at 1/ISO for a full Moon, with more light for a thinner or lower Moon. It uses your aperture and the ISO you pick, and shows how many pixels the Moon spans at your focal length.",
                 "**Star Trails & Time-Lapse** plans how long to shoot for a trail, how to stack short frames, and how many pictures, how much time and how much storage a time-lapse needs.",
                 "**Polar Alignment** shows where the pole star stands against the celestial pole, as a clock position. It helps you aim a star tracker\u{2019}s axis at the pole. The **Tonight** tab has the same clock.",
                 "The planners start from your camera in Settings. Changes you make in a planner stay in that planner.",
-                "Each object\u{2019}s page also shows the longest exposure before stars trail.",
+                "Each object\u{2019}s page also shows the longest exposure before stars trail. The page of the Sun, the Moon or a planet shows how many pixels it spans at your focal length.",
             ]),
             .tip("Stars near the celestial pole move more slowly, so you can expose longer when you aim toward it."),
             .caution("These limits are rules of thumb. Check the stars in your first test frame at full size."),
