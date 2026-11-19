@@ -26,6 +26,7 @@ struct AlignmentFinderView: View {
     var body: some View {
         let context = app.observerContext
         let request = context.flatMap { inputs.request(for: $0, now: openedAt) }
+        let hasSkyline = context.map { AlignmentFinderRequest.skyline(of: $0) != nil } ?? false
         Group {
             if let context {
                 form(context: context, request: request)
@@ -38,6 +39,11 @@ struct AlignmentFinderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: request) {
             await search(request)
+        }
+        // A site without a recorded skyline starts on the window of numbers; the skyline choice stays, with its
+        // explanation.
+        .onChange(of: hasSkyline, initial: true) { _, has in
+            if !has && inputs.place == .skyline { inputs.place = .window }
         }
         .sheet(isPresented: $isChoosingObject) {
             AlignmentFinderObjectSheet(chosen: inputs.chosenObject) { inputs.choose($0) }
