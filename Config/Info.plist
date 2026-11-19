@@ -26,6 +26,10 @@
 			</array>
 		</dict>
 	</array>
+	<!-- The Live Activity of a followed satellite pass (Lock Screen and Dynamic Island). The app starts it itself; no
+	     push updates, so no frequent-updates key. -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

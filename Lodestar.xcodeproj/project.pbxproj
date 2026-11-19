@@ -211,6 +211,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				F23611DD04DF96FEE6BCA90B /* Lodestar */,
+				F26A35D81BEEDA43EF371B9F /* WidgetShared */,
 			);
 			name = Lodestar;
 			packageProductDependencies = (

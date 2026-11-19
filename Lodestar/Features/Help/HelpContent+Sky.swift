@@ -131,7 +131,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Stars drift across the sky, so a long exposure turns them into streaks. These tools help you pick an exposure that keeps stars sharp, or plan star trails and time-lapses on purpose."),
             .bullets([
-                "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse** and **Polar Alignment**.",
+                "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse**, **Polar Alignment** and **Red Torch**.",
                 "The **Exposure Calculator** gives the longest exposure before stars trail. The NPF rule counts your aperture and pixel size, so it suits high-resolution sensors. The 500 rule is simpler but too generous for them.",
                 "Below the result, **Tracked** shows how fast a star tracker drifts when its axis is off the pole, and the longest exposure for the polar alignment error you set. It is the worst case, for a target 90\u{00B0} from the direction of the error.",
                 "**Alt-Az Mount** shows how fast the field turns on an alt-azimuth mount, and the longest exposure at your target\u{2019}s place. Without a target, set the altitude and azimuth yourself. Due east or west the field does not turn.",
