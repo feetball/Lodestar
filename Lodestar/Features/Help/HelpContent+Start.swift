@@ -39,7 +39,7 @@ extension HelpContent {
     private static let aimScreen = HelpTopic(
         topic: .aimScreen, category: .aiming, title: "The Aim screen", systemImage: "scope",
         summary: "What the Aim screen shows and what its buttons do.",
-        keywords: ["arrow", "guidance", "chips", "status", "icons", "hud", "roll", "crosshair", "readout", "buttons"],
+        keywords: ["arrow", "guidance", "chips", "status", "icons", "hud", "roll", "crosshair", "readout", "buttons", "spoken", "voice", "speech", "watch"],
         blocks: [
             .paragraph("The Aim tab shows the sky where your camera points and leads you to the target."),
             .bullets([
@@ -47,6 +47,8 @@ extension HelpContent {
                 "**The arrow** circles the middle of the screen and points the shortest way to the target, with the distance left in degrees. The rectangle outlines your camera\u{2019}s frame.",
                 "**The card** shows the target\u{2019}s name, kind, altitude (**Alt**, height) and azimuth (**Az**, compass direction). Two readouts such as **Pan right 30.7\u{00B0}** and **Tilt up 12.4\u{00B0}** say how far to turn each axis.",
                 "**On target**, a ring with a check mark replaces the arrow and the panel reads **In your frame \u{00B7} 8.2\u{00B0} from center**. Haptics tap when you arrive and leave; audio ticks are optional (**Settings** \u{25B8} **Feedback**).",
+                "**Spoken guidance** (**Settings** \u{25B8} **Feedback**) says the move to make, such as \u{201C}Pan right 12, tilt up 3\u{201D}, when it changes by a degree or every five seconds, then \u{201C}Almost there\u{201D} and \u{201C}On target\u{201D}, so you can keep your eye at the viewfinder. It is quiet while the target is below the horizon, and the **Silent** switch mutes it. Choose a **Slow** or **Normal** speech rate.",
+                "**On your Apple Watch**, open Lodestar and swipe to its **Aim** page: a large arrow, the pan and tilt in degrees, the distance and the target, a check mark and a tap when you are on target, and red only when the phone is in night mode. It shows **Waiting for iPhone\u{2026}** when the phone is not aiming or out of reach. **Show aiming on the watch** in **Settings** \u{25B8} **Feedback** turns it off.",
                 "**Chips** (small labels) along the top: **Compass good**, **Compass fair** or **Compass poor** (or **Gyro lock**), **Magnetic interference**, **Not aligned**, **Aligned \u{00B1}0.6\u{00B0} \u{00B7} 2 pts** or **Alignment 3 h old**, **Virtual sky**, **Approx. location**, camera notices and Starlink streak warnings.",
                 "**The level gauge**, top right, reads **Level** with a check mark when the camera is level.",
                 "**Buttons:** **Target**, **Align**, **Mosaic**, **Camera**, the night button (**Night off**, **Night on** or **Night auto**) and zoom. **Mount** appears once a GoTo mount has connected.",

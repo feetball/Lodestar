@@ -23,13 +23,22 @@ final class WatchTonightModel {
     @ObservationIgnored private var link: WatchPhoneLink?
     @ObservationIgnored private var phonePlace = TonightPlaceStore.load(.phone)
     @ObservationIgnored private var isRefreshing = false
+    /// The Aim page's model, which gets the aim messages that arrive on the phone link.
+    @ObservationIgnored private let aim: WatchAimModel
+
+    init(aim: WatchAimModel) {
+        self.aim = aim
+    }
 
     /// Starts listening to the iPhone and asks for location access if the user has not been asked.
     func start() {
         guard link == nil else { return }
-        let link = WatchPhoneLink { [weak self] place in
+        let aim = aim
+        let link = WatchPhoneLink(onPlace: { [weak self] place in
             Task { @MainActor [weak self] in await self?.receive(place) }
-        }
+        }, onAim: { message in
+            Task { @MainActor in aim.receive(message) }
+        })
         self.link = link
         link.activate()
         #if DEBUG

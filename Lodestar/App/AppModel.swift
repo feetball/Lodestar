@@ -40,6 +40,8 @@ final class AppModel {
     let camera: CameraService
     let catalog: CatalogService
     let feedback: FeedbackService
+    /// Speaks the aiming guidance (Settings ▸ Feedback); silent unless switched on.
+    let spokenGuidance: SpokenGuidanceService
     let screen: ScreenController
     /// The optional downloads (satellites, comets, cloud forecast); everything in it is off until switched on.
     let online: OnlineDataService
@@ -101,6 +103,7 @@ final class AppModel {
         camera = CameraService()
         catalog = CatalogService()
         feedback = FeedbackService()
+        spokenGuidance = SpokenGuidanceService()
         screen = ScreenController()
         online = OnlineDataService(catalog: catalog)
         satelliteAim = SatelliteAimSession()
@@ -333,6 +336,7 @@ final class AppModel {
         }
 
         feedback.configure(haptics: settings.hapticsEnabled, audio: settings.audioCuesEnabled)
+        spokenGuidance.configure(isEnabled: settings.spokenGuidance, rate: settings.spokenGuidanceRate)
         invalidateAlignmentIfNeeded()
     }
 
