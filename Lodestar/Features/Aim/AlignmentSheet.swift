@@ -195,7 +195,8 @@ struct AlignmentSheet: View {
         var wait = AimHoldStill(startedAt: ProcessInfo.processInfo.systemUptime)
         while !Task.isCancelled {
             let mount = app.mountProfile
-            let sample = app.motion.latestSample().flatMap { SteadinessSample(attitude: $0.rawAttitude, mount: mount) }
+            let motionSample = app.motion.latestSample()
+            let sample = motionSample.flatMap { SteadinessSample(attitude: $0.rawAttitude, mount: mount) }
             switch wait.update(now: ProcessInfo.processInfo.systemUptime, sample: sample) {
             case .waiting(let progress):
                 // In steps of 2 %, so that the sheet is not redrawn at the polling rate for a bar that moves slowly.
@@ -203,7 +204,7 @@ struct AlignmentSheet: View {
                 if shown != holdProgress { holdProgress = shown }
             case .steady:
                 holdProgress = nil
-                syncNow()
+                syncNow(sample: motionSample)
                 return
             case .timedOut:
                 holdProgress = nil
@@ -216,7 +217,12 @@ struct AlignmentSheet: View {
 
     /// Records the camera's attitude together with the object's true apparent position at this instant.
     private func syncNow() {
-        guard let selected, let sample = app.motion.latestSample(), let observer = app.observerContext?.observer else {
+        syncNow(sample: app.motion.latestSample())
+    }
+
+    /// Records the supplied sample without reading the sensors again.
+    private func syncNow(sample: MotionSample?) {
+        guard let selected, let sample, let observer = app.observerContext?.observer else {
             notice = .failure("The motion sensors are not delivering data yet. Wait a moment and sync again.")
             return
         }
