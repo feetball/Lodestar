@@ -17,6 +17,9 @@ enum EventsFormat {
         case .fullMoonSpecial: return "moonphase.full.moon"
         case .lunarEclipse: return "moon.circle.fill"
         case .solarEclipse: return "sun.max.fill"
+        case .greatRedSpotTransit: return "smallcircle.filled.circle"
+        case .jupiterMoonEvent: return "smallcircle.circle"
+        case .planetStation: return "pause.circle"
         }
     }
 
@@ -144,6 +147,18 @@ enum EventsFormat {
             return lunarSummary(eclipse)
         case .solarEclipse(let eclipse):
             return solarSummary(eclipse, hasObserver: event.visibility != nil, timeZone: timeZone)
+        case .greatRedSpotTransit(let transit):
+            return "Crosses the central meridian at \(AppFormat.time(event.date, in: timeZone)) \u{00B7} well placed "
+                + window(transit.wellPlaced, in: timeZone)
+        case .jupiterMoonEvent:
+            var parts = ["At \(AppFormat.time(event.date, in: timeZone)) (\u{00B1}\(Int(GalileanMoons.accuracyMinutes)) min)"]
+            if let altitude = event.visibility?.altitude, altitude > 0 {
+                parts.append("Jupiter \(AngleFormatter.formatDegrees(altitude, decimals: 0)) high")
+            }
+            return parts.joined(separator: " \u{00B7} ")
+        case .planetStation(let station):
+            return station.kind == .retrogradeBegins ? "Starts to move west among the stars"
+                                                     : "Moves east among the stars again"
         }
     }
 

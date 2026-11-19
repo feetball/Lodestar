@@ -8,6 +8,12 @@ private struct EventsMonth: Identifiable {
     let entries: [EventsEntry]
 }
 
+/// What the calendar's refresh loop runs for: the observer and the Great Red Spot, so a changed longitude starts it over.
+private struct FreshnessKey: Equatable {
+    let context: ObserverContext
+    let greatRedSpot: GreatRedSpot
+}
+
 /// The astronomical events of the next twelve months, grouped by month, with a filter by kind and a switch that
 /// keeps only what can be seen from the observer's place.
 struct EventsCalendarView: View {
@@ -23,7 +29,7 @@ struct EventsCalendarView: View {
         Group {
             if let context = app.observerContext {
                 content(context: context)
-                    .task(id: context) {
+                    .task(id: FreshnessKey(context: context, greatRedSpot: app.settings.greatRedSpotOrDefault)) {
                         await keepFresh(context: context)
                     }
             } else {
@@ -131,7 +137,8 @@ struct EventsCalendarView: View {
         return VStack(alignment: .leading, spacing: 4) {
             TonightNote(text: "\(context.name) \u{00B7} times in \(zone). Conjunctions are listed when the pair comes "
                         + "within 3\u{00B0}. \u{201C}Visible from here\u{201D} means there is a window with the target "
-                        + "at least 10\u{00B0} high and the sky dark enough.", style: .footnote)
+                        + "at least 10\u{00B0} high and the sky dark enough. Jupiter\u{2019}s Great Red Spot transits and "
+                        + "moon events come by the dozen, so they are listed for today and tomorrow only.", style: .footnote)
             TonightNote(text: "Meteor shower data: International Meteor Organization.", style: .footnote)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -214,7 +221,7 @@ struct EventsCalendarView: View {
     private func keepFresh(context: ObserverContext) async {
         while !Task.isCancelled {
             now = app.clock.now
-            model.refresh(context: context, now: now)
+            model.refresh(context: context, now: now, greatRedSpot: app.settings.greatRedSpotOrDefault)
             try? await Task.sleep(for: .seconds(60))
         }
     }

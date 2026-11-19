@@ -50,6 +50,20 @@ enum EventsDetailModel {
             return lunarFacts(eclipse)
         case .solarEclipse(let eclipse):
             return solarFacts(eclipse, hasObserver: entry.event.visibility != nil, timeZone: timeZone)
+        case .greatRedSpotTransit(let transit):
+            return [EventsDetailRow(label: "Well placed",
+                                    value: "\(EventsFormat.window(transit.wellPlaced, in: timeZone)) "
+                                        + "(\u{00B1}\(Int(GreatRedSpot.wellPlacedMinutes)) min)"),
+                    EventsDetailRow(label: "Longitude (System II)",
+                                    value: AngleFormatter.formatDegrees(transit.longitude, decimals: 0))]
+        case .jupiterMoonEvent:
+            return [EventsDetailRow(label: "Accuracy", value: "About \u{00B1}\(Int(GalileanMoons.accuracyMinutes)) minutes")]
+        case .planetStation(let station):
+            return [EventsDetailRow(label: "Planet", value: station.planet.displayName),
+                    EventsDetailRow(label: "Motion", value: String(station.kind.displayName.prefix(1)).uppercased()
+                                        + String(station.kind.displayName.dropFirst())),
+                    EventsDetailRow(label: "Ecliptic longitude",
+                                    value: AngleFormatter.formatDegrees(station.longitude, decimals: 1))]
         }
     }
 
@@ -204,6 +218,9 @@ enum EventsDetailModel {
         case .fullMoonSpecial: instantLabel = "Full Moon"
         case .lunarEclipse: instantLabel = "Greatest eclipse"
         case .solarEclipse: instantLabel = "Greatest eclipse (anywhere)"
+        case .greatRedSpotTransit: instantLabel = "Crosses the central meridian"
+        case .jupiterMoonEvent: instantLabel = "Time"
+        case .planetStation: instantLabel = "Station"
         }
         rows.append(EventsDetailRow(label: instantLabel, value: EventsFormat.dayAndTime(event.date, in: timeZone)))
         guard let visibility = event.visibility else { return rows }
@@ -260,6 +277,8 @@ enum EventsDetailModel {
                 return "The Moon is below the horizon during the eclipse as seen from here."
             case .solarEclipse:
                 return "The Sun is below the horizon during the eclipse as seen from here."
+            case .greatRedSpotTransit, .jupiterMoonEvent:
+                return "Jupiter is too low or the sky too bright while this happens."
             default:
                 return "There is no good viewing window from here: the target stays too low or the sky too bright that night."
             }

@@ -213,6 +213,9 @@ private struct Workspace {
         case .fullMoonSpecial: return "moonphase.full.moon"
         case .lunarEclipse: return "moon.circle.fill"
         case .solarEclipse: return "sun.max.fill"
+        case .greatRedSpotTransit: return "smallcircle.filled.circle"
+        case .jupiterMoonEvent: return "smallcircle.circle"
+        case .planetStation: return "pause.circle"
         }
     }
 }

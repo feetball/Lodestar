@@ -38,8 +38,10 @@ tilt the tripod head until it is in your frame.
   targets of the night, and a polar-scope clock for star trackers.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
-  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
-  and where to look and a button to aim at it.
+  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, the stations
+  of the planets, and for planet imagers the Great Red Spot's transits and the Galilean moons' transits, shadows
+  and eclipses (with a "Moons tonight" diagram on Jupiter's screen), each with when and where to look and a button
+  to aim at it.
 - **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
   order, guided panel by panel in Aim), and star-trail and time-lapse planners.
 - **Exposure calculator** — the longest exposure before stars trail by the NPF, 500, 400 and 300 rules for your

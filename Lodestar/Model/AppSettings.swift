@@ -66,6 +66,16 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
     var timeZone: TimeZone? { timeZoneIdentifier.flatMap(TimeZone.init(identifier:)) }
 }
 
+/// The Great Red Spot's System II longitude as the user read it (`longitude`, degrees, [0, 360)) on the day `asOf`.
+/// The kit moves it on from there with the spot's usual drift. Absent, the kit's dated default applies.
+struct GreatRedSpotSetting: Codable, Equatable, Sendable {
+    var longitude: Double
+    var asOf: Date
+
+    /// The spot this describes, or `nil` when the values are not usable.
+    var spot: GreatRedSpot? { GreatRedSpot(longitude: longitude, epoch: asOf) }
+}
+
 enum NightModeSetting: String, Codable, CaseIterable, Identifiable, Sendable {
     case off, on, automatic
     var id: String { rawValue }
@@ -170,6 +180,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     var favoriteObjectIDs: [String] = []
     var recentObjectIDs: [String] = []
 
+    // Jupiter
+    /// The Great Red Spot's longitude the user entered, or `nil` for the kit's dated default.
+    var greatRedSpot: GreatRedSpotSetting?
+
     init() {}
 
     init(from decoder: Decoder) throws {
@@ -214,6 +228,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         pressureMillibars = value(.pressureMillibars, d.pressureMillibars)
         favoriteObjectIDs = Array(value(.favoriteObjectIDs, d.favoriteObjectIDs).prefix(Self.maximumFavorites))
         recentObjectIDs = Array(value(.recentObjectIDs, d.recentObjectIDs).prefix(Self.maximumRecents))
+        greatRedSpot = value(.greatRedSpot, d.greatRedSpot)
         sanitize()
     }
 
@@ -239,11 +254,15 @@ struct AppSettings: Codable, Equatable, Sendable {
         if case .site(let id) = locationSource, !savedSites.contains(where: { $0.id == id }) {
             locationSource = .device
         }
+        if let setting = greatRedSpot, setting.spot == nil { greatRedSpot = nil }
     }
 
     var atmosphere: Atmosphere {
         Atmosphere(pressureMillibars: pressureMillibars, temperatureCelsius: temperatureCelsius)
     }
+
+    /// The Great Red Spot to compute with: the user's longitude, else `GreatRedSpot.reference`.
+    var greatRedSpotOrDefault: GreatRedSpot { greatRedSpot?.spot ?? .reference }
 }
 
 /// Decodes an element if possible and yields `nil` instead of failing the enclosing collection.
