@@ -257,8 +257,11 @@ public final class MountController {
         _ = try requireConnected()
         let direction = nudgeDirection
         var failure = repeatUntilDone { try driver.abort() }
-        if failure == nil, let toStop = direction {
-            failure = repeatUntilDone { try driver.stopNudge(direction: toStop) }
+        // The abort of some protocols (NexStar, Alpaca) cancels only a GoTo, so a running nudge is stopped on its own,
+        // whatever became of the abort. The first failure is the one reported.
+        if let toStop = direction {
+            let stopFailure = repeatUntilDone { try driver.stopNudge(direction: toStop) }
+            if failure == nil { failure = stopFailure }
         }
         if let failure {
             lastError = failure
@@ -285,16 +288,32 @@ public final class MountController {
         if let previous = nudgeDirection, previous != direction {
             try driver.stopNudge(direction: previous)
             nudgeDirection = nil
+            nudgeEnds = nil
         }
         let now = clock.now()
         do {
             try driver.startNudge(direction: direction, rate: rate, durationSeconds: durationSeconds)
         } catch let error as MountError {
             lastError = error
+            var stopped = true
             do {
                 try driver.stopNudge(direction: direction)
             } catch {
                 // Already failing; the error above is what the caller needs to see.
+                stopped = false
+            }
+            if stopped {
+                // What ran before is stopped (the previous direction above, this one just now): the controller is idle and
+                // not left in a nudge that has no direction.
+                if phase == .nudging { phase = .idle }
+                nudgeDirection = nil
+                nudgeEnds = nil
+            } else {
+                // The move may be running although the stop could not be confirmed: it stays on the books, so that
+                // `stopNudge`, `abort` and the end of its duration still send the stop.
+                phase = .nudging
+                nudgeDirection = direction
+                nudgeEnds = now.addingTimeInterval(durationSeconds)
             }
             throw error
         }

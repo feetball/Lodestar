@@ -4,7 +4,7 @@ extension HelpContent {
     private static let mounts = HelpTopic(
         topic: .mounts, category: .equipment, title: "GoTo mounts", systemImage: "antenna.radiowaves.left.and.right",
         summary: "Slew a GoTo mount to your target over Wi-Fi.",
-        keywords: ["telescope", "slew", "wifi", "onstep", "synscan", "nexstar", "alpaca", "simulated"],
+        keywords: ["telescope", "slew", "wifi", "onstep", "synscan", "nexstar", "alpaca", "simulated", "meridian", "flip", "hour angle"],
         blocks: [
             .paragraph("A GoTo mount turns the camera to your target for you. Lodestar connects to it over Wi-Fi and works with OnStep and LX200 mounts, Celestron NexStar and SynScan hand controllers, ASCOM Alpaca, and the Sky-Watcher AZ-GTi and Star Adventurer GTi. Switch the Sky-Watcher mounts on at their home position, and align them on one to three stars before the first **Go to**. For NexStar and SynScan, align on the hand controller first. When Lodestar goes to the background, it stops the mount and disconnects."),
             .steps([
@@ -13,6 +13,7 @@ extension HelpContent {
                 "In **Aim**, tap **Mount**. The button appears after the first connection. Its strip shows the mount\u{2019}s name and where it points.",
                 "**Go to** and **Sync** ask for confirmation first. **Nudge** opens the arrows. **Stop** is always there.",
             ]),
+            .paragraph("While a German equatorial mount tracks, a chip in the strip counts down to the meridian, the line from north to south across the sky, where the mount has to flip: **Meridian in 25 min**. It changes color under 15 minutes and reads **Past the meridian: flip** after it. Lodestar only tells you and never flips the mount. A Sky-Watcher mount counts down to its own limit past the meridian, and other mounts to the meridian itself."),
             .tip("To practice without hardware, tap **Simulated OnStep mount** or **Simulated Sky-Watcher mount** under **Connect**."),
             .caution("Lodestar cannot see cables, people or obstacles, and a mount can swing through a wide arc. Keep hands and cables clear before a slew, and tap **Stop** if anything looks wrong. Lodestar never slews to the Sun, but it does not check the path, so do not use GoTo by day unless your optics have a certified solar filter."),
         ],
