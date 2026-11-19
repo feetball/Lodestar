@@ -54,7 +54,7 @@ struct HelpTopic: Identifiable, Hashable {
     enum ID: String, Hashable {
         case gettingStarted, mounting, aimScreen, alignment, compassAndGyro
         case objects, skyChart, planFraming, tonight, events
-        case mosaic, trailsAndExposure, skyline
+        case mosaic, trailsAndExposure, skyline, alignmentFinder
         case mounts, nightMode, onlineData, widgets
         case troubleshooting, glossary
     }

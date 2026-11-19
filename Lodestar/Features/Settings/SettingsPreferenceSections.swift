@@ -103,8 +103,8 @@ struct SettingsAtmosphereSection: View {
     }
 }
 
-/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner and the polar alignment
-/// helper.
+/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner, the polar alignment
+/// helper and the alignment finder.
 struct SettingsToolsSection: View {
     var body: some View {
         SettingsSection(title: "Tools") {
@@ -122,6 +122,11 @@ struct SettingsToolsSection: View {
                 PolarAlignmentView()
             } label: {
                 Label("Polar Alignment", systemImage: "sparkle")
+            }
+            NavigationLink {
+                AlignmentFinderView()
+            } label: {
+                Label("Alignment Finder", systemImage: "mountain.2")
             }
         }
     }
