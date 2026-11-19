@@ -35,7 +35,7 @@ enum OnlineText {
         case .comets:
             return "Adds the current comets to the object list, the sky chart and Aim."
         case .clouds:
-            return "Shows tonight's hourly cloud cover on the Tonight screen."
+            return "Shows tonight's hourly cloud cover, dew, wind, fog and temperature on the Tonight screen."
         }
     }
 
