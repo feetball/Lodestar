@@ -251,12 +251,13 @@ public final class SkyWatcherDriver: MountDriver {
             gotoNeedsAlignment: !configuration.allowsGotoWithoutAlignment, isAligned: false)
     }
 
-    /// Ends the session. Servo tracking (alt-azimuth mounts) and a nudge are stopped, because the mount would otherwise keep turning
-    /// at the last rate; a sidereal tracking equatorial mount keeps tracking, and a running slew is left to finish.
+    /// Ends the session. Servo tracking (alt-azimuth mounts), a nudge and a stop that is still pending (tracking that ran into a
+    /// limit, a nudge whose stop did not get through) are stopped, because the mount would otherwise keep turning at the last rate;
+    /// a sidereal tracking equatorial mount keeps tracking, and a running slew is left to finish.
     public func disconnect() {
         if !connected { return }
         connected = false
-        if motion == .nudging || (motion == .tracking && resolvedStrategy == .servo) {
+        if motion == .nudging || pendingStop || (motion == .tracking && resolvedStrategy == .servo) {
             // Best effort: the link is probably gone. Each axis gets its own try, so that a failure on one does not leave the other running.
             for axis in SkyWatcherAxis.allCases {
                 do {
@@ -429,9 +430,8 @@ public final class SkyWatcherDriver: MountDriver {
         try requireConnected()
         try stopAxes()
         try waitUntilStopped()
-        for axis in SkyWatcherAxis.allCases {
-            try link.exchange(.setPosition, axis: axis, data: SkyWatcherCodec.encodePosition(0), operation: "set position")
-        }
+        // The zero of an axis moves with the first `E` that reaches it (also when its reply is lost), so from here on the alignment
+        // and the motion state no longer match the encoders, whatever becomes of the other axis.
         slew = nil
         nudge = nil
         anchor = nil
@@ -441,6 +441,9 @@ public final class SkyWatcherDriver: MountDriver {
         pendingStop = false
         lastServo = nil
         clearAlignment()
+        for axis in SkyWatcherAxis.allCases {
+            try link.exchange(.setPosition, axis: axis, data: SkyWatcherCodec.encodePosition(0), operation: "set position")
+        }
         let reading = try readAxes()
         startupAxisAngles = SkyWatcherAxisAngles(axis1Degrees: reading.axis1, axis2Degrees: reading.axis2)
     }
@@ -532,8 +535,17 @@ public final class SkyWatcherDriver: MountDriver {
         try readStatus(.axis2)
     }
 
+    /// Sends the stop to both axes. Each axis gets its command even if the other's failed; the first error is thrown afterwards.
     private func stopAxes() throws {
-        for axis in SkyWatcherAxis.allCases { try link.exchange(.stopMotion, axis: axis, data: "", operation: "stop") }
+        var first: Error?
+        for axis in SkyWatcherAxis.allCases {
+            do {
+                try link.exchange(.stopMotion, axis: axis, data: "", operation: "stop")
+            } catch {
+                if first == nil { first = error }
+            }
+        }
+        if let first { throw first }
     }
 
     /// Stops both axes without braking (the protocol's instant stop), for a move that has run into a limit of the mount.
