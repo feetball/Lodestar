@@ -23,8 +23,11 @@ tilt the tripod head until it is in your frame.
   spelling) or browse by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters, Special
   (Milky Way core, celestial poles). Sort by name, brightness, altitude or rise time; favourites,
   recents and custom RA/Dec targets. Each object shows where it is now, its rise/transit/set, an
-  altitude chart over the night with twilight shading, how it fits your frame, and the longest
-  exposure before stars trail (NPF and 500 rules).
+  altitude chart over the night with twilight shading, how it fits your frame, the longest
+  exposure before stars trail (NPF and 500 rules) and how much the Moon will matter. That advice is
+  filter-aware: set a light-pollution or narrowband filter in *Settings ▸ Camera & Lens* and it is
+  relaxed for emission nebulae, planetary nebulae and supernova remnants. Tonight's best targets
+  weigh the Moon the same way.
 - **Sky chart** — an all-sky planisphere with constellations, the Milky Way, planets and deep-sky
   objects, your camera's live pointing, tap-to-identify, time travel and zoom up to 15×. **Plan your
   framing** holds your camera's frame in the middle of the chart so you can move the sky under it and

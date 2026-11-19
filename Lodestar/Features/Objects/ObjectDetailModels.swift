@@ -126,20 +126,18 @@ struct ObjectDetailEvent: Sendable, Identifiable {
     var id: String { kind.rawValue }
 }
 
-/// How much the Moon is likely to disturb a shot of the object.
+/// Where the Moon is relative to the object. How much it disturbs a shot depends on the user's filter, so the level
+/// is assessed where it is shown (`ObjectMoonGeometry.assess(filter:kind:)`), not stored here.
 struct ObjectDetailMoonConditions: Sendable, Equatable {
-    enum Impact: Sendable {
-        case moonDown, minor, moderate, severe
-    }
-
     /// The instant the conditions were evaluated for.
     let date: Date
     /// Whether `date` is the present moment (otherwise it is the object's best time tonight).
     let isNow: Bool
+    let geometry: ObjectMoonGeometry
+
     /// Angular distance between the object and the Moon, in degrees.
-    let separation: Double
-    let illuminatedFraction: Double
-    let impact: Impact
+    var separation: Double { geometry.separation }
+    var illuminatedFraction: Double { geometry.illuminatedFraction }
 }
 
 /// Everything the detail screen computes for an object and an observer.
