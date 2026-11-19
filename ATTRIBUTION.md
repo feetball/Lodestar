@@ -131,8 +131,10 @@ The optional cloud forecast (Settings > Online Data, off by default) is download
 MET Norway licenses its data under the Norwegian Licence for Open Government Data (NLOD) 2.0 and
 [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/) (CC BY 4.0). The app
 shows **"Weather forecast from MET Norway"** (on the Tonight card: "Forecast: MET Norway") and states the changes it makes:
-it shows the cloud-cover values as forecast, for the night and place shown, and derives its own summary of the clear
-spells from them. MET Norway does not endorse Lodestar. Requests follow MET Norway's terms of service
+it shows the cloud-cover, temperature, dew-point and wind values as forecast (rounded for display, and converted to °F
+and mph where the region uses them), for the night and place shown, and derives its own summary of the clear spells and its
+dew, wind and fog warnings from them. The unit tests contain a small extract of one real answer
+(`WidgetTests/Tests/ForecastCoreTests/Fixtures`). MET Norway does not endorse Lodestar. Requests follow MET Norway's terms of service
 (https://api.met.no/doc/TermsOfService): an identifying `User-Agent`
 (`Lodestar/<version> (+https://feetball.github.io/Lodestar/support.html)`), coordinates rounded to 0.1 degree (at most four
 decimals), `If-Modified-Since` for repeat requests and no request before the response's `Expires` time. The server

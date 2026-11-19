@@ -43,7 +43,7 @@ extension HelpContent {
                 "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",
                 "**Comets** join the object list, the sky chart and Aim. About 164 KB from the Minor Planet Center.",
-                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
+                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover, dew, wind, fog and temperature on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
             ]),
             .tip("**Update now** refreshes a feed. CelesTrak answers repeated requests for unchanged data with an error, so the satellite lists wait at least two hours between requests. When it is too soon, the button is grayed out and says when the next update is possible."),
             .caution("Switching a feed off deletes what it downloaded. If a feed shows **The last update failed.**, Lodestar keeps the data it already has. Wait, then try **Update now** again."),
