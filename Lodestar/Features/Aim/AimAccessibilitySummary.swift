@@ -17,6 +17,21 @@ struct AimAccessibilitySummary: View {
     }
 
     private func summary() -> String {
+        previewLead() + liveSummary()
+    }
+
+    /// While the sky is previewed: where it is previewed at and where the target will stand then.
+    private func previewLead() -> String {
+        guard let moment = model.previewMoment else { return "" }
+        let lead = AimPreview.spokenChip(time: moment.time, day: moment.day, isDaylight: model.isDaylightAtPreview == true)
+        guard let target = model.guidanceTarget, let placed = model.engine.frame()?.target,
+              !model.mosaicSession.isActive, model.isSkyBuiltForPreview else { return lead + " " }
+        let place = AimPreview.spokenPlace(name: target.name, altitude: placed.horizontal.altitude, time: moment.text,
+                                           isFuture: moment.isFuture)
+        return lead + " " + place + " "
+    }
+
+    private func liveSummary() -> String {
         guard let frame = model.engine.frame() else { return "Waiting for the motion sensors." }
         let skyline = model.skyContent?.skyline.map {
             " The sky overlay shades the ground below your recorded skyline, up to \(AimFormat.spoken($0.highestAltitude)) high."

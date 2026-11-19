@@ -13,6 +13,8 @@ tilt the tripod head until it is in your frame.
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
   closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
   With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
+  A time bar previews the sky at a later (or earlier) time, up to 48 hours either way, so you can frame the Milky
+  Way core or a planet for 2 am at 9 pm and lock the head; the phone's pointing stays live.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Syncing waits until the phone has been held still, each
