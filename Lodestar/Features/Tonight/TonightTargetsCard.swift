@@ -34,13 +34,15 @@ struct TonightTargetsCard: View {
                 }
                 TonightTargetRow(target: target, timeZone: timeZone)
             }
-            TonightNote(text: "Ranked by height in the dark, brightness and size. Only objects that climb above "
-                        + "\(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} are listed.", style: .footnote)
+            TonightNote(text: "Ranked by height in the dark, brightness and size, and lower where the Moon spoils the "
+                        + "sky. Only objects that climb above \(Int(TonightCalculator.minimumTargetAltitude))\u{00B0} "
+                        + "are listed.", style: .footnote)
             if targets.contains(where: { $0.note != nil }) {
                 TonightNote(text: SmallBodyText.targetsNote, style: .footnote)
             }
             if appliesSkyline {
-                TonightSkylineNote(detail: "targets hidden behind the skyline are left out.")
+                TonightSkylineNote(detail: "targets hidden behind the skyline are left out, and targets that stay clear"
+                                   + " of it longer rank higher.")
             }
         case .noDarkness:
             TonightNote(text: "There is no astronomical darkness on this night, so there is nothing to rank.")
@@ -91,6 +93,9 @@ private struct TonightTargetRow: View {
                     Text(timing)
                         .font(.footnote)
                         .foregroundStyle(palette.tertiaryText)
+                    if let moon = target.moon {
+                        moonChip(for: moon)
+                    }
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
@@ -119,18 +124,34 @@ private struct TonightTargetRow: View {
         .accessibilityHint("Opens details")
     }
 
+    /// What the Moon does to the target at its best time: "Moon down", "Moon: moderate", "Moon: fine with your filter".
+    /// A label rather than a capsule, so that it wraps in the narrow text column instead of being cut off.
+    private func moonChip(for moon: ObjectMoonAssessment) -> some View {
+        let appearance: (symbol: String, color: Color)
+        switch moon.level {
+        case .moonDown: appearance = ("moon.zzz", palette.positive)
+        case .minor: appearance = ("moon", moon.isRelaxed ? palette.positive : palette.secondaryText)
+        case .moderate: appearance = ("moon.fill", palette.warning)
+        case .severe: appearance = ("exclamationmark.triangle", palette.critical)
+        }
+        return Label(ObjectMoonText.chip(moon), systemImage: appearance.symbol)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(appearance.color)
+    }
+
     /// The name, with the first catalog designation when it differs: "Andromeda Galaxy · M 31".
     private var title: String {
         let name = SmallBodyText.displayName(object)
         return TonightFormat.designation(of: object).map { "\(name)\u{00A0}\u{00B7} \($0)" } ?? name
     }
 
-    /// "Best 23:40 facing SE · 7h 12m above 20°".
+    /// "Best 23:40 facing SE · 7h 12m above 20°"; with a skyline "Best 23:40 facing SE · 3.5 h clear of your skyline".
     private var timing: String {
         let minimum = Int(TonightCalculator.minimumTargetAltitude)
         let best = TonightFormat.solid("Best \(AppFormat.time(target.peakTime, in: timeZone))") + " "
             + TonightFormat.solid(TonightFormat.facing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
-        let above = "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
+        let above = target.unobstructedHours.map { "\(ObjectsFormat.hours($0)) clear of your skyline" }
+            ?? "\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above\u{00A0}\(minimum)\u{00B0}"
         // A wrapped line breaks after the dot, not between "8h 14m" and a lone "above 20°". At accessibility sizes the
         // text column is too narrow for the whole phrase in one piece, so it may break at its spaces there.
         return TonightFormat.dotted([best, dynamicTypeSize.isAccessibilitySize ? above : TonightFormat.solid(above)])
@@ -144,8 +165,15 @@ private struct TonightTargetRow: View {
         parts.append("highest \(AngleFormatter.formatDegrees(target.peakAltitude, decimals: 0))"
                      + " at \(AppFormat.time(target.peakTime, in: timeZone))"
                      + ", " + TonightFormat.spokenFacing(azimuth: target.peakAzimuth, altitude: target.peakAltitude))
-        parts.append("\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above"
-                     + " \(Int(TonightCalculator.minimumTargetAltitude)) degrees")
+        if let clear = target.unobstructedHours {
+            parts.append("\(ObjectsFormat.hours(clear, spoken: true)) clear of your skyline")
+        } else {
+            parts.append("\(TonightFormat.duration(hours: target.hoursAboveMinimum)) above"
+                         + " \(Int(TonightCalculator.minimumTargetAltitude)) degrees")
+        }
+        if let moon = target.moon {
+            parts.append(ObjectMoonText.chip(moon))
+        }
         return parts.joined(separator: ", ")
     }
 }

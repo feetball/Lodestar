@@ -140,6 +140,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var focalLength: Double = 24
     var aperture: Double = 2.8
     var pixelPitch: Double?
+    /// The filter in front of the sensor: it decides how far the Moon warnings are relaxed for emission nebulae.
+    var imagingFilter: ImagingFilter = .none
 
     // Exposure calculator
     /// The angle between a tracker's axis and the pole that the Tracked section works with, in degrees.
@@ -205,6 +207,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         focalLength = value(.focalLength, d.focalLength)
         aperture = value(.aperture, d.aperture)
         pixelPitch = value(.pixelPitch, d.pixelPitch)
+        imagingFilter = value(.imagingFilter, d.imagingFilter)
         polarErrorDegrees = value(.polarErrorDegrees, d.polarErrorDegrees)
         exposureISO = value(.exposureISO, d.exposureISO)
         nightMode = value(.nightMode, d.nightMode)

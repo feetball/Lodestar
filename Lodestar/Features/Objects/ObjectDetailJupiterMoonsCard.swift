@@ -113,15 +113,22 @@ struct ObjectDetailJupiterMoonsCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(palette)
         .task(id: key) {
-            guard let key else { return }
-            let observer = key.context.observer
-            let timeZone = key.context.timeZone
-            let hour = key.hour
-            let spot = key.spot
-            events = await Task.detached(priority: .userInitiated) {
-                ObjectsJupiterMoons.tonight(observer: observer, timeZone: timeZone, from: hour, spot: spot)
-            }.value
+            await refreshEvents()
         }
+    }
+
+    /// Works out tonight's events off the main actor and keeps them for the card.
+    private func refreshEvents() async {
+        guard let key else { return }
+        let observer = key.context.observer
+        let timeZone = key.context.timeZone
+        let hour = key.hour
+        let spot = key.spot
+        let computed = await Task.detached(priority: .userInitiated) {
+            ObjectsJupiterMoons.tonight(observer: observer, timeZone: timeZone, from: hour, spot: spot)
+        }.value
+        guard !Task.isCancelled else { return }
+        events = computed
     }
 
     @ViewBuilder

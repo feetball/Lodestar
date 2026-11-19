@@ -116,24 +116,37 @@ final class CatalogModelTests: XCTestCase {
         func text(_ major: Double, _ minor: Double? = nil) throws -> String {
             try XCTUnwrap(AngularSize(majorArcminutes: major, minorArcminutes: minor)).description
         }
-        XCTAssertEqual(try text(178, 69.7), "178′ × 70′")
-        XCTAssertEqual(try text(150, 150), "150′")
-        XCTAssertEqual(try text(646, 550), "646′ × 550′")
+        // From 1° up: degrees and whole arcminutes.
+        XCTAssertEqual(try text(178, 69.7), "2° 58′ × 1° 10′")
+        XCTAssertEqual(try text(85, 60), "1° 25′ × 1°")
+        XCTAssertEqual(try text(150, 150), "2° 30′")
+        XCTAssertEqual(try text(646, 550), "10° 46′ × 9° 10′")
+        XCTAssertEqual(try text(60), "1°")
+        XCTAssertEqual(try text(65), "1° 05′")
+        XCTAssertEqual(try text(120), "2°")
+        XCTAssertEqual(try text(119.6), "2°", "119.6′ rounds up to a whole 2°")
+        XCTAssertEqual(try text(125.4), "2° 05′")
+        XCTAssertEqual(try text(21600), "360°")
+        // From 1′ up: arcminutes and whole arcseconds.
         XCTAssertEqual(try text(12), "12′")
-        XCTAssertEqual(try text(12.4), "12′")
-        XCTAssertEqual(try text(8.4, 4), "8.4′ × 4′")
-        XCTAssertEqual(try text(9.96), "10′")
-        XCTAssertEqual(try text(1.2, 0.5), "1.2′ × 0.5′")
+        XCTAssertEqual(try text(12.4), "12′ 24″")
+        XCTAssertEqual(try text(8.4, 4), "8′ 24″ × 4′")
+        XCTAssertEqual(try text(8.07), "8′ 04″")
+        XCTAssertEqual(try text(9.96), "9′ 58″")
+        XCTAssertEqual(try text(1.2, 0.5), "1′ 12″ × 30″")
         XCTAssertEqual(try text(1), "1′")
+        XCTAssertEqual(try text(30.5), "30′ 30″")
+        XCTAssertEqual(try text(59.99), "59′ 59″")
+        XCTAssertEqual(try text(59.9999), "1°", "59′ 59.99″ rounds up to the next degree")
+        // Below 1′: arcseconds.
         XCTAssertEqual(try text(0.6), "36″")
         XCTAssertEqual(try text(0.5, 0.25), "30″ × 15″")
         XCTAssertEqual(try text(0.1), "6″")
         XCTAssertEqual(try text(0.01), "0.6″")
         XCTAssertEqual(try text(0.99), "59″")
         XCTAssertEqual(try text(0.9917), "1′", "59.5″ would round to 60″, which is written as one arcminute")
-        XCTAssertEqual(try text(0.9999, 0.5), "1′ × 0.5′")
-        XCTAssertEqual(try text(21600), "21600′")
-        XCTAssertEqual(String(describing: try XCTUnwrap(AngularSize(majorArcminutes: 30.5))), "31′")
+        XCTAssertEqual(try text(0.9999, 0.5), "1′ × 30″")
+        XCTAssertEqual(String(describing: try XCTUnwrap(AngularSize(majorArcminutes: 30.5))), "30′ 30″")
     }
 
     func testAngularSizeCoding() throws {

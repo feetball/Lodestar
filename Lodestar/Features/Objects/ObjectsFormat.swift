@@ -42,16 +42,35 @@ enum ObjectsFormat {
         designation.compare(object.name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
     }
 
+    /// Hours with one decimal, such as "3.4 h" ("3.4 hours" when `spoken`); "0 h" below a twentieth of an hour.
+    static func hours(_ hours: Double, spoken: Bool = false) -> String {
+        let unit = spoken ? "hours" : "h"
+        guard hours.isFinite, hours >= 0.05 else { return "0 \(unit)" }
+        return "\(hours.formatted(.number.precision(.fractionLength(1)))) \(unit)"
+    }
+
+    /// What a row says of tonight when the list is ordered or filtered by hours: "3.4 h tonight", or "behind skyline"
+    /// when the site has a skyline and the object is up in the dark but never clears it.
+    static func tonightText(_ tonight: UnobstructedVisibility, spoken: Bool = false) -> String {
+        if tonight.isBehindSkyline {
+            return spoken ? "behind your skyline tonight" : "behind skyline"
+        }
+        return "\(hours(tonight.hours, spoken: spoken)) tonight"
+    }
+
     /// Type, constellation and magnitude on one line, such as "Galaxy · Andromeda · mag 3.4".
     ///
     /// `magnitude` overrides the catalog magnitude for objects whose brightness changes. With `spoken` the parts are
     /// separated by commas and "magnitude" is written out. A comet or an asteroid gets its kind, magnitude estimate,
-    /// elongation and warnings from `position` instead.
+    /// elongation and warnings from `position` instead. With `tonight`, when the list is ordered or filtered by
+    /// hours, the line ends with "3.4 h tonight".
     static func subtitle(of object: CelestialObject, magnitude: Double?, spoken: Bool = false,
-                         position: ObjectSkyPosition? = nil) -> String {
+                         position: ObjectSkyPosition? = nil, tonight: UnobstructedVisibility? = nil) -> String {
         if object.smallBody != nil {
-            return SmallBodyText.subtitle(of: object, info: position?.smallBody, isComputed: position != nil,
-                                          spoken: spoken)
+            let line = SmallBodyText.subtitle(of: object, info: position?.smallBody, isComputed: position != nil,
+                                              spoken: spoken)
+            guard let tonight else { return line }
+            return line + (spoken ? ", " : " \u{00B7} ") + tonightText(tonight, spoken: spoken)
         }
         var parts = [object.category.displayName]
         if let constellation = object.constellationName {
@@ -60,6 +79,9 @@ enum ObjectsFormat {
         if let magnitude = magnitude ?? object.magnitude {
             let text = AppFormat.magnitude(magnitude)
             parts.append(spoken ? text.replacingOccurrences(of: "mag ", with: "magnitude ") : text)
+        }
+        if let tonight {
+            parts.append(tonightText(tonight, spoken: spoken))
         }
         return parts.joined(separator: spoken ? ", " : " \u{00B7} ")
     }
@@ -116,13 +138,15 @@ enum ObjectsFormat {
     }
 
     /// Everything a row shows, as one VoiceOver label.
-    static func spokenSummary(of object: CelestialObject, position: ObjectSkyPosition?, isFavorite: Bool,
+    static func spokenSummary(of object: CelestialObject, position: ObjectSkyPosition?,
+                              tonight: UnobstructedVisibility? = nil, isFavorite: Bool,
                               in timeZone: TimeZone, showsProminence: Bool = false) -> String {
         var parts = [SmallBodyText.displayName(object)]
         if let designation = extraDesignation(of: object) {
             parts.append(designation)
         }
-        parts.append(subtitle(of: object, magnitude: position?.magnitude, spoken: true, position: position))
+        parts.append(subtitle(of: object, magnitude: position?.magnitude, spoken: true, position: position,
+                              tonight: tonight))
         if let line = catalogueLine(of: object, showsProminence: showsProminence) {
             parts.append(line.replacingOccurrences(of: " \u{00B7} ", with: ", "))
         }
