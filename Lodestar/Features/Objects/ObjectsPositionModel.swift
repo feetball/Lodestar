@@ -92,6 +92,10 @@ enum ObjectsPositionCalculator {
 ///
 /// The Objects list sorts and filters by these positions and shows them in every row. They are computed off the
 /// main actor and refreshed every 30 s while the list is visible.
+///
+/// When the list asks for them (the "Hours Visible Tonight" order or filter), the same loop also works out how many
+/// hours tonight each tracked object is above the skyline (`tonight`). That is done once per observer, skyline and
+/// night, for the objects that have no hours yet, and kept until one of them changes.
 @MainActor
 @Observable
 final class ObjectsPositionModel {
@@ -103,8 +107,19 @@ final class ObjectsPositionModel {
     /// The latest position of each tracked object, keyed by object identifier.
     private(set) var positions: [String: ObjectSkyPosition] = [:]
 
+    /// Tonight's hours above the skyline of each tracked object, keyed by object identifier; empty until computed.
+    private(set) var tonight: [String: UnobstructedVisibility] = [:]
+
+    /// What tonight's hours were computed for.
+    private struct TonightKey: Equatable {
+        let observer: Observer
+        let skyline: HorizonProfile?
+        let night: ObjectsNight
+    }
+
     @ObservationIgnored private var observer: Observer?
     @ObservationIgnored private var skyline: HorizonProfile?
+    @ObservationIgnored private var tonightKey: TonightKey?
 
     /// The latest position of the object with `id`, or `nil` when it is not tracked or not yet computed.
     func position(for id: String) -> ObjectSkyPosition? {
@@ -112,20 +127,48 @@ final class ObjectsPositionModel {
     }
 
     /// Computes the positions of the objects `tracked` returns now and then every `refreshInterval` until the
-    /// calling task is cancelled. `tracked` is asked again on every pass, so the objects can change over time.
-    func keepFresh(observer: Observer, skyline: HorizonProfile?, clock: SkyClock,
-                   tracking tracked: @MainActor () -> [CelestialObject]) async {
+    /// calling task is cancelled. `tracked` is asked again on every pass, so the objects can change over time. With
+    /// `wantsTonight` it also keeps tonight's hours above the skyline up to date; `timeZone` decides which night is
+    /// tonight.
+    func keepFresh(observer: Observer, skyline: HorizonProfile?, timeZone: TimeZone, clock: SkyClock,
+                   wantsTonight: Bool, tracking tracked: @MainActor () -> [CelestialObject]) async {
         while !Task.isCancelled {
-            await refresh(tracked(), observer: observer, skyline: skyline, date: clock.now)
+            let objects = tracked()
+            await refresh(objects, observer: observer, skyline: skyline, date: clock.now)
+            if wantsTonight {
+                await refreshTonight(objects, observer: observer, skyline: skyline, timeZone: timeZone,
+                                     date: clock.now)
+            }
             try? await Task.sleep(for: Self.refreshInterval)
         }
     }
 
-    /// Forgets every position, for when there is no observer.
+    /// Forgets every position and every hour, for when there is no observer.
     func clear() {
         positions = [:]
         observer = nil
         skyline = nil
+        tonight = [:]
+        tonightKey = nil
+    }
+
+    /// Works out tonight's hours for the `objects` that have none. Another observer, another skyline or the next night
+    /// makes every known hour wrong, so those start again.
+    private func refreshTonight(_ objects: [CelestialObject], observer: Observer, skyline: HorizonProfile?,
+                                timeZone: TimeZone, date: Date) async {
+        let night = await Task.detached(priority: .utility) {
+            ObjectsTonight.night(observer: observer, timeZone: timeZone, now: date)
+        }.value
+        let key = TonightKey(observer: observer, skyline: skyline, night: night)
+        let isNewKey = tonightKey != key
+        let missing = isNewKey ? objects : objects.filter { tonight[$0.id] == nil }
+        guard !missing.isEmpty else { return }
+        let computed = await Task.detached(priority: .utility) {
+            ObjectsTonight.visibility(of: missing, observer: observer, night: night, skyline: skyline)
+        }.value
+        guard !Task.isCancelled else { return }
+        tonight = isNewKey ? computed : tonight.merging(computed) { _, new in new }
+        tonightKey = key
     }
 
     private func refresh(_ objects: [CelestialObject], observer: Observer, skyline: HorizonProfile?,

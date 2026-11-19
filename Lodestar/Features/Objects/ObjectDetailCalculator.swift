@@ -75,6 +75,12 @@ enum ObjectDetailCalculator {
         } ?? RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: interval)
         let samples = altitudeSamples(of: object, observer: observer, over: chartRange)
         let darkness = twilight.astronomicalNight
+        // With a skyline, the stretches of the dark in which the object is above it and high enough to shoot.
+        var unobstructed: UnobstructedVisibility?
+        if let visibility, let darkness {
+            unobstructed = ObjectsTonight.visibility(of: object, observer: observer, darkness: darkness,
+                                                     skyline: visibility.profile)
+        }
         return ObjectDetailNight(
             interval: interval,
             chartRange: chartRange,
@@ -89,19 +95,14 @@ enum ObjectDetailCalculator {
             hourTicks: hourTicks(in: chartRange, calendar: context.calendar),
             bestInDarkness: bestPoint(of: object, observer: observer, samples: samples, darkness: darkness,
                                       transit: events.transit, visibility: visibility),
-            appliesSkyline: visibility != nil)
+            appliesSkyline: visibility != nil,
+            unobstructed: unobstructed)
     }
 
     /// The twilight of the night that contains `date`: the one that began at noon yesterday while it is still
     /// before sunrise, otherwise the one that begins at noon today.
     private static func currentTwilight(context: ObserverContext, date: Date) -> NightTwilight {
-        let yesterday = context.calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400)
-        let previous = TwilightCalculator.night(startingOn: yesterday, observer: context.observer,
-                                                timeZone: context.timeZone)
-        if date < previous.interval.end, date < (previous.sunrise ?? previous.interval.end) {
-            return previous
-        }
-        return TwilightCalculator.night(startingOn: date, observer: context.observer, timeZone: context.timeZone)
+        ObjectsTonight.twilight(observer: context.observer, timeZone: context.timeZone, date: date)
     }
 
     private static func apparentAltitude(of object: CelestialObject, observer: Observer, at date: Date) -> Double {
@@ -257,33 +258,16 @@ enum ObjectDetailCalculator {
         }
     }
 
-    /// How the Moon affects the object: now while the sky is dark, otherwise at the object's best time tonight.
+    /// Where the Moon is relative to the object: now while the sky is dark, otherwise at the object's best time
+    /// tonight.
     ///
-    /// The impact is a rule of thumb from the Moon's illuminated fraction and its distance from the object.
+    /// `ObjectMoonGeometry.assess(filter:kind:)` turns it into a level for the user's filter.
     static func moonConditions(for object: CelestialObject, observer: Observer, night: ObjectDetailNight,
                                now: Date) -> ObjectDetailMoonConditions? {
         guard object.category != .sun, object.category != .moon else { return nil }
         let isDark = night.darkness?.contains(now) ?? false
         let date = isDark ? now : (night.bestInDarkness?.date ?? now)
-        let frame = SkyFrame(date: date, observer: observer)
-        let moon = frame.horizontal(of: .moon, refraction: false)
-        let separation = frame.horizontal(of: object, refraction: false).angularSeparation(to: moon)
-        let illuminatedFraction = frame.state(of: .moon).illuminatedFraction ?? 0
-        let impact = moonImpact(moonAltitude: moon.altitude, separation: separation,
-                                illuminatedFraction: illuminatedFraction)
-        return ObjectDetailMoonConditions(date: date, isNow: date == now, separation: separation,
-                                          illuminatedFraction: illuminatedFraction, impact: impact)
-    }
-
-    private static func moonImpact(moonAltitude: Double, separation: Double,
-                                   illuminatedFraction: Double) -> ObjectDetailMoonConditions.Impact {
-        guard moonAltitude > 0 else { return .moonDown }
-        // Moonlight scatters across the whole sky but is strongest near the Moon.
-        let proximity = min(max(1 - separation / 120, 0.25), 1)
-        switch illuminatedFraction * proximity {
-        case 0.5...: return .severe
-        case 0.2...: return .moderate
-        default: return .minor
-        }
+        return ObjectDetailMoonConditions(date: date, isNow: date == now,
+                                          geometry: ObjectMoonGeometry(of: object, observer: observer, at: date))
     }
 }

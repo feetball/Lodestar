@@ -93,10 +93,12 @@ enum ObjectsListBuilder {
     /// filtered and ordered by `options`.
     ///
     /// Without sky positions the options that need them (the horizon filter and the altitude and rise-time
-    /// orders) cannot be applied; they are skipped until positions arrive.
+    /// orders) cannot be applied; they are skipped until positions arrive. The same goes for the hours-tonight order
+    /// and filter until `tonight` arrives.
     static func sections(options: ObjectsListOptions, catalog: Catalog, index: ObjectsCatalogIndex,
                          favoriteIDs: [String], recentIDs: [String],
-                         positions: [String: ObjectSkyPosition]) -> [ObjectsListSection] {
+                         positions: [String: ObjectSkyPosition],
+                         tonight: [String: UnobstructedVisibility] = [:]) -> [ObjectsListSection] {
         var effective = options
         if positions.isEmpty {
             effective.showsOnlyAboveHorizon = false
@@ -104,18 +106,25 @@ enum ObjectsListBuilder {
                 effective.sortOrder = .name
             }
         }
+        if tonight.isEmpty {
+            effective.showsOnlyVisibleTonight = false
+            if effective.sortOrder.needsTonightHours {
+                effective.sortOrder = .name
+            }
+        }
         func resolved(_ ids: [String]) -> [CelestialObject] {
             var seen = Set<String>()
             return ids.compactMap { seen.insert($0).inserted ? catalog.object(id: $0) : nil }
-                .filter { passes($0, effective, positions) }
+                .filter { passes($0, effective, positions, tonight) }
         }
 
         var sections: [ObjectsListSection] = []
         let favorites = ordered(resolved(favoriteIDs), by: effective.sortOrder, index: index, positions: positions,
-                                catalogue: effective.catalogue)
+                                tonight: tonight, catalogue: effective.catalogue)
         // A favorite comet that dropped out of the orbit data stays, as "no current orbit", unless a filter is on.
-        let lostFavorites = effective.showsOnlyAboveHorizon || effective.showsOnlyPopular || effective.catalogue != .all
-            ? [] : SmallBodyFavorites.withoutOrbit(favoriteIDs: favoriteIDs, catalog: catalog)
+        let hasFilter = effective.showsOnlyAboveHorizon || effective.showsOnlyVisibleTonight
+            || effective.showsOnlyPopular || effective.catalogue != .all
+        let lostFavorites = hasFilter ? [] : SmallBodyFavorites.withoutOrbit(favoriteIDs: favoriteIDs, catalog: catalog)
         if !favorites.isEmpty || !lostFavorites.isEmpty {
             sections.append(ObjectsListSection(kind: .favorites, objects: favorites, unavailable: lostFavorites))
         }
@@ -129,9 +138,9 @@ enum ObjectsListBuilder {
         // sort. A catalogue's own list is in catalogue order instead.
         let isBrowse = effective.catalogue == .all
         let source = isBrowse ? index.listed : effective.catalogue.objects(in: catalog)
-        let visible = source.filter { passes($0, effective, positions) }
+        let visible = source.filter { passes($0, effective, positions, tonight) }
         func sorted(_ objects: [CelestialObject]) -> [CelestialObject] {
-            ordered(objects, by: effective.sortOrder, index: index, positions: positions,
+            ordered(objects, by: effective.sortOrder, index: index, positions: positions, tonight: tonight,
                     isInNameOrder: isBrowse, catalogue: effective.catalogue)
         }
         switch effective.grouping {
@@ -171,8 +180,12 @@ enum ObjectsListBuilder {
     // MARK: Filtering
 
     private static func passes(_ object: CelestialObject, _ options: ObjectsListOptions,
-                               _ positions: [String: ObjectSkyPosition]) -> Bool {
+                               _ positions: [String: ObjectSkyPosition],
+                               _ tonight: [String: UnobstructedVisibility]) -> Bool {
         if options.showsOnlyAboveHorizon, positions[object.id]?.isAboveHorizon != true {
+            return false
+        }
+        if options.showsOnlyVisibleTonight, (tonight[object.id]?.hours ?? 0) < ObjectsTonight.minimumHours {
             return false
         }
         // A planet, a comet or an asteroid has no catalog magnitude: its current one decides.
@@ -206,7 +219,8 @@ enum ObjectsListBuilder {
 
     /// `objects` in the given order. `isInNameOrder` says they already are in name order, which saves sorting them.
     private static func ordered(_ objects: [CelestialObject], by order: ObjectsSortOrder, index: ObjectsCatalogIndex,
-                                positions: [String: ObjectSkyPosition], isInNameOrder: Bool = false,
+                                positions: [String: ObjectSkyPosition], tonight: [String: UnobstructedVisibility],
+                                isInNameOrder: Bool = false,
                                 catalogue: ObjectsCatalogueFilter = .all) -> [CelestialObject] {
         if order == .name, isInNameOrder {
             return objects
@@ -231,6 +245,9 @@ enum ObjectsListBuilder {
             case .altitude:
                 // Highest first; objects without a position come last.
                 return make(position.map { -$0.altitude } ?? .infinity)
+            case .hoursTonight:
+                // The most hours clear of the skyline tonight first; objects with no hours known come last.
+                return make(tonight[object.id].map { -$0.hours } ?? .infinity)
             case .riseTime:
                 // Objects already up come first, highest first; then the soonest risings; then those that never rise.
                 guard let position else { return make(tier: 2) }

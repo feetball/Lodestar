@@ -5,6 +5,8 @@ import LodestarKit
 private struct TonightTaskKey: Equatable {
     let night: TonightNightKey
     let catalogID: ObjectIdentifier?
+    /// Another filter ranks the targets afresh.
+    let imagingFilter: ImagingFilter
 }
 
 /// The Tonight tab's content once an observing place is known: the night selector and the cards for the chosen night.
@@ -23,7 +25,8 @@ struct TonightScreen: View {
 
     var body: some View {
         let taskKey = TonightTaskKey(night: TonightNightKey(context: context, choice: choice),
-                                     catalogID: app.catalog.catalog.map(ObjectIdentifier.init))
+                                     catalogID: app.catalog.catalog.map(ObjectIdentifier.init),
+                                     imagingFilter: app.settings.imagingFilter)
         ScrollView {
             VStack(spacing: 16) {
                 dateBar
@@ -157,7 +160,8 @@ struct TonightScreen: View {
     /// tonight, which moves "tonight" itself and the label of any other chosen night ("Tomorrow night") with it.
     private func keepReportFresh(for key: TonightTaskKey) async {
         repeat {
-            let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog)
+            let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog,
+                                     imagingFilter: key.imagingFilter)
             let computed = await Task.detached(priority: .userInitiated) {
                 TonightCalculator.report(for: input)
             }.value
