@@ -112,7 +112,8 @@ WidgetShared/        what the three share: tonight's entries from LodestarKit (n
                      the timeline provider, the Lock Screen / complication views and the widget look
 LodestarKit/         Swift package, Foundation only, builds and tests on macOS and Linux
   Foundation/        time scales, coordinates, precession/nutation/aberration, refraction, SkyFrame
-  Ephemeris/         Sun & planets (VSOP87), Moon (ELP-2000/82 after Meeus), rise/set, twilight, phases
+  Ephemeris/         Sun & planets (VSOP87), Pluto (Meeus), Moon (ELP-2000/82 after Meeus), rise/set,
+                     twilight, phases
   Catalog/           bundled star/deep-sky/constellation/Milky Way data, search, sorting
   Pointing/          CoreMotion attitude → camera pointing, mounts, star-alignment solver, guidance
   Planning/          night summary, darkness and Moon windows, Milky Way core, best targets, polar scope
@@ -131,9 +132,10 @@ Key design points:
   corrected by the alignment model, and compared with the target's *apparent* (refracted) position.
   All frame conventions are documented in `LodestarKit/Sources/LodestarKit/Pointing/DeviceAttitude.swift`.
 - **Positions.** Catalog stars are propagated with proper motion, precession, nutation and annual
-  aberration; Sun, Moon and planets come from analytic theories with light-time and topocentric
-  parallax. Against JPL DE440s: Sun 0.2″, planets ≤ 5″, Moon ≤ 8″; rise/set times within about a
-  second of an independent reference; Moon phases within 16 s.
+  aberration; Sun, Moon, planets and Pluto come from analytic theories with light-time and
+  topocentric parallax. Against JPL DE440s: Sun 0.2″, planets ≤ 5″, Pluto ≤ 1.4″ in 1950–2049 (its
+  series is valid only for 1885–2099), Moon ≤ 8″; rise/set times within about a second of an
+  independent reference; Moon phases within 16 s.
 - **Concurrency.** Sensor callbacks run off the main thread and hand Sendable samples to the UI
   through a lock-protected box that the 30 fps overlay polls; heavy sky computations run in detached
   tasks.
@@ -189,6 +191,6 @@ rounded to about 10 km. GoTo mount control talks to the mount on the local netwo
 
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation
 figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025
-(public domain). Planetary theory VSOP87 (Bretagnon & Francou); lunar theory after J. Meeus. Full
-details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md) and
-[Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.
+(public domain). Planetary theory VSOP87 (Bretagnon & Francou); Pluto and lunar theory after
+J. Meeus. Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
+and [Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.

@@ -264,15 +264,16 @@ final class CatalogModelTests: XCTestCase {
     }
 
     func testRankingMagnitudePlacesSolarSystemBodiesByBrightness() {
-        let order: [SolarSystemBody] = [.sun, .moon, .venus, .jupiter, .mars, .mercury, .saturn, .uranus, .neptune]
+        let order: [SolarSystemBody] = [.sun, .moon, .venus, .jupiter, .mars, .mercury, .saturn, .uranus, .neptune, .pluto]
         let ranking = order.map { CelestialObject(id: $0.rawValue, name: $0.displayName, category: .planet,
                                                   position: .solarSystem($0), isListed: true).rankingMagnitude }
         XCTAssertEqual(ranking, ranking.sorted())
-        XCTAssertEqual(Set(ranking).count, 9)
+        XCTAssertEqual(Set(ranking).count, 10)
         let nebula = CelestialObject(id: "x", name: "x", category: .nebula,
                                      position: .fixed(EquatorialCoordinate(rightAscension: 0, declination: 0), nil), isListed: true)
         XCTAssertEqual(nebula.rankingMagnitude, .infinity)
-        XCTAssertLessThan(ranking.last ?? 0, 10)
+        XCTAssertLessThan(ranking.dropLast().last ?? 0, 10)
+        XCTAssertEqual(ranking.last, 14.4, "Pluto is the faintest of them")
     }
 
     // MARK: Sharing between tasks

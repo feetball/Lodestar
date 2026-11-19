@@ -10,11 +10,11 @@ regenerate (see [Regenerating](#regenerating)).
 | --- | ---: | --- | --- |
 | `sidereal.json` | 32,193 | time scales, GMST/GAST, nutation, obliquity, precession and nutation matrices, Earth velocity | 44 instants |
 | `stars_apparent.json` | 106,148 | apparent place and horizontal coordinates of 12 bright stars | 240 cases |
-| `bodies_apparent.json` | 270,793 | Sun, Moon and 7 planets: apparent places, horizontal coordinates, phase, distances | 450 cases |
+| `bodies_apparent.json` | 301,247 | Sun, Moon, 7 planets and Pluto: apparent places, horizontal coordinates, phase, distances | 500 cases |
 | `riseset.json` | 95,481 | rise, set, transit and twilight crossings | 30 windows x 6 objects |
 | `moon_phases.json` | 28,252 | new/quarter/full moons 2024-2028 plus illumination samples | 248 phases, 30 samples |
 
-The JSON files total 532,867 bytes (budget: 1.5 MB).
+The JSON files total 563,321 bytes (budget: 1.5 MB).
 
 ## Read this first
 
@@ -184,18 +184,22 @@ altitudes only above the horizon.
 
 ## bodies_apparent.json
 
-Top level: `sites` (6), `cases` (450 = 50 instants x 9 bodies). The instants are
+Top level: `sites` (6), `cases` (500 = 50 instants x 10 bodies). The instants are
 2000-01-01T12:00:00Z, 2026-10-17T00:00:00Z and 48 seeded ones over 1950-2049; instant `i`
-(0-based, ascending) is observed from site `i mod 6`, and all nine bodies share it. Bodies, in
-order: `sun`, `moon`, `mercury`, `venus`, `mars`, `jupiter`, `saturn`, `uranus`, `neptune`.
-Mars, Jupiter, Saturn, Uranus and Neptune are the system barycentres (DE440s has no body-centre
-segments for them); the offset from the planet centre is at most 0.07 arcsec (0.01 arcsec for
-Jupiter on 2026-10-17).
+(0-based, ascending) is observed from site `i mod 6`, and all ten bodies share it. Bodies, in
+order: `sun`, `moon`, `mercury`, `venus`, `mars`, `jupiter`, `saturn`, `uranus`, `neptune`,
+`pluto`. Mars, Jupiter, Saturn, Uranus, Neptune and Pluto are the system barycentres (DE440s has
+no body-centre segments for them); for Mars to Neptune the offset from the planet centre is at
+most 0.07 arcsec (0.01 arcsec for Jupiter on 2026-10-17). Pluto's centre is 2,131 km from the
+Pluto-Charon barycentre (JPL Horizons vectors of body 999 relative to 9, constant to 0.4 km over
+a Charon orbit), which is 0.07 arcsec at Pluto's farthest instant of the file (42.0 AU) and
+0.10 arcsec at its nearest (28.9 AU); the closest Pluto comes to the Earth in 1950-2049 is
+28.7 AU (0.102 arcsec). Pluto's `apparent_magnitude` is always null (see below).
 
 | Field | Type | Definition |
 | --- | --- | --- |
 | `utc`, `ut1_jd`, `tt_jd`, `site`, `lat`, `lon`, `elevation_m` | | instant and observer |
-| `body` | string | one of the nine names above |
+| `body` | string | one of the ten names above |
 | `ra_apparent_j2000_deg`, `dec_apparent_j2000_deg` | double | geocentric apparent direction on the ICRS (J2000) axes: light time, light deflection, annual aberration. With `distance_au` this is the vector `BodyState.geocentricJ2000` should reproduce. For the Moon and Sun it equals the geocentric vector with both bodies at `t - light time` and no separate aberration (0.0005 arcsec), as DESIGN.md prescribes for the Moon |
 | `ra_apparent_deg`, `dec_apparent_deg` | double | the same direction in the true equator and equinox of date |
 | `ra_topo_deg`, `dec_topo_deg` | double | topocentric apparent place of date (parallax, diurnal aberration included) |
@@ -204,8 +208,8 @@ Jupiter on 2026-10-17).
 | `illuminated_fraction` | double or null | `(1 + cos(phase_angle_deg)) / 2`; null for the Sun |
 | `phase_angle_deg` | double or null | geocentric Sun-body-Earth angle at the body, 0 = full (Skyfield `phase_angle`; the Sun's position is taken at the observation instant); null for the Sun |
 | `elongation_deg` | double or null | angle between the geocentric apparent directions of the body and the Sun; null for the Sun |
-| `heliocentric_distance_au` | double or null | planets only: Sun-planet distance with both bodies at the instant the light left the planet (observation time minus light time) |
-| `apparent_magnitude` | double or null | planets only: Mallama and Hilton (2018), Skyfield `magnitudelib`; null if the model returns NaN (none do here) |
+| `heliocentric_distance_au` | double or null | Mercury to Pluto: Sun-planet distance with both bodies at the instant the light left the planet (observation time minus light time) |
+| `apparent_magnitude` | double or null | Mercury to Neptune: Mallama and Hilton (2018), Skyfield `magnitudelib`; null if the model returns NaN (none do here). **Always null for Pluto**: `magnitudelib` has no Pluto model (Mallama and Hilton 2018 cover Mercury to Neptune), so a Pluto magnitude test needs another reference (JPL Horizons) |
 
 ## riseset.json
 
@@ -312,7 +316,8 @@ Suggested use per file:
 * `bodies_apparent.json`: first the ephemeris (`geocentricJ2000` against the `..._j2000_deg`
   pair and `distance_au`, phase, elongation, magnitude), then `SkyFrame.topocentricEquatorial`
   and `horizontal` with the J2000 vector the *fixture* provides, which isolates the frame code
-  from the ephemeris error.
+  from the ephemeris error. Pluto has no fixture magnitude (`apparent_magnitude` is null), so a
+  magnitude comparison must skip it.
 * `riseset.json`: `RiseSetCalculator` with the window from the file. For
   `TwilightCalculator.night(startingOn:observer:timeZone:)`, whose night runs from the time
   zone's local noon, use `TimeZone(secondsFromGMT: Int((lon * 240).rounded()))`: local noon is then
@@ -334,7 +339,7 @@ The ERFA and transit checks were run once with throw-away scripts. Results of th
 | `stars_apparent.json` (all 240 cases) vs ERFA/SOFA 2.0.1.5 (`apci13`/`atciq` for the apparent place; `apco`/`atciq`/`atioq` with `epv00`, `xy06`, `s06`, `era00`, `sp00` for az/alt) | apparent place of date: 2.1e-5 arcsec max; az/alt: 4e-4 arcsec max (ad hoc script, not in the repository) |
 | Moon and Mars apparent RA/Dec vs JPL Horizons quantity 2, geocentric, same TT, 1955-2043 | 0.084 arcsec max in RA, 0.011 in Dec |
 | Same, topocentric from Boulder, 2026-10-17 | 0.063 arcsec max |
-| All 450 `bodies_apparent.json` entries vs Horizons, geocentric, same TT | RA 0.084 arcsec, Dec 0.029 arcsec max; `distance_au` 7.9e-11 AU max; `heliocentric_distance_au` 1.6e-6 AU max (Horizons uses the Sun at the observation time); `illuminated_fraction` 0.009 percentage points; `elongation_deg` 1.1e-4 deg; `phase_angle_deg` 0.0115 deg; `apparent_magnitude` 0.135 (Mercury), 0.116 (Mars), at most 0.03 for the others |
+| All 500 `bodies_apparent.json` entries vs Horizons, geocentric, same TT (Pluto: Horizons body 999 for the appearance columns, the Pluto system barycentre 9 for the position) | RA 0.084 arcsec, Dec 0.028 arcsec max; `distance_au` 2.3e-11 AU max; `heliocentric_distance_au` 1.8e-6 AU max (Horizons uses the Sun at the observation time); `illuminated_fraction` 0.009 percentage points; `elongation_deg` 1.1e-4 deg; `phase_angle_deg` 0.0115 deg; `apparent_magnitude` 0.135 (Mercury), 0.115 (Mars), at most 0.03 for the others, none for Pluto. Pluto alone: RA 0.081 arcsec, Dec 0.023 arcsec, `distance_au` 1.5e-11 AU, `heliocentric_distance_au` 1.75e-6 AU, `phase_angle_deg` 0.0057 deg |
 | Rise/set vs Skyfield's own `find_risings`/`find_settings`/`find_transits` (all 30 windows) | 0.034 s max; fixed-star transits 0.021 s |
 | All 180 transits, sampled every 0.25 s from -3 s to +3 s | each is the altitude maximum; reported altitude reproduced to 5e-10 deg (ad hoc script) |
 | 2026-10-17 rise/set vs Horizons 1-minute RTS search (boulder, sydney, tromso; Sun, Moon, Jupiter, Venus) | Sun and planets and `moon.horizon_upper_limb`: Horizons time minus fixture within -1.8..+54 s (a Horizons event lies in the minute before its printed time); `moon.horizon`: -311..+363 s |

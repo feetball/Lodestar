@@ -27,8 +27,9 @@ enum EphemerisFixtureStore {
     }
 }
 
-/// Compares `Ephemeris` with `bodies_apparent.json`: apparent places of the Sun, Moon and planets from
-/// DE440s, at 50 instants between 1950 and 2049, each seen from one of six observing sites.
+/// Compares `Ephemeris` with `bodies_apparent.json`: apparent places of the Sun, Moon, planets and Pluto from
+/// DE440s, at 50 instants between 1950 and 2049, each seen from one of six observing sites. Pluto's fixture is
+/// the Pluto-system barycentre (its centre is up to 0.10″ away) and has no magnitude: Skyfield has no model.
 final class EphemerisFixtureTests: XCTestCase {
     private struct BodyCase: Decodable {
         let utc: String
@@ -69,21 +70,23 @@ final class EphemerisFixtureTests: XCTestCase {
 
     /// Maximum acceptable angular error in arcseconds of an apparent position, by body. The Sun and
     /// planets come from truncated VSOP87 (observed maxima 0.2″ Sun, 0.6″ Mercury, 1.6″ Venus, 4.8″
-    /// Mars, 2.7″ Jupiter, 4.3″ Saturn, 4.2″ Uranus, 4.1″ Neptune); the Moon from Meeus' truncated
-    /// ELP-2000 (8.1″). The limits leave room for other instants and platforms.
+    /// Mars, 2.7″ Jupiter, 4.3″ Saturn, 4.2″ Uranus, 4.1″ Neptune), Pluto from the 43 terms of Meeus, chapter 37
+    /// (1.4″); the Moon from Meeus' truncated ELP-2000 (8.1″). The limits leave room for other instants and
+    /// platforms.
     private static let positionToleranceArcseconds: [SolarSystemBody: Double] = [
         .sun: 1, .moon: 15, .mercury: 2, .venus: 4, .mars: 10, .jupiter: 6, .saturn: 8, .uranus: 8, .neptune: 8,
+        .pluto: 3,
     ]
 
     /// Maximum acceptable relative error of the geocentric and heliocentric distances.
     private static let distanceToleranceRelative: [SolarSystemBody: Double] = [
         .sun: 5e-6, .moon: 2.5e-4, .mercury: 1e-5, .venus: 2e-5, .mars: 4e-5, .jupiter: 4e-5, .saturn: 5e-5,
-        .uranus: 4e-5, .neptune: 3e-5,
+        .uranus: 4e-5, .neptune: 3e-5, .pluto: 1e-5,
     ]
 
     private func fixtureCases() throws -> [BodyCase] {
         let cases = try EphemerisFixtureStore.load(BodyFixture.self, from: "bodies_apparent.json").cases
-        XCTAssertEqual(cases.count, 450, "50 instants x 9 bodies")
+        XCTAssertEqual(cases.count, 500, "50 instants x 10 bodies")
         for body in SolarSystemBody.allCases {
             XCTAssertEqual(cases.filter { $0.solarSystemBody == body }.count, 50, "cases for \(body)")
         }
@@ -217,6 +220,8 @@ final class EphemerisFixtureTests: XCTestCase {
     /// solar-system barycentre, which shifts r and α slightly; for Mercury at large phase angles that is
     /// worth up to 0.13 mag, for the others at most 0.03 mag (Uranus) — Skyfield also switches on its
     /// phase term for Uranus above 3.1° while this implementation ignores it.
+    /// Pluto is not in Mallama & Hilton and has no magnitude in the fixture; its magnitude is checked against JPL Horizons
+    /// in `EphemerisPlutoTests`.
     func testPlanetMagnitudesMatchMallamaHilton() throws {
         let tolerance: [SolarSystemBody: Double] = [
             .mercury: 0.2, .venus: 0.05, .mars: 0.05, .jupiter: 0.02, .saturn: 0.02, .uranus: 0.03, .neptune: 0.03,
@@ -224,9 +229,17 @@ final class EphemerisFixtureTests: XCTestCase {
         for fixtureCase in try fixtureCases() {
             let state = Ephemeris.state(of: fixtureCase.solarSystemBody, at: fixtureCase.julianDate)
             guard let expected = fixtureCase.apparentMagnitude else {
-                XCTAssertFalse(fixtureCase.solarSystemBody.isPlanet, "planets have a magnitude in the fixture")
+                // Skyfield's magnitudelib has no Pluto model, so the fixture magnitude is always null for it (the
+                // magnitude is checked against JPL Horizons in `EphemerisPlutoTests`); the engine still has one.
+                if fixtureCase.solarSystemBody == .pluto {
+                    XCTAssertNotNil(state.apparentMagnitude, "Pluto has a magnitude")
+                } else {
+                    XCTAssertFalse(fixtureCase.solarSystemBody.isPlanet,
+                                   "planets other than Pluto have a magnitude in the fixture")
+                }
                 continue
             }
+            XCTAssertNotEqual(fixtureCase.solarSystemBody, .pluto, "Pluto's fixture magnitude is null")
             XCTAssertEqual(try XCTUnwrap(state.apparentMagnitude), expected,
                            accuracy: tolerance[fixtureCase.solarSystemBody] ?? 0,
                            "\(fixtureCase.body) magnitude at \(fixtureCase.utc)")
