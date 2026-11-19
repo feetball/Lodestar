@@ -325,6 +325,45 @@ Android engine) with subcommands `sgp4`, `snapshot`, `passes` and `streaks`. Pin
 The comet generators (`gen_comet*.py` and companions copied from the comets work) rebuild the Kepler and Horizons
 test tables in `CometsKeplerData`/`CometsHorizonsData` from JPL Horizons queries and an independent mpmath solver.
 
+## Night lights — `build_light_pollution.py`
+
+Builds `lightpollution.bin` (bundled in both engines, read by `LightPollutionMap`) from **NASA GIBS**, layer
+`VIIRS_Black_Marble` (Black Marble, Suomi NPP VIIRS day/night band, time 2016-01-01, TileMatrixSet `500m`), zoom level 4:
+20 x 10 PNG tiles of 512 pixels, 18 degrees each (28.4 pixels per degree), 200 tiles and 26 MB. Every tile is pinned by
+sha256 and size in `lightpollution.lock.json`, as are the output, the level thresholds and the level luminances. The
+generator uses only the standard library and must be run with `-I`; point `--cache` at a RAM disk when the disk is tight
+and delete it afterwards.
+
+```
+python3 -I Tools/build_light_pollution.py --cache /dev/shm/lp --android <Android repo>                # rebuild from the pinned tiles
+python3 -I Tools/build_light_pollution.py --cache /dev/shm/lp --android <Android repo> --refresh-lock   # re-pin the tiles
+python3 -I Tools/build_light_pollution.py --check --android <Android repo>                            # verify the shipped files, offline
+python3 -I Tools/build_light_pollution.py --report                                                    # reference places from the shipped file
+```
+
+Steps: fetch (HTTPS only, no redirect away from TLS, sha256 and size checked against the lock) -> remove the land base
+texture (`k = min(5R // 3, 5G // 3, B, 96)`, then `R, G -= ceil(0.6 k)`, `B -= k`: land is bluish, lights are warm) ->
+linear luminance (sRGB decode, Rec. 709 weights) -> exact area average into 3600 x 1800 cells of 0.1 degree -> 16 levels
+on a log scale (level 0 below 0.0025 of the display's full scale, then 15 thresholds spaced evenly in the logarithm up to
+0.4) -> 16-byte header and run-length encoded rows (the format is in the script's docstring; no zlib is needed to read
+it). The output is 137 kB; a build with the pinned tiles reproduces it byte for byte, and the sanity checks (ocean,
+Sahara, Antarctica and Greenland are level 0; New York, London, Tokyo, Las Vegas, Paris and Los Angeles are level 14 or
+more; 0.5 to 10 percent of the cells are lit) stop a bad build before any file is written. The Swift copy goes to
+`LodestarKit/Sources/LodestarKit/Resources/`, the Kotlin copy to the Android repository's
+`lodestar-kit/src/main/resources/net/kuecker/lodestar/kit/catalog/`.
+
+`--report` prints the cell level, the sky-glow index and the Bortle class of 25 reference places (Cherry Springs, Death
+Valley, Big Bend, Joshua Tree, Zselic, Galloway, Mauna Kea, Natural Bridges, Paranal, La Palma, Kielder, McDonald,
+Green Bank, Flagstaff, Boulder, Palo Alto, Plano, Munich, Cape Town, London, New York, Las Vegas, Tokyo, the open Pacific
+and the Sahara) with the class published for each (park and observatory pages, NPS, IDA; approximate, sources differ by
+a class). The Bortle thresholds (`BORTLE_GLOW_THRESHOLDS`, repeated in `BortleEstimate.glowThresholds`) were chosen from
+that table: 21 of the 25 places fall in their published class; Joshua Tree, La Palma, Green Bank and Plano do not (see
+the documentation of `LightPollutionMap`). The sky-glow model (100 km radius, distance to the power -2.5, core 5.5 km)
+is repeated in the script for the report and must match the engines.
+
+Licence: NASA open data, credit "NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP)"; see `ATTRIBUTION.md`. The World
+Atlas of Artificial Night Sky Brightness (CC BY-NC) is not used.
+
 ## Bright asteroids — `build_bright_asteroids.py`
 
 Builds `asteroids.txt` (bundled in both engines): the 216 asteroids that can reach magnitude 11

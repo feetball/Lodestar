@@ -159,6 +159,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var showConstellationNames = true
     var showDeepSkyObjects = true
     var showMilkyWay = true
+    /// A thin ring on the sky chart's horizon that is brighter toward the artificial light.
+    var showHorizonGlow = true
     /// Deep-sky objects drawn in the sky views, up to this `Prominence` level (1 showpieces … 4 everything).
     var deepSkyProminence = 2
     var starMagnitudeLimit: Double = 5.0
@@ -210,6 +212,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
         showMilkyWay = value(.showMilkyWay, d.showMilkyWay)
+        showHorizonGlow = value(.showHorizonGlow, d.showHorizonGlow)
         deepSkyProminence = value(.deepSkyProminence, d.deepSkyProminence)
         starMagnitudeLimit = value(.starMagnitudeLimit, d.starMagnitudeLimit)
         coordinateStyle = value(.coordinateStyle, d.coordinateStyle)
