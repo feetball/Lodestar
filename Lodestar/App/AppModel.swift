@@ -28,6 +28,14 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Why the World Magnetic Model's declination is not used as it stands at the observer; the Aim chips report it.
+enum MagneticReferenceLimit: Equatable {
+    /// The model's five years of validity (2025 to 2030) are over, so the field is extrapolated and less accurate.
+    case modelExpired
+    /// The Blackout Zone around a magnetic pole: the declination means nothing and a compass cannot be trusted.
+    case blackout
+}
+
 /// Root application state: owns the services, the current target and alignment, and derives the
 /// observing context and display mode. Views read it with `@Environment(AppModel.self)`.
 @MainActor
@@ -57,6 +65,10 @@ final class AppModel {
 
     /// The object the Aim screen guides to.
     private(set) var target: CelestialObject?
+
+    /// Why the compass's magnetic reference is limited here, or `nil` when it is not. It is set whenever the reference is
+    /// worked out (while the motion sensors run).
+    private(set) var magneticReferenceLimit: MagneticReferenceLimit?
 
     /// Star-alignment corrections for the current mount and heading source.
     var alignment: AlignmentModel = .identity
@@ -396,15 +408,32 @@ final class AppModel {
 
     /// Magnetic declination and expected field strength at the observer from WMM2025, used when
     /// CoreMotion's true-north frame is unavailable and to detect magnetic interference.
+    ///
+    /// In the model's Blackout Zone the declination is meaningless, so there is no reference at all (CoreMotion's own
+    /// true-north frame, when it has one, still applies) and `magneticReferenceLimit` says so. After the model's
+    /// validity ends the extrapolated field is still the best estimate and is used, flagged the same way.
     private func magneticReference() -> MagneticReference? {
-        guard let context = observerContext else { return nil }
+        guard let context = observerContext else {
+            setMagneticReferenceLimit(nil)
+            return nil
+        }
         let location = context.location
         let model = WorldMagneticModel.wmm2025
+        let year = WorldMagneticModel.decimalYear(from: clock.now)
         let field = model.field(latitude: location.latitude, longitude: location.longitude,
-                                altitudeMeters: location.elevation,
-                                decimalYear: WorldMagneticModel.decimalYear(from: clock.now))
+                                altitudeMeters: location.elevation, decimalYear: year)
+        guard field.compassReliability != .blackout else {
+            setMagneticReferenceLimit(.blackout)
+            return nil
+        }
+        setMagneticReferenceLimit(model.isWithinValidity(decimalYear: year) ? nil : .modelExpired)
         return MagneticReference(declination: field.declination,
                                  expectedFieldMicrotesla: field.totalIntensity / 1000)
+    }
+
+    /// Stores the limit only when it changes, so that the views that read it are not refreshed on every sync.
+    private func setMagneticReferenceLimit(_ limit: MagneticReferenceLimit?) {
+        if magneticReferenceLimit != limit { magneticReferenceLimit = limit }
     }
 
     /// Looks up the real time zone of saved sites that only have the one estimated from their longitude (they were saved

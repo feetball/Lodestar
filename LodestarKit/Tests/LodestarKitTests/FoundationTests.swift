@@ -213,6 +213,25 @@ final class FoundationTests: XCTestCase {
         XCTAssertEqual(clamped.elevation, 0)
     }
 
+    func testDecodingAGeographicLocationClampsAndWrapsLikeTheInitialiser() throws {
+        let decoder = JSONDecoder()
+        let absurd = try decoder.decode(GeographicLocation.self,
+                                        from: Data(#"{"latitude":1e18,"longitude":-1e18,"elevation":1e18}"#.utf8))
+        XCTAssertEqual(absurd.latitude, 90)
+        XCTAssertTrue((-180.0...180.0).contains(absurd.longitude))
+        XCTAssertEqual(absurd.elevation, GeographicLocation.elevationRange.upperBound)
+        let wrapped = try decoder.decode(GeographicLocation.self,
+                                         from: Data(#"{"latitude":-120,"longitude":540,"elevation":-5000}"#.utf8))
+        XCTAssertEqual(wrapped, GeographicLocation(latitude: -120, longitude: 540, elevation: -5000))
+        XCTAssertEqual(wrapped.latitude, -90)
+        XCTAssertEqual(wrapped.longitude, 180)
+        XCTAssertEqual(wrapped.elevation, GeographicLocation.elevationRange.lowerBound)
+        // A valid location survives the round trip unchanged, and a missing field is still an error.
+        let site = GeographicLocation(latitude: 47.5, longitude: -122.25, elevation: 56)
+        XCTAssertEqual(try decoder.decode(GeographicLocation.self, from: JSONEncoder().encode(site)), site)
+        XCTAssertThrowsError(try decoder.decode(GeographicLocation.self, from: Data(#"{"latitude":1,"longitude":2}"#.utf8)))
+    }
+
     // MARK: Refraction
 
     func testRefraction() {

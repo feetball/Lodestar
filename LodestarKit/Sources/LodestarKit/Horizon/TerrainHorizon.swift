@@ -125,15 +125,17 @@ public enum TerrainHorizon {
     /// within that distance of the site, nearest first (the tile with the site first), at most `maximumTileCount`.
     /// A 50 km circle is 0.9° wide at the equator and 1.3° wide at 47° of latitude, so it reaches up to four tiles
     /// near the equator and up to six at mid latitudes. Ties in distance are ordered by latitude, then longitude. The
-    /// distance to a tile is measured to the nearest point of its border, with a local flat-earth metric (error
-    /// well under a kilometre at 50 km).
+    /// distance to a tile is the great-circle distance to the nearest point of its border. Within a degree of a pole
+    /// the circle spans many tiles of the polar row (all 360 when it holds the pole).
     public static func requiredTiles(at location: GeographicLocation,
                                      maxDistanceMeters: Double = defaultMaximumDistanceMeters) -> [TerrainTileKey] {
         let range = clampedRange(maxDistanceMeters)
         let latitude = location.latitude
         let longitude = location.longitude
         let latitudeSpan = range / metersPerDegree
-        let longitudeSpan = min(latitudeSpan / max(AstroMath.cosDeg(latitude), 0.01), 180)
+        // The circle reaches this far east and west of the site, 180° when it holds the pole.
+        let longitudeSpan = abs(latitude) + latitudeSpan >= 90
+            ? 180.0 : AstroMath.degrees(asin(min(AstroMath.sinDeg(latitudeSpan) / AstroMath.cosDeg(latitude), 1)))
         let southmost = max(Int((latitude - latitudeSpan).rounded(.down)), -90)
         let northmost = min(Int((latitude + latitudeSpan).rounded(.down)), 89)
         let westmost = Int((longitude - longitudeSpan).rounded(.down))
@@ -145,15 +147,37 @@ public enum TerrainHorizon {
             for column in westmost...eastmost {
                 let wrapped = ((column + 180) % 360 + 360) % 360 - 180
                 guard let key = TerrainTileKey(latitude: row, longitude: wrapped) else { continue }
-                let northSouth = max(Double(row) - latitude, 0, latitude - Double(row + 1))
-                let eastWest = max(Double(column) - longitude, 0, longitude - Double(column + 1))
-                let nearestLatitude = AstroMath.clamp(latitude, Double(row), Double(row + 1))
-                let meters = hypot(northSouth, eastWest * AstroMath.cosDeg(nearestLatitude)) * metersPerDegree
+                let meters = distanceToTile(row: row, column: column, latitude: latitude, longitude: longitude)
                 if meters <= range, seen.insert(key).inserted { found.append((meters, key)) }
             }
         }
         found.sort { $0.meters != $1.meters ? $0.meters < $1.meters : $0.key < $1.key }
         return found.prefix(maximumTileCount).map(\.key)
+    }
+
+    /// The great-circle distance in metres from a site to the nearest point of the tile whose south-west corner is
+    /// `row`, `column` (a column may lie beyond ±180°).
+    private static func distanceToTile(row: Int, column: Int, latitude: Double, longitude: Double) -> Double {
+        let southEdge = Double(row)
+        let northEdge = Double(row + 1)
+        let eastWest = max(Double(column) - longitude, 0, longitude - Double(column + 1))
+        let separation = eastWest > 180 ? 360 - eastWest : eastWest
+        guard separation > 0 else {
+            return abs(latitude - AstroMath.clamp(latitude, southEdge, northEdge)) * metersPerDegree
+        }
+        // The site is outside the tile's longitudes, so the nearest point is on the meridian edge that faces it: at the
+        // foot of the perpendicular from the site, or at a corner when the foot lies outside the edge.
+        let foot = AstroMath.degrees(atan2(AstroMath.sinDeg(latitude),
+                                           AstroMath.cosDeg(latitude) * AstroMath.cosDeg(separation)))
+        var nearest = Double.infinity
+        for edgeLatitude in [AstroMath.clamp(foot, southEdge, northEdge), southEdge, northEdge] {
+            let halfLatitude = AstroMath.sinDeg((edgeLatitude - latitude) / 2)
+            let halfLongitude = AstroMath.sinDeg(separation / 2)
+            let haversine = halfLatitude * halfLatitude
+                + AstroMath.cosDeg(latitude) * AstroMath.cosDeg(edgeLatitude) * halfLongitude * halfLongitude
+            nearest = min(nearest, 2 * asin(min(haversine.squareRoot(), 1)))
+        }
+        return nearest * earthRadiusMeters
     }
 
     /// The skyline of the terrain around `location` from `tiles`.

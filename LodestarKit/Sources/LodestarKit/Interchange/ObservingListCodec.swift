@@ -69,7 +69,7 @@ public enum ObservingListCodec {
             rows.append([
                 InterchangeCSV.guarded(InterchangeText.singleLine(entry.name, limit: maximumNameScalars)),
                 InterchangeCSV.guarded(InterchangeText.singleLine(entry.designation ?? "", limit: maximumNameScalars)),
-                hasPosition ? InterchangeText.fixed(entry.rightAscension ?? 0, decimals: 5) : "",
+                hasPosition ? InterchangeText.fixedAngle(entry.rightAscension ?? 0, decimals: 5) : "",
                 hasPosition ? InterchangeText.fixed(entry.declination ?? 0, decimals: 5) : "",
                 InterchangeCSV.guarded(InterchangeText.singleLine(entry.typeName ?? "", limit: maximumNameScalars)),
             ])

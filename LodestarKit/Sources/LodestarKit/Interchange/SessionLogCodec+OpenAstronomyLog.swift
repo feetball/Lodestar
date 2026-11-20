@@ -125,7 +125,8 @@ private struct OpenAstronomyLogDocument {
                 + Self.element("name", entry.targetName, indent: 3)
             if let rightAscension = entry.rightAscension, let declination = entry.declination {
                 text += "      <position>\n"
-                    + Self.element("ra", InterchangeText.fixed(rightAscension, decimals: 5), attributes: " unit=\"deg\"", indent: 4)
+                    + Self.element("ra", InterchangeText.fixedAngle(rightAscension, decimals: 5),
+                                   attributes: " unit=\"deg\"", indent: 4)
                     + Self.element("dec", InterchangeText.fixed(declination, decimals: 5), attributes: " unit=\"deg\"", indent: 4)
                     + "        <frame>\n"
                     + Self.element("origin", "geo", indent: 5)

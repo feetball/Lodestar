@@ -20,6 +20,14 @@ enum InterchangeText {
         return value.isFinite && value < 0 && !point.isZero ? "-" + point.text : point.text
     }
 
+    /// `fixed` for an angle in [0, 360) such as a right ascension or a position angle: one that rounds up to 360
+    /// (359.999996 with five places) is written as zero, so that the text still reads back inside the range.
+    static func fixedAngle(_ degrees: Double, decimals: Int) -> String {
+        let text = fixed(degrees, decimals: decimals)
+        guard degrees >= 0, degrees < 360, text == fixed(360, decimals: decimals) else { return text }
+        return fixed(0, decimals: decimals)
+    }
+
     /// `a / b` rounded towards negative infinity, for a positive `b`.
     static func floorDivide(_ a: Int64, _ b: Int64) -> Int64 {
         let quotient = a / b
