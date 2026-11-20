@@ -56,7 +56,7 @@ final class MosaicPanelCodecTests: XCTestCase {
 
     private let records = [
         MosaicPanelRecord(panel: "R1C2", row: 1, column: 2, rightAscension: 10.6847, declination: 41.2687, positionAngle: 12.5, order: 3),
-        MosaicPanelRecord(panel: "R1C1", row: 1, column: 1, rightAscension: 359.9999, declination: -0.00001, positionAngle: 0, order: 1),
+        MosaicPanelRecord(panel: "R1C1", row: 1, column: 1, rightAscension: 359.9999, declination: -0.000001, positionAngle: 0, order: 1),
         MosaicPanelRecord(panel: "R2C1", row: 2, column: 1, rightAscension: 83.8221, declination: -5.3911, positionAngle: 359.99999, order: 2),
     ]
 

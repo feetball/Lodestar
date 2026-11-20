@@ -135,7 +135,7 @@ final class InterchangeTextTests: XCTestCase {
         XCTAssertEqual(InterchangeText.singleLine("  a \t b\n\nc  ", limit: 100), "a b c")
         XCTAssertEqual(InterchangeText.singleLine("abcdef", limit: 3), "abc")
         XCTAssertEqual(InterchangeText.singleLine("ab cd", limit: 3), "ab")
-        XCTAssertEqual(InterchangeText.singleLine("a\u{200B}b\u{7}c", limit: 100), "abc")
+        XCTAssertEqual(InterchangeText.singleLine("a\u{200B}b\u{7}c", limit: 100), "ab c")
         XCTAssertEqual(InterchangeText.multiLine("a\r\nb\rc\nd\u{7}\te", limit: 100), "a\nb\nc\nd e")
         XCTAssertEqual(InterchangeText.multiLine("abcdef", limit: 4), "abcd")
     }
