@@ -45,8 +45,20 @@ enum TerrainText {
     /// The share of void samples from which the summary mentions them.
     static let voidNoteShare = 0.01
 
-    /// "Computed · highest 9° in the south" for a site with a terrain horizon.
-    static func status(_ profile: HorizonProfile) -> String { "Computed \u{00B7} \(HorizonText.highest(profile))" }
+    /// "Computed · highest 9° in the south" for a site with a terrain horizon; "Computed · partial: 4 of 6 tiles ·
+    /// highest 9° in the south" when the tile limit left some of the surroundings out.
+    static func status(_ profile: HorizonProfile, tiles: TerrainTileMemory.Entry? = nil) -> String {
+        var parts = ["Computed"]
+        if let tiles { parts.append("partial: \(tiles.used) of \(tiles.needed) tiles") }
+        parts.append(HorizonText.highest(profile))
+        return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// The status of the terrain horizon stored with `site`, or "Not computed".
+    static func status(of site: SavedSite) -> String {
+        guard let profile = site.terrainHorizon else { return notComputed }
+        return status(profile, tiles: TerrainTileMemory.recall(for: site))
+    }
 
     /// What the confirmation says before `tileCount` tiles are downloaded.
     static func confirmMessage(tileCount: Int) -> String {
@@ -78,7 +90,7 @@ enum TerrainText {
             lines.append("No elevation data for \(names(unavailable)) (open sea or outside the tile set): nothing there is "
                          + "in the skyline.")
         }
-        let skipped = result.missingTiles.filter { !unavailable.contains($0) }
+        let skipped = skippedTiles(of: result, unavailable: unavailable)
         if !skipped.isEmpty {
             let kilometres = Int((result.minimumCoveredRangeMeters / 1000).rounded())
             lines.append("Not downloaded (only the \(TerrainHorizonLoader.maximumTiles) nearest tiles are used): "
@@ -90,10 +102,62 @@ enum TerrainText {
         return TerrainSummary(lines: lines, groundElevationMeters: ground)
     }
 
+    /// The tiles within reach that were not downloaded because of `TerrainHorizonLoader.maximumTiles`, not counting the
+    /// ones the provider has no file for.
+    static func skippedTiles(of result: TerrainHorizonResult, unavailable: [TerrainTileKey]) -> [TerrainTileKey] {
+        result.missingTiles.filter { !unavailable.contains($0) }
+    }
+
     /// "N47E007", "N47E007 and N46E008", "N47E007, N46E008 and N46E007".
     static func names(_ keys: [TerrainTileKey]) -> String {
         let names = keys.map(\.name)
         guard names.count > 1 else { return names.joined() }
         return names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+    }
+}
+
+/// How many of the tiles a site's terrain horizon needs were used, remembered next to the terrain horizon when the
+/// tile limit left some out. The stored terrain horizon is only the 360 altitudes, so, like `HorizonCoverageMemory`,
+/// this lives in this device's preferences together with a fingerprint of the terrain horizon it belongs to; a terrain
+/// horizon from elsewhere (a restore, another version) simply has nothing to say about its tiles.
+enum TerrainTileMemory {
+    /// What is remembered with a partial terrain horizon.
+    struct Entry: Equatable {
+        /// The tiles that were used or have no data (open sea): all but the ones the limit left out.
+        let used: Int
+        /// The tiles within reach of the site.
+        let needed: Int
+    }
+
+    private static func key(_ siteID: UUID) -> String {
+        "lodestar.terrain.tiles.\(siteID.uuidString)"
+    }
+
+    /// What is remembered with `site`'s terrain horizon, or `nil` when it is complete, nothing is remembered or the
+    /// terrain horizon has changed since.
+    static func recall(for site: SavedSite) -> Entry? {
+        guard let profile = site.terrainHorizon, let text = UserDefaults.standard.string(forKey: key(site.id)) else {
+            return nil
+        }
+        let parts = text.split(separator: ":").map(String.init)
+        guard parts.count == 3, parts[0] == HorizonCoverageMemory.fingerprint(of: profile),
+              let used = Int(parts[1]), let needed = Int(parts[2]), 0 <= used, used < needed else { return nil }
+        return Entry(used: used, needed: needed)
+    }
+
+    /// Remembers that `profile`, the terrain horizon of the site `siteID`, was worked out with `skipped` of `needed`
+    /// tiles left out because of the tile limit; forgets what was remembered when none was.
+    static func store(siteID: UUID, profile: HorizonProfile, needed: Int, skipped: Int) {
+        guard skipped > 0, skipped <= needed else {
+            forget(siteID: siteID)
+            return
+        }
+        UserDefaults.standard.set("\(HorizonCoverageMemory.fingerprint(of: profile)):\(needed - skipped):\(needed)",
+                                  forKey: key(siteID))
+    }
+
+    /// Drops what is remembered for the site `siteID`.
+    static func forget(siteID: UUID) {
+        UserDefaults.standard.removeObject(forKey: key(siteID))
     }
 }
