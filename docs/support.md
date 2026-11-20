@@ -34,7 +34,8 @@ assign it to the Accessibility Shortcut (triple-click the side button).
 
 **Does it need an internet connection?** No. Everything works offline. The site map and the time-zone
 lookup for a new site use the network, and **Settings ▸ Online Data** has optional downloads (satellite
-passes, Starlink streak warnings, comets and a cloud forecast) that are all off until you switch them on.
+passes, Starlink streak warnings, comets, a cloud forecast and terrain horizons) that are all off until you
+switch them on.
 Each one tells you what it sends; see the [privacy policy](privacy.html).
 
 **Online Data: "The last update failed".** Lodestar keeps the data you already have. CelesTrak answers

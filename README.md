@@ -158,16 +158,26 @@ WidgetShared/        what the three share: tonight's entries from LodestarKit (n
 LodestarKit/         Swift package, Foundation only, builds and tests on macOS and Linux
   Foundation/        time scales, coordinates, precession/nutation/aberration, refraction, SkyFrame
   Ephemeris/         Sun & planets (VSOP87), Pluto (Meeus), Moon (ELP-2000/82 after Meeus), rise/set,
-                     twilight, phases
+                     twilight, phases, Jupiter's moons and Great Red Spot
   Catalog/           bundled star/deep-sky/constellation/Milky Way data, search, sorting
+  Comets/            comets and asteroids: MPC and JPL element readers, orbit propagation, brightness, tail direction
+  Events/            meteor showers, eclipses, conjunctions, oppositions, supermoons, seasons, planet stations
   Pointing/          CoreMotion attitude → camera pointing, mounts, star-alignment solver, guidance
   Planning/          night summary, darkness and Moon windows, Milky Way core, best targets, polar scope
   PhotoTools/        sensor formats, field of view, NPF/500-rule exposure limits, polar-error drift, field rotation, Moon exposure
+  Horizon/           recorded skyline, terrain horizon from elevation tiles, visibility above the skyline
+  Mosaic/            mosaic planner, Milky Way panorama, panel-by-panel guidance
+  Mount/             GoTo drivers (LX200/OnStep, NexStar/SynScan, ASCOM Alpaca, Sky-Watcher) and simulated mounts
+  Satellites/        element sets (OMM, TLE), SGP4/SDP4, passes, Sun and Moon transits, streak risk, brightness
+  SkyQuality/        offline light-pollution grid, Bortle estimate, imaging score
+  Interchange/       session log and observing-list files (CSV, SkySafari, OpenAstronomyLog), mosaic panel tables
   Formatting/        angle/coordinate formatting and robust parsing
   Geomagnetism/      World Magnetic Model 2025 (declination, field strength)
-  Resources/         stars.json (9,001 stars), dsos.json (693 objects incl. all 110 Messier),
-                     constellations.json (88), milkyway.json
-Tools/               reproducible generators for the bundled data, coefficients, icon and test fixtures
+  Resources/         stars.json (9,001 stars), dsos.json (2,441 objects incl. all 110 Messier),
+                     constellations.json (88), milkyway.json, asteroids.txt (216 asteroids),
+                     lightpollution.bin (night-lights grid)
+Tools/               generators for the bundled data, coefficients, icon and test fixtures (Tools/README.md
+                     says which rebuild byte for byte)
 ```
 
 Key design points:
@@ -188,7 +198,7 @@ Key design points:
 ## Tests
 
 ```
-cd LodestarKit && swift test          # 700+ tests: worked examples from Meeus and Skyfield/JPL fixtures
+cd LodestarKit && swift test          # 2,000+ tests: worked examples from Meeus and Skyfield/JPL fixtures
 cd WidgetTests && swift test          # the widgets' entries and wording (WidgetShared/Core, no Xcode needed)
 ```
 
@@ -207,9 +217,9 @@ The `Lodestar` scheme's Test action runs the same package tests in Xcode.
 
 ## Before relying on it — check on your device
 
-This project was written without access to Xcode or an iPhone; the engine is verified by its test
-suite and the app was type-checked against stand-ins for the iOS SDK, but a few things can only be
-confirmed on hardware. *Settings ▸ About ▸ Sensor Diagnostics* helps with the first two:
+The engine is verified by its test suite, and CI and Xcode Cloud build the app on macOS (the first version was
+written without access to Xcode or an iPhone), but a few things can only be confirmed on hardware.
+*Settings ▸ About ▸ Sensor Diagnostics* helps with the first two:
 
 1. **Sensor convention.** With the phone upright and the camera facing north, the gravity check
    should read PASS; laid flat with the top edge toward a known compass bearing, the "top-edge
