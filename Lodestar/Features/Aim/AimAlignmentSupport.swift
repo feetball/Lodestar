@@ -32,6 +32,12 @@ enum AimAlignmentCandidates {
     /// Planets at least this bright are offered.
     static let planetMagnitudeLimit = 3.0
 
+    /// Shown in place of the list when no object is between the altitude limits; it names the limits above.
+    static var emptyListText: String {
+        "No bright star or planet is between \(Int(minimumAltitude))\u{00B0} and \(Int(maximumAltitude))\u{00B0} "
+            + "right now. Try again later or after the sky has darkened."
+    }
+
     /// The Moon, the bright planets and the bright stars that are between the altitude limits at `date`. The Sun is
     /// never offered: it must not be pointed at without a solar filter. Searches the catalog, so run it off the main
     /// actor.

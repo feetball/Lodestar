@@ -40,6 +40,11 @@ public struct GreatRedSpot: Sendable, Hashable {
     public static let referenceDriftPer30Days = 1.75
 
     /// The spot Sky & Telescope's tool assumes for 2026; see the type's comment.
+    ///
+    /// This is one straight line from `referenceEpoch` (2026 June 1), used for every date, and it has no validity
+    /// horizon: the real spot wanders, so the error grows with the distance from that day, and `transits(from:to:)`
+    /// gives exact-looking times years later all the same. Refresh `referenceLongitude`, `referenceEpoch` and
+    /// `referenceDriftPer30Days` from a current JUPOS-based source once a year.
     public static let reference = GreatRedSpot(
         normalized: referenceLongitude, epoch: referenceEpoch, driftPer30Days: referenceDriftPer30Days)
 

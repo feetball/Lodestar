@@ -86,6 +86,15 @@ final class FoundationTests: XCTestCase {
         XCTAssertEqual(JulianDate.deltaT(decimalYear: .nan), 69.2)
     }
 
+    func testJulianDatesWithTheSameUTButADifferentDeltaTAreOrderedAndHashedAsDistinctValues() {
+        let lower = JulianDate(ut: 2_461_000.5, deltaT: 69.1), higher = JulianDate(ut: 2_461_000.5, deltaT: 70.1)
+        XCTAssertNotEqual(lower, higher)
+        XCTAssertTrue(lower < higher)
+        XCTAssertFalse(higher < lower)
+        XCTAssertEqual(Set([lower, higher, JulianDate(ut: 2_461_000.5, deltaT: 69.1)]).count, 2)
+        XCTAssertTrue(JulianDate(ut: 2_461_000.5, deltaT: 99.0) < JulianDate(ut: 2_461_001.5, deltaT: 1.0))
+    }
+
     func testSiderealTime() {
         // Meeus 12.a: 1987 April 10, 0h UT → GMST 13h10m46.3668s.
         let a = JulianDate(ut: 2_446_895.5)

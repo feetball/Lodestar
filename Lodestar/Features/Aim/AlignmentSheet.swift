@@ -143,7 +143,7 @@ struct AlignmentSheet: View {
     private var candidateList: some View {
         CardTitle(title: "Reference objects", systemImage: "star")
         if rows.isEmpty {
-            Text("No bright star or planet is between 15\u{00B0} and 78\u{00B0} right now. Try again later or after the sky has darkened.")
+            Text(AimAlignmentCandidates.emptyListText)
                 .font(.subheadline)
                 .foregroundStyle(palette.secondaryText)
         } else {
