@@ -12,11 +12,11 @@ struct SkyChartCameraPose {
     /// The pose for the newest motion sample, or `nil` while the sensors deliver none.
     @MainActor
     static func current(from motion: MotionService, mount: MountProfile, alignment: AlignmentModel,
-                        frame: FrameSize) -> SkyChartCameraPose? {
+                        lens: LensSetup) -> SkyChartCameraPose? {
         guard let sample = motion.latestSample() else { return nil }
         let solution = PointingSolution.solve(attitude: sample.attitude, mount: mount, alignment: alignment)
-        let outline = PinholeProjection.dslrFrameOutline(solution: solution, horizontalFOV: frame.horizontal,
-                                                         verticalFOV: frame.vertical, samplesPerEdge: 6)
+        let outline = AimLensFrame.worldDirections(of: AimLensFrame.outline(of: lens, rectilinearSamplesPerEdge: 6),
+                                                   pointing: solution)
         return SkyChartCameraPose(horizontal: solution.boresight, boresight: solution.boresightVector,
                                   footprint: outline)
     }

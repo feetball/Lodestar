@@ -43,20 +43,22 @@ extension HelpContent {
     private static let tonight = HelpTopic(
         topic: .tonight, category: .sky, title: "Tonight", systemImage: "moon.stars",
         summary: "When it is dark, where the Moon is, what to shoot.",
-        keywords: ["twilight", "darkness", "moon phase", "milky way", "planets", "best targets", "sunset", "sunrise", "clouds", "forecast"],
+        keywords: ["twilight", "darkness", "moon phase", "milky way", "planets", "best targets", "sunset", "sunrise", "clouds", "forecast", "sky quality", "bortle", "light pollution", "imaging score", "darkest sky"],
         blocks: [
             .paragraph("The **Tonight** tab shows what the night will be like where you are: when it gets dark, when the Moon is up, and what is worth shooting. Use it to plan before you set up."),
             .bullets([
                 "**Darkness** is a timeline of the night with a **Now** marker. Its bars show the sky\u{2019}s brightness, when the Moon is up, the dark hours without the Moon, and when the Milky Way core can be photographed.",
                 "**Sun & Twilight** lists sunset, dusk, dawn and sunrise. The sky is fully dark when the Sun is more than 18\u{00B0} below the horizon.",
                 "**Moon** gives the phase, moonrise, moonset and the dark hours you get without it. **Milky Way Core** and **Planets** say when they are high enough to shoot.",
+                "**Sky quality** estimates how dark the sky is at the site as a Bortle class (1 is a pristine dark sky, 9 an inner-city sky) from satellite night-light imagery, says toward which compass direction the sky is darker, and scores the night for imaging out of 10: dark hours, the Moon, the sky\u{2019}s brightness and, when the cloud forecast is on and up to date, clouds. The estimate and its limits are explained in **Observing sites**.",
                 "**Best Targets** ranks deep-sky objects (galaxies, nebulae and clusters) by height in the dark, brightness and size, and moves down those that the Moon spoils. Each row says what the Moon does to it at its best time, and your **Filter** setting counts. With a recorded skyline each row says how many hours the object is clear of it, and targets that stay clear for longer rank higher. **Upcoming** lists the next sky events. **Polar Alignment** is a clock for aligning a star tracker.",
                 "To see another night, use the arrows at the top or tap the date. You can go a year either way. **Tonight** brings you back.",
                 "With a recorded skyline, the times follow it. If you switch on **Cloud forecast** in **Settings** \u{25B8} **Online Data**, a **Clouds tonight** card appears.",
+                "Under the cloud strip, **Clouds tonight** shows chips for **Dew**, **Wind**, **Fog** and the night\u{2019}s temperature range, one line for the most important warning, and an **Hourly** table of cloud, temperature, dew gap and wind. **Dew** appears when the air gets within 2\u{00A0}\u{00B0}C of its dew point, when dew can form on your lens: bring a dew heater or shield. **Wind** warns from 5\u{00A0}m/s (11\u{00A0}mph) that long exposures may shake, from 8\u{00A0}m/s (18\u{00A0}mph) that the tripod needs weight, and from 12\u{00A0}m/s (27\u{00A0}mph) that the wind is strong. **Fog** appears when the forecast puts fog over at least half the area around you. Temperatures and speeds follow your region: \u{00B0}C and m/s, or \u{00B0}F and mph.",
             ]),
             .tip("Long stretches in the **Dark sky** bar are your best hours for faint objects."),
         ],
-        related: [.events, .skyline, .nightMode])
+        related: [.sites, .events, .skyline, .nightMode])
 
     private static let events = HelpTopic(
         topic: .events, category: .sky, title: "Events calendar", systemImage: "calendar",
@@ -90,7 +92,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Check how a target will sit in your picture before you set up. The Sky tab can hold your camera\u{2019}s frame in the middle while you move the sky under it."),
             .steps([
-                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from them.",
+                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from the profile in use. A fisheye lens gets a curved frame.",
                 "On the **Sky** tab, open the layers menu. Turn on **Camera view**, then **Frame in the middle**.",
                 "Drag to move the frame over the sky and pinch to zoom, up to 15\u{00D7}. Zoomed in, large deep-sky objects are drawn near their real size. The frame stays on the same stars as time passes, so use the time bar to see how it will look later.",
                 "Turn the frame by twisting two fingers, or press and hold on the chart, then drag around the middle. It snaps at 0\u{00B0}, 90\u{00B0}, 180\u{00B0} and 270\u{00B0}. The **90\u{00B0}** button gives a quarter turn, for a portrait frame.",
@@ -103,7 +105,7 @@ extension HelpContent {
             ]),
             .caution("The frame is drawn from your camera and lens in Settings. If those are wrong, so is the frame. Below the horizon, only the part above it is drawn."),
         ],
-        related: [.skyChart, .aimScreen, .glossary])
+        related: [.skyChart, .aimScreen, .cameraAndLens, .glossary])
 
     private static let mosaic = HelpTopic(
         topic: .mosaic, category: .planning, title: "Mosaic planner", systemImage: "square.grid.3x3",
@@ -120,7 +122,7 @@ extension HelpContent {
                 "Tap **Finish** to end the mosaic.",
             ]),
             .tip("An object\u{2019}s page tells you when it needs a mosaic with your lens."),
-            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars."),
+            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars. It also needs a rectilinear lens: with a fisheye profile in Settings the planner says so."),
         ],
         related: [.planFraming, .aimScreen])
 
@@ -149,8 +151,9 @@ extension HelpContent {
 
     private static let skyline = HelpTopic(
         topic: .skyline, category: .planning, title: "Record your skyline", systemImage: "mountain.2",
-        summary: "Teach Lodestar where trees and hills hide the sky.",
-        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set"],
+        summary: "Teach Lodestar where trees and hills hide the sky, or let it work out the hills from elevation data.",
+        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set",
+                   "terrain", "elevation", "terrain horizon"],
         blocks: [
             .paragraph("Trees, buildings and hills hide objects long before the true horizon. Record your site\u{2019}s real skyline once. Rise and set times, Tonight, the object pages and the sky chart then use it, and the Aim screen shades the ground below it."),
             .steps([
@@ -160,11 +163,30 @@ extension HelpContent {
                 "The screen shows how much is covered and what is still to sweep. **Start Over** begins again.",
                 "Tap **Done** to save. If the circle is not complete, Lodestar asks what to do with the gaps.",
             ]),
+            .paragraph("**Terrain horizon.** Where you cannot sweep, or have swept only part of the circle, Lodestar can work out the skyline of the hills and mountains from elevation data. Switch on **Terrain horizons** in **Settings** \u{25B8} **Online Data**, edit the saved site and, in its **Terrain Horizon** section, tap **Compute from Elevation Data\u{2026}**. Lodestar asks first, downloads up to four elevation tiles of about 11 MB each, works out the skyline and deletes the tiles. The tile server sees your IP address and which 1\u{00B0} tiles you request. Then the Aim screen, Tonight, the object pages and the sky chart use the terrain horizon wherever you have not recorded a skyline, and in the stretches a partial sweep left open. They say which skyline applies: **Recorded skyline**, **Terrain horizon** or **Recorded + terrain**. The same section offers the ground elevation of the data as the site\u{2019}s elevation, and **Remove Terrain Horizon\u{2026}**."),
             .tip("Record in daylight, when the camera picture shows the skyline. It helps you keep the line on the crosshair."),
-            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again."),
+            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again. The terrain horizon is computed for the saved position, so compute it again after moving a site. It comes from a surface model: ridges narrower than about 30 to 90 m, trees and buildings nearby are not in it."),
         ],
         related: [.tonight, .objects])
 
+    private static let sites = HelpTopic(
+        topic: .sites, category: .planning, title: "Observing sites", systemImage: "mappin.and.ellipse",
+        summary: "Save places, and see how dark their sky is.",
+        keywords: ["site", "location", "dark sky", "bortle", "light pollution", "sky quality", "satellite", "night lights", "horizon glow", "darkest direction", "sqm"],
+        blocks: [
+            .paragraph("A **saved site** lets you plan a trip before you get there: choose it in **Settings** \u{25B8} **Location** and every screen works out the sky for it. **Add Site\u{2026}** takes a place from the map or from coordinates."),
+            .paragraph("Under each site, and under **Current Location**, a line says how dark the sky is there, for example **Sky: Bortle ~4 (rural/suburban transition)**. Tap it to read how it is estimated."),
+            .bullets([
+                "The **Bortle scale** rates a night sky from class 1, a pristine dark sky, to class 9, an inner-city sky. Class 4 is the edge of the countryside, where the Milky Way is still easy to see; at class 7 and above it is hard to find.",
+                "Lodestar works the class out on the phone from a map of the artificial light that satellites saw at night in 2016 (NASA Black Marble). It adds up the light of the towns within about 100 km of the site, the nearest counting most.",
+                "The map has one cell for every 11 km, so it is a guide, not a measurement. It is good to about one class near a city and two in the dark, where it cannot tell class 1 from class 3. New lights, dark-sky rules and the sky\u{2019}s own glow are not in it. A meter reading (SQM) is better when you have one.",
+                "On **Tonight**, the **Sky quality** card also names the direction where the sky is darker, and scores the night for imaging. On the **Sky Chart**, a thin **Horizon glow** ring is brighter toward the lights; turn it off in the layers menu or in **Settings** \u{25B8} **Sky Display**.",
+            ]),
+            .tip("For a darker sky, drive away from the bright side: the card tells you which compass direction that is."),
+            .caution("A dark cell next to a town can still have a bright sky. Check the direction of the lights before you set up."),
+        ],
+        related: [.tonight, .skyline, .skyChart])
+
     /// The topics of "Sky and objects" and "Planning a picture".
-    static let sky: [HelpTopic] = [objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline]
+    static let sky: [HelpTopic] = [objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline, sites]
 }

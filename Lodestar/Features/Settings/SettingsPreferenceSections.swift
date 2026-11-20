@@ -40,6 +40,11 @@ struct SettingsSkyDisplaySection: View {
             }
             Toggle("Milky Way", isOn: $store.settings.showMilkyWay)
             VStack(alignment: .leading, spacing: 4) {
+                Toggle("Horizon glow", isOn: $store.settings.showHorizonGlow)
+                SettingsCaption("A thin ring along the sky chart's horizon that is brighter toward the artificial "
+                                + "light around you.")
+            }
+            VStack(alignment: .leading, spacing: 4) {
                 SettingsSliderRow(title: "Faintest stars",
                                   valueText: AppFormat.magnitude(store.settings.starMagnitudeLimit),
                                   value: $store.settings.starMagnitudeLimit, range: 1...6.5, step: 0.5)

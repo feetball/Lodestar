@@ -22,10 +22,14 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
     var timeZoneIdentifier: String?
     /// The recorded skyline (trees, mountains), or nil for an open horizon.
     var horizon: HorizonProfile?
+    /// The skyline of the terrain computed from elevation data (hills, mountains), or nil when none was computed. Unlike
+    /// `horizon` a flat one is kept: it says that the terrain was looked at and is flat. It is used where no skyline was
+    /// recorded, and for the stretches a partial sweep left open.
+    var terrainHorizon: HorizonProfile?
 
     /// Validates the coordinates and trims/limits the name; returns nil for invalid input.
     init?(id: UUID = UUID(), name: String, latitude: Double, longitude: Double, elevation: Double = 0,
-          timeZoneIdentifier: String? = nil, horizon: HorizonProfile? = nil) {
+          timeZoneIdentifier: String? = nil, horizon: HorizonProfile? = nil, terrainHorizon: HorizonProfile? = nil) {
         guard let location = GeographicLocation.validated(latitude: latitude, longitude: longitude, elevation: elevation) else {
             return nil
         }
@@ -37,10 +41,11 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
         self.elevation = location.elevation
         self.timeZoneIdentifier = timeZoneIdentifier.flatMap { TimeZone(identifier: $0) != nil ? $0 : nil }
         self.horizon = horizon.flatMap { $0.isFlat ? nil : $0 }
+        self.terrainHorizon = terrainHorizon
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, latitude, longitude, elevation, timeZoneIdentifier, horizon
+        case id, name, latitude, longitude, elevation, timeZoneIdentifier, horizon, terrainHorizon
     }
 
     /// Decodes and re-validates a stored site; invalid entries throw and are dropped by the caller.
@@ -53,7 +58,8 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
                                    elevation: try c.decodeIfPresent(Double.self, forKey: .elevation) ?? 0,
                                    timeZoneIdentifier: try c.decodeIfPresent(String.self, forKey: .timeZoneIdentifier),
                                    // A damaged skyline is dropped rather than losing the site.
-                                   horizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .horizon)) ?? nil) else {
+                                   horizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .horizon)) ?? nil,
+                                   terrainHorizon: (try? c.decodeIfPresent(HorizonProfile.self, forKey: .terrainHorizon)) ?? nil) else {
             throw DecodingError.dataCorruptedError(forKey: .latitude, in: c, debugDescription: "Invalid site coordinates")
         }
         self = site
@@ -112,6 +118,7 @@ enum CoordinateStyle: String, Codable, CaseIterable, Identifiable, Sendable {
 /// back to defaults, so adding a setting never wipes the user's data.
 struct AppSettings: Codable, Equatable, Sendable {
     static let maximumSavedSites = 100
+    static let maximumCameraProfiles = 50
     static let maximumRecents = 20
     static let maximumFavorites = 200
 
@@ -133,7 +140,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     /// Attitude smoothing time constant in seconds.
     var smoothingTimeConstant: Double = 0.12
 
-    // Camera and lens (for the framing rectangle and exposure tools)
+    // Camera and lens (for the framing rectangle and exposure tools). The camera profiles are the source; the single
+    // camera keys below them follow the active profile (see `sanitizeCamera`), so code that reads them keeps working.
+    var cameraProfiles: [CameraProfile] = []
+    var activeCameraProfileID: UUID?
     var sensorID: String = SensorFormat.fullFrame.id
     var customSensorWidth: Double = 36
     var customSensorHeight: Double = 24
@@ -169,6 +179,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var showConstellationNames = true
     var showDeepSkyObjects = true
     var showMilkyWay = true
+    /// A thin ring on the sky chart's horizon that is brighter toward the artificial light.
+    var showHorizonGlow = true
     /// Deep-sky objects drawn in the sky views, up to this `Prominence` level (1 showpieces … 4 everything).
     var deepSkyProminence = 2
     var starMagnitudeLimit: Double = 5.0
@@ -201,6 +213,9 @@ struct AppSettings: Codable, Equatable, Sendable {
         mountPresetID = value(.mountPresetID, d.mountPresetID)
         headingSource = value(.headingSource, d.headingSource)
         smoothingTimeConstant = value(.smoothingTimeConstant, d.smoothingTimeConstant)
+        let storedProfiles = (try? c.decodeIfPresent([Lossy<CameraProfile>].self, forKey: .cameraProfiles)) ?? nil
+        cameraProfiles = (storedProfiles ?? []).compactMap(\.value)
+        activeCameraProfileID = value(.activeCameraProfileID, d.activeCameraProfileID)
         sensorID = value(.sensorID, d.sensorID)
         customSensorWidth = value(.customSensorWidth, d.customSensorWidth)
         customSensorHeight = value(.customSensorHeight, d.customSensorHeight)
@@ -224,6 +239,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
         showMilkyWay = value(.showMilkyWay, d.showMilkyWay)
+        showHorizonGlow = value(.showHorizonGlow, d.showHorizonGlow)
         deepSkyProminence = value(.deepSkyProminence, d.deepSkyProminence)
         starMagnitudeLimit = value(.starMagnitudeLimit, d.starMagnitudeLimit)
         coordinateStyle = value(.coordinateStyle, d.coordinateStyle)
@@ -241,11 +257,7 @@ struct AppSettings: Codable, Equatable, Sendable {
             v.isFinite ? min(max(v, range.lowerBound), range.upperBound) : fallback
         }
         smoothingTimeConstant = clamp(smoothingTimeConstant, 0...1, 0.12)
-        customSensorWidth = clamp(customSensorWidth, 1...100, 36)
-        customSensorHeight = clamp(customSensorHeight, 1...100, 24)
-        focalLength = clamp(focalLength, 4...2000, 24)
-        aperture = clamp(aperture, 0.95...32, 2.8)
-        if let pitch = pixelPitch { pixelPitch = pitch.isFinite && (0.5...20).contains(pitch) ? pitch : nil }
+        sanitizeCamera()
         polarErrorDegrees = clamp(polarErrorDegrees, Self.polarErrorRange, 1)
         exposureISO = min(max(exposureISO, Self.exposureISORange.lowerBound), Self.exposureISORange.upperBound)
         nightIntensity = clamp(nightIntensity, 0.25...1, 0.7)
@@ -266,6 +278,67 @@ struct AppSettings: Codable, Equatable, Sendable {
 
     /// The Great Red Spot to compute with: the user's longitude, else `GreatRedSpot.reference`.
     var greatRedSpotOrDefault: GreatRedSpot { greatRedSpot?.spot ?? .reference }
+
+    // MARK: Camera profiles
+
+    /// The camera and lens in use: the stored profile with `activeCameraProfileID`, else the first one, else a profile
+    /// made from the single camera keys (before the profiles exist).
+    var activeCameraProfile: CameraProfile {
+        cameraProfiles.first { $0.id == activeCameraProfileID } ?? cameraProfiles.first ?? singleCameraProfile
+    }
+
+    /// The camera of the single camera keys as a profile, with the identifier of the migrated profile.
+    private var singleCameraProfile: CameraProfile {
+        CameraProfile(id: CameraProfile.migratedID, name: CameraProfile.defaultName, sensorID: sensorID,
+                      customSensorWidth: customSensorWidth, customSensorHeight: customSensorHeight,
+                      focalLength: focalLength, aperture: aperture, pixelPitch: pixelPitch)
+    }
+
+    /// Takes a change that the `previous` settings went through to their single camera keys alone (code that predates
+    /// the profiles writes them) into the active profile. A change to the profiles themselves wins, and so does any
+    /// change to the profiles made together with one to the keys; `sanitizeCamera()` then lets the keys follow the
+    /// profile.
+    mutating func reconcileCamera(after previous: AppSettings) {
+        let keysChanged = sensorID != previous.sensorID || customSensorWidth != previous.customSensorWidth
+            || customSensorHeight != previous.customSensorHeight || focalLength != previous.focalLength
+            || aperture != previous.aperture || pixelPitch != previous.pixelPitch
+        let profilesChanged = cameraProfiles != previous.cameraProfiles
+            || activeCameraProfileID != previous.activeCameraProfileID
+        guard keysChanged, !profilesChanged, !cameraProfiles.isEmpty else {
+            sanitizeCamera()
+            return
+        }
+        let activeID = activeCameraProfile.id
+        if let index = cameraProfiles.firstIndex(where: { $0.id == activeID }) {
+            var updated = cameraProfiles[index]
+            updated.sensorID = sensorID
+            updated.customSensorWidth = customSensorWidth
+            updated.customSensorHeight = customSensorHeight
+            updated.focalLength = focalLength
+            updated.aperture = aperture
+            updated.pixelPitch = pixelPitch
+            cameraProfiles[index] = updated.sanitized()
+        }
+        sanitizeCamera()
+    }
+
+    /// Makes sure there is a camera profile and an active one (the first start with profiles turns the single camera
+    /// into "My camera"), limits every profile, and sets the single camera keys to the active profile.
+    mutating func sanitizeCamera() {
+        var seen = Set<UUID>()
+        var profiles = cameraProfiles.filter { seen.insert($0.id).inserted }.prefix(Self.maximumCameraProfiles)
+            .map { $0.sanitized() }
+        if profiles.isEmpty { profiles = [singleCameraProfile] }
+        let active = profiles.first { $0.id == activeCameraProfileID } ?? profiles[0]
+        cameraProfiles = profiles
+        activeCameraProfileID = active.id
+        sensorID = active.sensorID
+        customSensorWidth = active.customSensorWidth
+        customSensorHeight = active.customSensorHeight
+        focalLength = active.focalLength
+        aperture = active.aperture
+        pixelPitch = active.pixelPitch
+    }
 }
 
 /// Decodes an element if possible and yields `nil` instead of failing the enclosing collection.
@@ -286,6 +359,11 @@ final class SettingsStore {
     var settings: AppSettings {
         didSet {
             guard settings != oldValue else { return }
+            // A change that only touches the single camera keys goes to the active camera profile, and the keys
+            // follow the profile otherwise.
+            var reconciled = settings
+            reconciled.reconcileCamera(after: oldValue)
+            if reconciled != settings { settings = reconciled }
             scheduleSave()
         }
     }
@@ -295,12 +373,15 @@ final class SettingsStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        var initial: AppSettings
         if let data = defaults.data(forKey: Self.storageKey),
            let decoded = try? JSONDecoder().decode(AppSettings.self, from: data) {
-            settings = decoded
+            initial = decoded
         } else {
-            settings = AppSettings()
+            initial = AppSettings()
         }
+        initial.sanitizeCamera()
+        settings = initial
     }
 
     /// Writes immediately (call when the app moves to the background).
@@ -346,6 +427,35 @@ final class SettingsStore {
     func updateSite(_ site: SavedSite) {
         guard let index = settings.savedSites.firstIndex(where: { $0.id == site.id }) else { return }
         settings.savedSites[index] = site
+    }
+
+    /// Adds `profile` and makes it the active camera; `false` when the maximum number of profiles is reached.
+    @discardableResult
+    func addCameraProfile(_ profile: CameraProfile) -> Bool {
+        guard settings.cameraProfiles.count < AppSettings.maximumCameraProfiles else { return false }
+        settings.cameraProfiles.append(profile.sanitized())
+        settings.activeCameraProfileID = profile.id
+        return true
+    }
+
+    /// Replaces the profile that has the identifier of `profile`.
+    func updateCameraProfile(_ profile: CameraProfile) {
+        guard let index = settings.cameraProfiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        settings.cameraProfiles[index] = profile.sanitized()
+    }
+
+    /// Makes the profile with `id` the active camera.
+    func activateCameraProfile(_ id: UUID) {
+        guard settings.cameraProfiles.contains(where: { $0.id == id }) else { return }
+        settings.activeCameraProfileID = id
+    }
+
+    /// Deletes the profile with `id`; `false` (and nothing deleted) when it is the only one.
+    @discardableResult
+    func removeCameraProfile(_ id: UUID) -> Bool {
+        guard settings.cameraProfiles.count > 1 else { return false }
+        settings.cameraProfiles.removeAll { $0.id == id }
+        return true
     }
 
     func removeSites(withIDs ids: Set<UUID>) {

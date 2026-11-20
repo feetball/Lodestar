@@ -66,10 +66,7 @@ extension SkyOverlayRenderer {
     // MARK: DSLR frame
 
     mutating func drawDSLRFrame(in context: GraphicsContext) {
-        let outline = PinholeProjection.dslrFrameOutline(solution: frame.pointing,
-                                                         horizontalFOV: configuration.lensFrame.horizontal,
-                                                         verticalFOV: configuration.lensFrame.vertical,
-                                                         samplesPerEdge: 4)
+        let outline = AimLensFrame.worldDirections(of: configuration.lensOutline, pointing: frame.pointing)
         var world = AimWorldPath()
         world.addPolyline(outline, closed: true, frustum: frustum)
         context.stroke(world.path(projecting: projector), with: .color(palette.dslrFrame),
