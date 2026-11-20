@@ -153,7 +153,7 @@ extension MountServiceTests {
     // MARK: - The simulated Sky-Watcher mount
 
     private func connectSimulatedSkyWatcher() async {
-        service.connectDemo(.demoSkyWatcher, observer: observer)
+        service.connectDemo(.demoSkyWatcher, context: Self.context(observer))
         await mountServiceExpect("the simulated Sky-Watcher mount") { self.service.connection == .connected }
     }
 
@@ -297,7 +297,7 @@ extension MountServiceTests {
         let base = observer.location
         let elsewhere = Observer(location: GeographicLocation(latitude: base.latitude + 1.0, longitude: base.longitude,
                                                               elevation: base.elevation))
-        service.updateObserver(elsewhere)
+        service.updateObserver(Self.context(elsewhere))
         await mountServiceExpect("the alignment to be dropped") { self.service.needsFirstSync }
         await mountServiceExpect("the notice") { self.service.noticeText != nil }
         XCTAssertEqual(service.noticeText, "Your location changed, so the star alignment was cleared. Align on a star again.")
@@ -311,7 +311,7 @@ extension MountServiceTests {
         let base = observer.location
         let jitter = Observer(location: GeographicLocation(latitude: base.latitude + 0.005, longitude: base.longitude,
                                                            elevation: base.elevation))
-        service.updateObserver(jitter)
+        service.updateObserver(Self.context(jitter))
         await settle(0.5)
         XCTAssertFalse(service.needsFirstSync)
         XCTAssertEqual(service.alignedStars.count, 1)
@@ -337,7 +337,7 @@ extension MountServiceTests {
     }
 
     func testAMountThatStartedAwayFromHomeSaysSoUntilThePersonDeclaresHome() async {
-        service.connectDemo(equatorialOption(axis1: 45.0, axis2: 10.0), observer: observer)
+        service.connectDemo(equatorialOption(axis1: 45.0, axis2: 10.0), context: Self.context(observer))
         await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertEqual(service.driverDetail?.arrangement, .equatorial)
         XCTAssertTrue(service.startsAwayFromHome)
@@ -352,14 +352,14 @@ extension MountServiceTests {
     }
 
     func testTheOtherSideOfThePierIsNamed() async {
-        service.connectDemo(equatorialOption(axis1: 45.0, axis2: -10.0), observer: observer)
+        service.connectDemo(equatorialOption(axis1: 45.0, axis2: -10.0), context: Self.context(observer))
         await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertEqual(service.pierSideLine, "Telescope west of the pier")
         XCTAssertEqual(service.trackingAndPierLine, "Tracking is off \u{00B7} Telescope west of the pier")
     }
 
     func testTrackingThatStopsAtTheMeridianIsExplained() async {
-        service.connectDemo(equatorialOption(axis1: 100.0, axis2: 10.0), observer: observer)
+        service.connectDemo(equatorialOption(axis1: 100.0, axis2: 10.0), context: Self.context(observer))
         await mountServiceExpect("the equatorial mount") { self.service.connection == .connected }
         XCTAssertNil(service.trackingStopText, "tracking has not been tried yet")
         service.setTracking(true)

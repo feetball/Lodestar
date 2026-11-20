@@ -8,7 +8,8 @@ final class SettingsHelpContentTests: XCTestCase {
     private let expectedOrder: [HelpTopic.ID] = [
         .gettingStarted, .mounting, .aimScreen, .alignment, .compassAndGyro,
         .objects, .skyChart, .tonight, .events, .planFraming, .mosaic, .trailsAndExposure, .skyline,
-        .mounts, .nightMode, .onlineData, .widgets, .troubleshooting, .glossary,
+        .alignmentFinder, .sites, .sessionLog,
+        .cameraAndLens, .mounts, .nightMode, .onlineData, .widgets, .shortcuts, .troubleshooting, .glossary,
     ]
 
     /// Every string a block shows.
@@ -33,15 +34,17 @@ final class SettingsHelpContentTests: XCTestCase {
 
     func testTheTopicsAreInTheOrderOfTheListAndEveryIdHasOne() {
         XCTAssertEqual(HelpContent.all.map(\.topic), expectedOrder)
-        XCTAssertEqual(HelpContent.all.count, 19)
-        XCTAssertEqual(Set(HelpContent.all.map(\.topic)).count, 19, "a topic id appears twice")
+        XCTAssertEqual(HelpContent.all.count, 24)
+        XCTAssertEqual(Set(HelpContent.all.map(\.topic)).count, 24, "a topic id appears twice")
     }
 
     func testTheGroupsHoldTheirTopicsInOrder() {
         XCTAssertEqual(HelpContent.start.map(\.topic), [.gettingStarted, .mounting, .aimScreen, .alignment, .compassAndGyro])
         XCTAssertEqual(HelpContent.sky.map(\.topic),
-                       [.objects, .skyChart, .tonight, .events, .planFraming, .mosaic, .trailsAndExposure, .skyline])
-        XCTAssertEqual(HelpContent.more.map(\.topic), [.mounts, .nightMode, .onlineData, .widgets, .troubleshooting, .glossary])
+                       [.objects, .skyChart, .tonight, .events, .planFraming, .mosaic, .trailsAndExposure, .skyline,
+                        .alignmentFinder, .sites, .sessionLog])
+        XCTAssertEqual(HelpContent.more.map(\.topic),
+                       [.cameraAndLens, .mounts, .nightMode, .onlineData, .widgets, .shortcuts, .troubleshooting, .glossary])
         XCTAssertEqual(HelpContent.all, HelpContent.start + HelpContent.sky + HelpContent.more)
     }
 
@@ -87,14 +90,16 @@ final class SettingsHelpContentTests: XCTestCase {
         XCTAssertEqual(HelpContent.topics(in: .start).map(\.topic), [.gettingStarted, .mounting])
         XCTAssertEqual(HelpContent.topics(in: .aiming).map(\.topic), [.aimScreen, .alignment, .compassAndGyro])
         XCTAssertEqual(HelpContent.topics(in: .sky).map(\.topic), [.objects, .skyChart, .tonight, .events])
-        XCTAssertEqual(HelpContent.topics(in: .planning).map(\.topic), [.planFraming, .mosaic, .trailsAndExposure, .skyline])
-        XCTAssertEqual(HelpContent.topics(in: .equipment).map(\.topic), [.mounts])
-        XCTAssertEqual(HelpContent.topics(in: .more).map(\.topic), [.nightMode, .onlineData, .widgets, .troubleshooting, .glossary])
+        XCTAssertEqual(HelpContent.topics(in: .planning).map(\.topic),
+                       [.planFraming, .mosaic, .trailsAndExposure, .skyline, .alignmentFinder, .sites, .sessionLog])
+        XCTAssertEqual(HelpContent.topics(in: .equipment).map(\.topic), [.cameraAndLens, .mounts])
+        XCTAssertEqual(HelpContent.topics(in: .more).map(\.topic),
+                       [.nightMode, .onlineData, .widgets, .shortcuts, .troubleshooting, .glossary])
     }
 
     func testTheCategoriesTogetherCoverEveryTopicOnce() {
         let covered = HelpCategory.allCases.flatMap { HelpContent.topics(in: $0).map(\.topic) }
-        XCTAssertEqual(covered.count, 19)
+        XCTAssertEqual(covered.count, 24)
         XCTAssertEqual(Set(covered), Set(expectedOrder))
     }
 
@@ -197,7 +202,7 @@ final class SettingsHelpContentTests: XCTestCase {
 
     func testAnEmptyOrSymbolOnlyQueryMatchesEveryTopic() {
         for query in ["", "   ", "!?", " - , . "] {
-            XCTAssertEqual(HelpContent.all.filter { $0.matches(query) }.count, 19, "query \"\(query)\"")
+            XCTAssertEqual(HelpContent.all.filter { $0.matches(query) }.count, 24, "query \"\(query)\"")
         }
     }
 

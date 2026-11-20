@@ -40,6 +40,7 @@ private enum ObjectsPositionFixture {
     }
 
     static let denver = Observer(location: GeographicLocation(latitude: 40, longitude: -105, elevation: 1600))
+    static let denverZone = TimeZone(identifier: "America/Denver")!
     static let sydney = Observer(location: GeographicLocation(latitude: -34, longitude: 151, elevation: 20))
     static let svalbard = Observer(location: GeographicLocation(latitude: 80, longitude: 15, elevation: 0))
 
@@ -273,6 +274,101 @@ final class ObjectsPositionCalculatorTests: XCTestCase {
         XCTAssertEqual(first, try position(of: object))
         XCTAssertNotEqual(first, try position(of: object, date: ObjectsPositionFixture.evening.addingTimeInterval(600)))
     }
+
+    // MARK: Keeping a rising
+
+    private func position(of object: CelestialObject, at date: Date,
+                          keeping known: [String: ObjectSkyPosition] = [:]) throws -> ObjectSkyPosition {
+        let positions = ObjectsPositionCalculator.positions(for: [object], observer: ObjectsPositionFixture.denver, date: date,
+                                                            keepingRisingsOf: known)
+        return try XCTUnwrap(positions[object.id])
+    }
+
+    func testARisingIsKeptForFiveMinutes() {
+        XCTAssertEqual(ObjectsPositionCalculator.risingReuseAge, 5 * 60)
+    }
+
+    func testAPositionSaysWhenItsRisingWasSearchedFor() throws {
+        let result = try position(of: ObjectsPositionFixture.target(30, 0), at: ObjectsPositionFixture.evening)
+        XCTAssertEqual(result.risingSearchedAt, ObjectsPositionFixture.evening)
+    }
+
+    func testARisingYoungerThanTheReuseAgeIsKeptAndThePositionIsWorkedOutAgain() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        let earlier = try position(of: object, at: start)
+        let later = start.addingTimeInterval(120)
+        let again = try position(of: object, at: later, keeping: [object.id: earlier])
+        XCTAssertEqual(again.risingSearchedAt, start, "the search was not repeated")
+        XCTAssertEqual(again.nextRise, earlier.nextRise)
+        XCTAssertEqual(again.neverRises, earlier.neverRises)
+        XCTAssertEqual(again.noRiseInWindow, earlier.noRiseInWindow)
+        XCTAssertEqual(again.computedAt, later)
+        let horizontal = SkyFrame(date: later, observer: ObjectsPositionFixture.denver).horizontal(of: object, refraction: true)
+        XCTAssertEqual(again.altitude, horizontal.altitude, accuracy: 1e-9, "the position itself is not kept")
+    }
+
+    func testARisingExactlyAtTheReuseAgeIsStillKept() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        let earlier = try position(of: object, at: start)
+        let again = try position(of: object, at: start.addingTimeInterval(ObjectsPositionCalculator.risingReuseAge),
+                                 keeping: [object.id: earlier])
+        XCTAssertEqual(again.risingSearchedAt, start)
+    }
+
+    func testARisingOlderThanTheReuseAgeIsSearchedForAgain() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        let earlier = try position(of: object, at: start)
+        let later = start.addingTimeInterval(ObjectsPositionCalculator.risingReuseAge + 1)
+        let again = try position(of: object, at: later, keeping: [object.id: earlier])
+        XCTAssertEqual(again.risingSearchedAt, later)
+        XCTAssertEqual(again.nextRise, try position(of: object, at: later).nextRise)
+    }
+
+    func testARisingThatHasHappenedIsSearchedForAgain() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        let found = try position(of: object, at: start)
+        let earlier = ObjectSkyPosition(altitude: found.altitude, azimuth: found.azimuth,
+                                        nextRise: start.addingTimeInterval(60), neverRises: false, noRiseInWindow: false,
+                                        magnitude: nil, computedAt: start, isAboveHorizon: found.isAboveHorizon,
+                                        isBehindSkyline: false, usesSkyline: false, smallBody: nil, risingSearchedAt: start)
+        let later = start.addingTimeInterval(120)
+        let again = try position(of: object, at: later, keeping: [object.id: earlier])
+        XCTAssertEqual(again.risingSearchedAt, later, "a rising that is past is no longer the next one")
+        XCTAssertNotEqual(again.nextRise, earlier.nextRise)
+    }
+
+    func testAPositionThatDoesNotSayWhenItsRisingWasSearchedForIsNotKept() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        var earlier = try position(of: object, at: start)
+        earlier.risingSearchedAt = nil
+        let later = start.addingTimeInterval(10)
+        XCTAssertEqual(try position(of: object, at: later, keeping: [object.id: earlier]).risingSearchedAt, later)
+    }
+
+    func testARisingSearchedForAfterTheDateIsNotKept() throws {
+        let object = ObjectsPositionFixture.target(30, 0)
+        let start = ObjectsPositionFixture.evening
+        let earlier = try position(of: object, at: start)
+        let before = start.addingTimeInterval(-10)
+        XCTAssertEqual(try position(of: object, at: before, keeping: [object.id: earlier]).risingSearchedAt, before)
+    }
+
+    func testOnlyTheObjectsKnownKeepTheirRising() throws {
+        let known = ObjectsPositionFixture.target(30, 0)
+        let other = ObjectsPositionFixture.target(100, 45)
+        let start = ObjectsPositionFixture.evening
+        let earlier = try position(of: known, at: start)
+        let later = start.addingTimeInterval(60)
+        let positions = ObjectsPositionCalculator.positions(for: [known, other], observer: ObjectsPositionFixture.denver,
+                                                            date: later, keepingRisingsOf: [known.id: earlier])
+        XCTAssertEqual(positions[known.id]?.risingSearchedAt, start)
+        XCTAssertEqual(positions[other.id]?.risingSearchedAt, later)
+    }
 }
 
 // MARK: - The model
@@ -294,10 +390,11 @@ final class ObjectsPositionModelTests: XCTestCase {
 
     /// Runs `keepFresh` until `condition` holds (or time runs out), then cancels it.
     private func run(_ model: ObjectsPositionModel, observer: Observer = ObjectsPositionFixture.denver,
-                     skyline: HorizonProfile? = nil, clock: SkyClock, tracking objects: [CelestialObject],
-                     until condition: @MainActor () -> Bool) async -> Bool {
+                     skyline: HorizonProfile? = nil, clock: SkyClock, wantsTonight: Bool = false,
+                     tracking objects: [CelestialObject], until condition: @MainActor () -> Bool) async -> Bool {
         let task = Task {
-            await model.keepFresh(observer: observer, skyline: skyline, clock: clock, tracking: { objects })
+            await model.keepFresh(observer: observer, skyline: skyline, timeZone: ObjectsPositionFixture.denverZone,
+                                  clock: clock, wantsTonight: wantsTonight, tracking: { objects })
         }
         let reached = await waitUntil(condition)
         task.cancel()
@@ -334,7 +431,8 @@ final class ObjectsPositionModelTests: XCTestCase {
         let clock = SkyClock()
         let objects = [first]
         let task = Task {
-            await model.keepFresh(observer: ObjectsPositionFixture.denver, skyline: nil, clock: clock,
+            await model.keepFresh(observer: ObjectsPositionFixture.denver, skyline: nil,
+                                  timeZone: ObjectsPositionFixture.denverZone, clock: clock, wantsTonight: false,
                                   tracking: { objects })
         }
         task.cancel()
@@ -347,7 +445,8 @@ final class ObjectsPositionModelTests: XCTestCase {
         let clock = SkyClock()
         let nothing: [CelestialObject] = []
         let task = Task {
-            await model.keepFresh(observer: ObjectsPositionFixture.denver, skyline: nil, clock: clock,
+            await model.keepFresh(observer: ObjectsPositionFixture.denver, skyline: nil,
+                                  timeZone: ObjectsPositionFixture.denverZone, clock: clock, wantsTonight: false,
                                   tracking: { nothing })
         }
         // Give the first pass time to run: nothing is outdated, so nothing is computed.
@@ -495,5 +594,98 @@ final class ObjectsPositionModelTests: XCTestCase {
         XCTAssertTrue(three)
         XCTAssertEqual(model.position(for: second.id)?.computedAt, middle)
     }
+
+    func testTonightsHoursAreKeptOnlyWhenTheListAsksForThem() async {
+        let model = ObjectsPositionModel()
+        let start = ObjectsPositionFixture.evening
+        let clock = frozenClock(at: start)
+        let one = await run(model, clock: clock, tracking: [first]) { model.positions.count == 1 }
+        XCTAssertTrue(one)
+        XCTAssertTrue(model.tonight.isEmpty)
+        let two = await run(model, clock: clock, wantsTonight: true, tracking: [first, second]) { model.tonight.count == 2 }
+        XCTAssertTrue(two)
+        let night = ObjectsTonight.night(observer: ObjectsPositionFixture.denver, timeZone: ObjectsPositionFixture.denverZone,
+                                         now: start)
+        let expected = ObjectsTonight.visibility(of: [first, second], observer: ObjectsPositionFixture.denver, night: night,
+                                                 skyline: nil)
+        XCTAssertEqual(model.tonight, expected)
+    }
+
+    func testAnotherPlaceStartsTonightsHoursAgain() async {
+        let model = ObjectsPositionModel()
+        let clock = frozenClock(at: ObjectsPositionFixture.evening)
+        let one = await run(model, clock: clock, wantsTonight: true, tracking: [first, second]) { model.tonight.count == 2 }
+        XCTAssertTrue(one)
+        let two = await run(model, observer: ObjectsPositionFixture.sydney, clock: clock, wantsTonight: true,
+                            tracking: [first]) { model.tonight.count == 1 }
+        XCTAssertTrue(two)
+        XCTAssertNil(model.tonight[second.id], "the hours of the other place are gone")
+    }
+
+    func testClearForgetsTonightsHoursToo() async {
+        let model = ObjectsPositionModel()
+        let clock = frozenClock(at: ObjectsPositionFixture.evening)
+        let one = await run(model, clock: clock, wantsTonight: true, tracking: [first]) { model.tonight.count == 1 }
+        XCTAssertTrue(one)
+        model.clear()
+        XCTAssertTrue(model.tonight.isEmpty)
+        XCTAssertTrue(model.positions.isEmpty)
+    }
     #endif
+}
+
+// MARK: - Tonight's hours
+
+final class ObjectsTonightTests: XCTestCase {
+    private let denver = ObjectsPositionFixture.denver
+    private let zone = ObjectsPositionFixture.denverZone
+
+    func testTheNightUnderWayAtMidnightIsTheOneThatBeganAtNoon() {
+        // 2026-10-21 06:00 UTC is midnight in Denver.
+        let night = ObjectsTonight.night(observer: denver, timeZone: zone, now: Date(timeIntervalSince1970: 1_792_562_400))
+        XCTAssertNotNil(night.darkness)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        XCTAssertEqual(calendar.dateComponents([.month, .day, .hour], from: night.start).day, 20)
+        XCTAssertEqual(calendar.dateComponents([.hour], from: night.start).hour, 12)
+    }
+
+    func testByDayTheComingNightIsTheOneJudged() {
+        // 2026-10-21 18:00 UTC is noon in Denver, and the night that begins now is tonight's.
+        let noon = Date(timeIntervalSince1970: 1_792_605_600)
+        let night = ObjectsTonight.night(observer: denver, timeZone: zone, now: noon)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        XCTAssertEqual(calendar.dateComponents([.day], from: night.start).day, 21)
+    }
+
+    func testEveryObjectGetsHoursWhateverItsKind() throws {
+        let objects = [try ObjectsPositionFixture.object("sun"), try ObjectsPositionFixture.object("moon"),
+                       try ObjectsPositionFixture.object("dso.M31"), ObjectsPositionFixture.target(30, 0)]
+        let night = ObjectsTonight.night(observer: denver, timeZone: zone, now: ObjectsPositionFixture.evening)
+        let hours = ObjectsTonight.visibility(of: objects, observer: denver, night: night, skyline: nil)
+        XCTAssertEqual(Set(hours.keys), Set(objects.map(\.id)))
+        XCTAssertTrue(try XCTUnwrap(hours["sun"]).intervals.isEmpty, "the Sun is down during astronomical darkness")
+    }
+
+    func testASkylineCanHideAnObjectForTheWholeNight() throws {
+        let night = ObjectsTonight.night(observer: denver, timeZone: zone, now: ObjectsPositionFixture.evening)
+        let circumpolar = ObjectsPositionFixture.target(30, 80)
+        let open = ObjectsTonight.visibility(of: [circumpolar], observer: denver, night: night, skyline: nil)
+        let walled = ObjectsTonight.visibility(of: [circumpolar], observer: denver, night: night,
+                                               skyline: HorizonProfile.constant(80))
+        XCTAssertFalse(try XCTUnwrap(open[circumpolar.id]).intervals.isEmpty)
+        XCTAssertTrue(try XCTUnwrap(walled[circumpolar.id]).intervals.isEmpty)
+    }
+
+    func testWithoutAnAstronomicalNightThereAreNoHours() throws {
+        let svalbard = ObjectsPositionFixture.svalbard
+        // The midnight sun: 2026-06-21 12:00 UTC, when the Sun does not get below the horizon at 80 degrees north.
+        let night = ObjectsTonight.night(observer: svalbard, timeZone: TimeZone(identifier: "UTC")!,
+                                         now: Date(timeIntervalSince1970: 1_782_043_200))
+        XCTAssertNil(night.darkness)
+        let object = ObjectsPositionFixture.target(30, 80)
+        let hours = ObjectsTonight.visibility(of: [object], observer: svalbard, night: night, skyline: nil)
+        XCTAssertTrue(try XCTUnwrap(hours[object.id]).intervals.isEmpty)
+    }
 }

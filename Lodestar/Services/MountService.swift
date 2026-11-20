@@ -544,8 +544,9 @@ final class MountService {
                 return
             }
             Task {
-                // A GoTo that is being set up has not moved the mount yet as far as the status knows, but it may just have.
-                if isMoving || isWorking {
+                // A GoTo that is being set up has not moved the mount yet as far as the status knows, but it may just have; the same
+                // goes for the first pulse of a nudge that is held.
+                if isMoving || isWorking || nudgeTask != nil || nudgeGate != nil {
                     stopNudgeLoop()
                     motionGate?.cancel()
                     motionGate = nil
@@ -601,17 +602,20 @@ final class MountService {
         case .connected:
             guard let ending = session else { return }
             lifecycle?.beginBackgroundTask()
+            // The controller's phase cannot say whether something moves: it becomes .slewing or .nudging only when the driver call
+            // that starts the move returns, and the interrupt below cuts exactly that call off, after the command may have gone out.
+            // So the service's own state decides, as in `disconnect()`. The stop is not sent every time: a Sky-Watcher mount that
+            // stands still and tracks would lose its tracking.
+            let mayBeMoving = isMoving || isWorking || nudgeTask != nil || nudgeGate != nil
             stopNudgeLoop()
             // A GoTo that is still queued must not start after the stop.
             motionGate?.cancel()
             motionGate = nil
             Task {
-                // Whether there is a move for the stop to halt decides what the notice can say about tracking.
-                let wasMoving = isMoving
                 // Nobody can watch the mount from here, so a slew or a nudge is stopped and the mount is let go.
                 ending.interrupt()
                 let stopped = await ending.run(urgent: true) { controller in
-                    if controller.status.phase != .idle { try controller.abort() }
+                    if mayBeMoving || controller.status.phase != .idle { try controller.abort() }
                 }
                 if session === ending {
                     let reason = "Disconnected when Lodestar went to the background. "
@@ -620,7 +624,7 @@ final class MountService {
                     } else {
                         finishSession(lost: reason + Self.backgroundOutcomeText(
                             status: stopped.status, detail: stopped.detail, lodestarAligns: usesLodestarAlignment,
-                            wasMoving: wasMoving))
+                            wasMoving: mayBeMoving))
                     }
                 }
                 lifecycle?.endBackgroundTask()

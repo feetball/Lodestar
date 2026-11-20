@@ -146,7 +146,8 @@ final class ObjectsDetailNightModelTests: XCTestCase {
             interval: interval, chartRange: interval, twilight: twilight, darkness: nil,
             events: RiseTransitSet(rise: date(rise), transit: date(transit), set: date(set), transitAltitude: 50,
                                    circumstance: .normal),
-            transitAltitude: 50, samples: [], twilightBands: [], hourTicks: [], bestInDarkness: nil, appliesSkyline: false)
+            transitAltitude: 50, samples: [], twilightBands: [], hourTicks: [], bestInDarkness: nil, appliesSkyline: false,
+            unobstructed: nil)
     }
 
     func testTheTimelineListsRiseTransitAndSetInOrder() {

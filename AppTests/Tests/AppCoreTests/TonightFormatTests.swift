@@ -234,7 +234,7 @@ final class TonightFormatTests: XCTestCase {
     func testDescriptionHasTypeConstellationMagnitudeAndSize() throws {
         try requirePointDecimals()
         let andromeda = try catalogObject("dso.M31")
-        let expected = ["Galaxy", "Andromeda", "mag\(nbsp)3.4", "178\u{2032}\(nbsp)\u{00D7}\(nbsp)70\u{2032}"]
+        let expected = ["Galaxy", "Andromeda", "mag\(nbsp)3.4", "2\u{00B0}\(nbsp)58\u{2032}\(nbsp)\u{00D7}\(nbsp)1\u{00B0}\(nbsp)10\u{2032}"]
             .joined(separator: "\(nbsp)\(dot) ")
         XCTAssertEqual(TonightFormat.description(of: andromeda), expected)
     }

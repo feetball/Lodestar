@@ -109,9 +109,12 @@ final class EventsModelTests: XCTestCase {
         let middle = entries[entries.count / 2].event.date
         let later = model.upcoming(after: middle)
         XCTAssertEqual(later.first?.event.date, middle)
-        XCTAssertEqual(later.count, entries.filter { $0.event.date >= middle }.count)
+        // The Great Red Spot and the moons of Jupiter stay in the calendar; the lists of the next events leave them out.
+        let listed = entries.filter { $0.event.kind != .greatRedSpotTransit && $0.event.kind != .jupiterMoonEvent }
+        XCTAssertLessThan(listed.count, entries.count)
+        XCTAssertEqual(later.count, listed.filter { $0.event.date >= middle }.count)
         XCTAssertLessThan(later.count, entries.count)
-        XCTAssertEqual(model.upcoming(after: Date(timeIntervalSince1970: 0)), entries)
+        XCTAssertEqual(model.upcoming(after: Date(timeIntervalSince1970: 0)), listed)
         XCTAssertTrue(model.upcoming(after: Date.distantFuture).isEmpty)
     }
 

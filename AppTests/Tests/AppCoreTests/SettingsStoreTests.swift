@@ -10,6 +10,13 @@ final class SettingsStoreTests: XCTestCase {
     private let storageKey = "lodestar.settings.v1"
 
     /// A `UserDefaults` suite of its own, removed when the test ends.
+    /// The defaults as a store holds them: the single camera has become the first camera profile.
+    private var loadedDefaults: AppSettings {
+        var settings = AppSettings()
+        settings.sanitizeCamera()
+        return settings
+    }
+
     private func makeDefaults() throws -> UserDefaults {
         let name = "AppCoreTests.Settings.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
@@ -37,7 +44,7 @@ final class SettingsStoreTests: XCTestCase {
 
     func testAStoreOverEmptyDefaultsHoldsTheDefaultSettings() throws {
         let (store, defaults) = try makeStore()
-        XCTAssertEqual(store.settings, AppSettings())
+        XCTAssertEqual(store.settings, loadedDefaults)
         XCTAssertNil(defaults.data(forKey: storageKey))
     }
 
@@ -58,19 +65,19 @@ final class SettingsStoreTests: XCTestCase {
     func testUnreadableStoredDataFallsBackToTheDefaults() throws {
         let defaults = try makeDefaults()
         defaults.set(Data("this is not json".utf8), forKey: storageKey)
-        XCTAssertEqual(SettingsStore(defaults: defaults).settings, AppSettings())
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings, loadedDefaults)
     }
 
     func testAStoredValueThatIsNotDataFallsBackToTheDefaults() throws {
         let defaults = try makeDefaults()
         defaults.set("settings", forKey: storageKey)
-        XCTAssertEqual(SettingsStore(defaults: defaults).settings, AppSettings())
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings, loadedDefaults)
     }
 
     func testStoredJSONOfTheWrongShapeFallsBackToTheDefaults() throws {
         let defaults = try makeDefaults()
         defaults.set(Data("[1,2,3]".utf8), forKey: storageKey)
-        XCTAssertEqual(SettingsStore(defaults: defaults).settings, AppSettings())
+        XCTAssertEqual(SettingsStore(defaults: defaults).settings, loadedDefaults)
     }
 
     func testStoredPartialSettingsKeepTheirKnownValuesAndAreSanitized() throws {

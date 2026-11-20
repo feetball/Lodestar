@@ -21,8 +21,9 @@ private enum EventsModelsFixtures {
 
     /// A key for a place in Colorado (Denver's zone) unless told otherwise.
     static func key(latitude: Double = 40.0, longitude: Double = -105.0, zone identifier: String = "America/Denver",
-                    now: String = "2026-08-12T18:00:00Z") -> EventsKey {
-        EventsKey(context: context(latitude: latitude, longitude: longitude, zone: identifier), now: date(now))
+                    now: String = "2026-08-12T18:00:00Z", greatRedSpot: GreatRedSpot = .reference) -> EventsKey {
+        EventsKey(context: context(latitude: latitude, longitude: longitude, zone: identifier), now: date(now),
+                  greatRedSpot: greatRedSpot)
     }
 
     static func location(_ latitude: Double, _ longitude: Double, elevation: Double = 0) -> GeographicLocation {
@@ -56,6 +57,21 @@ private enum EventsModelsFixtures {
     static func conjunction(_ first: ConjunctionTarget, _ second: ConjunctionTarget) -> AstronomicalEvent {
         event(.conjunction(Conjunction(first: first, second: second, separation: 2, solarElongation: 90,
                                        occultationPossible: false, topocentric: nil)))
+    }
+
+    static var redSpotTransit: AstronomicalEvent {
+        let moment = Date(timeIntervalSince1970: 1_786_564_800)
+        return event(.greatRedSpotTransit(GreatRedSpotTransit(
+            date: moment, longitude: 91, wellPlaced: DateInterval(start: moment.addingTimeInterval(-3_000), duration: 6_000))))
+    }
+
+    static var jupiterMoonEvent: AstronomicalEvent {
+        event(.jupiterMoonEvent(GalileanMoonEvent(moon: .io, phenomenon: .transit, edge: .start,
+                                                  date: Date(timeIntervalSince1970: 1_786_564_800))))
+    }
+
+    static var planetStation: AstronomicalEvent {
+        event(.planetStation(PlanetStation(planet: .mars, kind: .retrogradeBegins, longitude: 120)))
     }
 
     static var opposition: AstronomicalEvent {
@@ -244,6 +260,17 @@ final class EventsKeyTests: XCTestCase {
         XCTAssertTrue(west.isNear(east))
     }
 
+    func testAnotherGreatRedSpotIsNotCovered() throws {
+        let moved = try XCTUnwrap(GreatRedSpot(longitude: 200, epoch: GreatRedSpot.referenceEpoch))
+        let reference = F.key()
+        let other = F.key(greatRedSpot: moved)
+        XCTAssertEqual(reference.greatRedSpot, GreatRedSpot.reference)
+        XCTAssertEqual(other.greatRedSpot, moved)
+        XCTAssertFalse(reference.covers(other), "the transits listed for another spot are other transits")
+        XCTAssertTrue(reference.isNear(other))
+        XCTAssertNotEqual(reference, other)
+    }
+
     func testKeysOfTheSameContextAndInstantAreEqual() {
         XCTAssertEqual(F.key(), F.key())
         XCTAssertNotEqual(F.key(), F.key(latitude: 40.0001))
@@ -400,12 +427,12 @@ final class EventsCategoryTests: XCTestCase {
 
     func testTheCalendarOffersTheGroupsInOrder() {
         XCTAssertEqual(EventsCategory.allCases.map(\.title),
-                       ["Meteor Showers", "Conjunctions", "Eclipses", "Planets", "Moon", "Seasons"])
+                       ["Meteor Showers", "Conjunctions", "Eclipses", "Planets", "Jupiter", "Moon", "Seasons"])
     }
 
     func testTheIdentifierIsTheRawValue() {
         XCTAssertEqual(EventsCategory.allCases.map(\.id),
-                       ["meteorShowers", "conjunctions", "eclipses", "planets", "moon", "seasons"])
+                       ["meteorShowers", "conjunctions", "eclipses", "planets", "jupiter", "moon", "seasons"])
     }
 
     func testEveryGroupHasItsOwnSymbol() {
@@ -436,6 +463,15 @@ final class EventsCategoryTests: XCTestCase {
 
     func testAConjunctionWithTheSunIsNotAPlanetEvent() {
         XCTAssertEqual(categories(of: F.conjunction(.body(.venus), .body(.sun))), [.conjunctions])
+    }
+
+    func testTheGreatRedSpotAndTheMoonsOfJupiterAreOnlyInJupiter() {
+        XCTAssertEqual(categories(of: F.redSpotTransit), [.jupiter])
+        XCTAssertEqual(categories(of: F.jupiterMoonEvent), [.jupiter])
+    }
+
+    func testAStationIsOnlyAPlanetEvent() {
+        XCTAssertEqual(categories(of: F.planetStation), [.planets])
     }
 
     func testAnOppositionAndAnElongationAreOnlyPlanetEvents() {
