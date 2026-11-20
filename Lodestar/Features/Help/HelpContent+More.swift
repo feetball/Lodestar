@@ -4,7 +4,7 @@ extension HelpContent {
     private static let cameraAndLens = HelpTopic(
         topic: .cameraAndLens, category: .equipment, title: "Cameras and lenses", systemImage: "camera",
         summary: "A profile for each camera and lens, and a quick switch between them.",
-        keywords: ["camera", "lens", "profile", "sensor", "focal length", "aperture", "pixel pitch", "fisheye", "seestar", "dwarf", "vespera", "smart telescope", "preset", "exif", "photo", "frame", "crop factor", "image circle"],
+        keywords: ["camera", "lens", "profile", "sensor", "focal length", "aperture", "pixel pitch", "fisheye", "seestar", "dwarf", "vespera", "smart telescope", "preset", "exif", "photo", "frame", "crop factor", "image circle", "filter", "narrowband", "light pollution", "moonlight"],
         blocks: [
             .paragraph("Lodestar draws the frame of your picture on the sky, and works out how long you can expose, from the camera and lens you describe. A **profile** holds one camera and lens. Keep one for each body and lens you use, and switch between them in a tap."),
             .steps([
@@ -17,12 +17,13 @@ extension HelpContent {
                 "**Lens type**: **Rectilinear** is any ordinary lens. The three fisheye types draw the frame as a curve, because a fisheye sees more than a rectangle can show. For a circular fisheye whose picture is a circle smaller than the sensor, enter the circle\u{2019}s diameter as the **Image circle**.",
                 "The **pixel pitch** is the spacing of the sensor\u{2019}s photosites. The NPF exposure rule and the image scale need it. Enter the resolution and Lodestar works it out from the sensor size.",
                 "With more than one profile, a **Frame** button on the Aim screen switches between them.",
+                "**Filter**: if you shoot through a light-pollution or narrowband filter, choose it with **Filter** in **Camera & Lens**. Lodestar then relaxes its Moon advice for emission nebulae, which shine in a few narrow colors that the filter lets through while it cuts much of the moonlight. Other objects keep the usual advice.",
                 "The exposure tools use the real focal length of a profile, fisheye or not. A mosaic needs a rectilinear lens: with a fisheye profile the mosaic planner says so.",
             ]),
             .tip("A smart telescope has fixed optics, so its preset is usually all you need."),
             .caution("The frame and the exposure numbers are only as good as the profile. If the frame on the sky looks too big or too small, check the focal length and the sensor."),
         ],
-        related: [.aimScreen, .planFraming, .trailsAndExposure, .glossary])
+        related: [.aimScreen, .planFraming, .trailsAndExposure, .objects, .glossary])
 
     private static let mounts = HelpTopic(
         topic: .mounts, category: .equipment, title: "GoTo mounts", systemImage: "antenna.radiowaves.left.and.right",
@@ -78,8 +79,9 @@ extension HelpContent {
 
     private static let widgets = HelpTopic(
         topic: .widgets, category: .more, title: "Widgets and Apple Watch", systemImage: "applewatch",
-        summary: "Tonight at a glance on your Home Screen and your watch.",
-        keywords: ["complication", "lock", "home", "glance", "moon", "milky", "smartwatch", "tonight"],
+        summary: "Tonight at a glance on your Home Screen and your watch, and aiming on your wrist.",
+        keywords: ["complication", "lock", "home", "glance", "moon", "milky", "smartwatch", "tonight", "aim", "pan",
+                   "tilt", "haptic"],
         blocks: [
             .paragraph("Widgets show tonight at a glance: when it gets dark, the Moon, when the Milky Way core (its bright center) is up, and the next event, for where you are. The iPhone has small and medium widgets for the Home Screen, and circular, rectangular and inline ones for the Lock Screen. On Apple Watch, the circular complication shows the Moon\u{2019}s phase, and the rectangular one shows the dark window, the Moon and the next event. A tap opens the **Tonight** tab. The widgets use your approximate location and work out the night on the device, with no network."),
             .steps([
@@ -87,9 +89,9 @@ extension HelpContent {
                 "Choose **Lodestar**, then the **Tonight** widget.",
                 "On Apple Watch, edit the watch face and choose a Lodestar complication.",
             ]),
-            .tip("The Apple Watch app also has a small **Tonight** screen of its own."),
+            .tip("The Apple Watch app also has a small **Tonight** screen of its own, and an **Aim** page that follows the iPhone\u{2019}s Aim screen: the pan and tilt to make in degrees, the distance to go and the target, and a tap on your wrist when you are on target. It is described under **The Aim screen**."),
         ],
-        related: [.tonight, .onlineData])
+        related: [.tonight, .aimScreen, .onlineData])
 
     private static let shortcuts = HelpTopic(
         topic: .shortcuts, category: .more, title: "Shortcuts, Control Center and torch", systemImage: "waveform",

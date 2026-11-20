@@ -34,8 +34,8 @@ public struct JupiterPhysicalState: Sendable, Hashable {
 /// the kit's VSOP87 positions of the Earth and Jupiter, the phase correction, and the corrections for aberration and
 /// nutation of the pole's direction.
 ///
-/// Accuracy against the book's worked example (1992 December 16, 0h TD): the central meridians agree to 0.02°, the
-/// declinations to 0.01° and the position angle to 0.03° (the book prints two decimals and uses the full VSOP87).
+/// Accuracy against the book's worked example (1992 December 16, 0h TD): the central meridians, the declinations and
+/// the position angle all agree to 0.01° (the book prints two decimals and uses the full VSOP87).
 /// One call costs about 20 µs.
 public enum JupiterPhysical {
     private static let epochJD = 2_433_282.5
