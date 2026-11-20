@@ -97,9 +97,9 @@ targets:
           tripod. Video is processed on your iPhone only and is never recorded, stored, or shared.
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: >-
           Lodestar uses your location on this iPhone to work out where stars and planets appear in
-          your sky and to find true north. It is never tracked. It leaves your iPhone only rounded,
+          your sky and to find true north. It is never tracked. It leaves your iPhone only rounded:
           to about 10 km for the optional cloud forecast and, if you save it as a site, to about 1 km
-          to ask Apple for its time zone.
+          to ask Apple for its time zone and to about 100 km for the optional terrain download.
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: "YES"
         INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleLightContent
