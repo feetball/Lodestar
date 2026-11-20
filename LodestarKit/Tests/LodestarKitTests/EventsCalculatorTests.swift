@@ -128,7 +128,8 @@ final class EventsCalculatorTests: XCTestCase {
     func testEventKindRawValuesAndCodable() throws {
         XCTAssertEqual(EventKind.allCases.map(\.rawValue),
                        ["meteorShower", "conjunction", "opposition", "greatestElongation", "earthApsis", "season",
-                        "fullMoonSpecial", "lunarEclipse", "solarEclipse"])
+                        "fullMoonSpecial", "lunarEclipse", "solarEclipse", "greatRedSpotTransit", "jupiterMoonEvent",
+                        "planetStation"])
         for kind in EventKind.allCases {
             XCTAssertEqual(EventKind(rawValue: kind.rawValue), kind)
             let encoded = String(decoding: try JSONEncoder().encode(kind), as: UTF8.self)
@@ -137,7 +138,8 @@ final class EventsCalculatorTests: XCTestCase {
             XCTAssertFalse(kind.displayName.isEmpty)
         }
         XCTAssertNil(EventKind(rawValue: "eclipse"))
-        XCTAssertEqual(EventKind.defaultKinds.count, EventKind.allCases.count - 1)
+        XCTAssertEqual(EventKind.defaultKinds.count, EventKind.allCases.count - 4)
+        XCTAssertEqual(EventKind.calendarKinds.count, EventKind.allCases.count - 1)
         func encoded<T: Encodable>(_ value: T) throws -> String { String(decoding: try JSONEncoder().encode(value), as: UTF8.self) }
         XCTAssertEqual(try encoded(EclipseContact.p1), "\"P1\"")
         XCTAssertEqual(EclipseContact(rawValue: "maximum"), .maximum)
@@ -344,6 +346,8 @@ final class EventsCalculatorTests: XCTestCase {
             case .fullMoonSpecial, .lunarEclipse: XCTAssertEqual(targets, [.body(.moon)])
             case .solarEclipse: XCTAssertEqual(targets, [.body(.sun)])
             case .season, .earthApsis: XCTAssertTrue(targets.isEmpty)
+            case .greatRedSpotTransit, .jupiterMoonEvent: XCTAssertEqual(targets, [.body(.jupiter)])
+            case let .planetStation(station): XCTAssertEqual(targets, [.body(station.planet)])
             }
         }
     }

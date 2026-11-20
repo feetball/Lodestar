@@ -12,14 +12,15 @@ struct AimReadout: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
             let frame = model.engine.frame()
-            if model.mosaicSession.isActive {
+            if model.isGuidingMosaic {
                 AimMosaicReadout(model: model, frame: frame)
             } else if let source = model.satelliteSource {
                 SatelliteAimReadout(model: model, source: source)
             } else if let target = model.guidanceTarget {
                 VStack(spacing: 8) {
                     AimTargetCard(object: target, horizontal: frame?.target?.horizontal,
-                                  belowHorizonNote: belowHorizonNote(for: target, frame: frame),
+                                  belowHorizonNote: model.isPreviewing ? nil : belowHorizonNote(for: target, frame: frame),
+                                  previewNote: model.isPreviewing ? previewNote(for: target, frame: frame) : nil,
                                   onClear: model.alignmentTarget == nil ? { app.clearTarget() } : nil)
                     if let guidance = frame?.guidance {
                         AimMoveRow(summary: AimGuidanceSummary(guidance))
@@ -29,6 +30,24 @@ struct AimReadout: View {
                 AimLookAroundPanel(model: model, sheet: $sheet, frame: frame)
             }
         }
+    }
+
+    /// Where the target stands at the previewed moment, in the future tense: "Will be at altitude 34° at 02:15", "Will be
+    /// below the horizon at 02:15 · rises 05:41", "Will be behind your skyline at 02:15". `nil` while the sky is still
+    /// being rebuilt for a moment that was just chosen, and without a position.
+    private func previewNote(for target: CelestialObject, frame: AimFrame?) -> String? {
+        guard let horizontal = frame?.target?.horizontal, let moment = model.previewMoment,
+              model.isSkyBuiltForPreview else { return nil }
+        if horizontal.altitude >= 0 {
+            if model.skyContent?.skyline?.mask.isBelow(azimuth: horizontal.azimuth, altitude: horizontal.altitude) == true {
+                return AimPreview.skylineNote(time: moment.text, isFuture: moment.isFuture)
+            }
+            return AimPreview.placeNote(altitude: horizontal.altitude, time: moment.text, isFuture: moment.isFuture)
+        }
+        let info = model.riseInfo.flatMap { $0.targetID == target.id ? $0 : nil }
+        let zone = model.previewTimeZone
+        return AimPreview.belowHorizonNote(time: moment.text, riseTime: info?.nextRise.map { AppFormat.time($0, in: zone) },
+                                           doesNotRise: info != nil && info?.nextRise == nil, isFuture: moment.isFuture)
     }
 
     /// "Below the horizon · rises 23:41 (in 5h 12m)", "Behind your skyline", or `nil` while the target is in the clear.
@@ -48,11 +67,13 @@ struct AimReadout: View {
     }
 }
 
-/// The target's name, kind and position, with a warning while it is below the horizon.
+/// The target's name, kind and position, with a warning while it is below the horizon, or while the sky is previewed
+/// where it will stand then (`previewNote`).
 private struct AimTargetCard: View {
     let object: CelestialObject
     let horizontal: HorizontalCoordinate?
     let belowHorizonNote: String?
+    let previewNote: String?
     /// Drops the target, to look around freely; `nil` hides the button.
     let onClear: (() -> Void)?
     @Environment(AppModel.self) private var app
@@ -104,6 +125,11 @@ private struct AimTargetCard: View {
             }
             if let belowHorizonNote {
                 Label(belowHorizonNote, systemImage: "arrow.down.to.line")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+            }
+            if let previewNote {
+                Label(previewNote, systemImage: "clock")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(palette.warning)
             }

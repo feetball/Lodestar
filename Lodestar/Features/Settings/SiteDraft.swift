@@ -23,10 +23,15 @@ struct SiteDraft: Equatable {
         if let location = GeographicLocation.validated(latitude: fix.latitude, longitude: fix.longitude) {
             setPosition(location)
         }
-        if fix.verticalAccuracy > 0, fix.altitude.isFinite {
+        if Self.hasUsableAltitude(fix) {
             let range = GeographicLocation.elevationRange
             elevation = AstroMath.clamp(fix.altitude, range.lowerBound, range.upperBound)
         }
+    }
+
+    /// Whether `fix` carries an altitude that can be the site's elevation: an approximate location, for one, has none.
+    static func hasUsableAltitude(_ fix: LocationFix) -> Bool {
+        fix.verticalAccuracy > 0 && fix.altitude.isFinite
     }
 
     /// A draft of a saved site. Coordinates are written to a micro-degree (about 10 cm) so editing the name leaves

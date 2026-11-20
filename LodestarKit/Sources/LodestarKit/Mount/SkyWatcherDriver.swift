@@ -251,12 +251,13 @@ public final class SkyWatcherDriver: MountDriver {
             gotoNeedsAlignment: !configuration.allowsGotoWithoutAlignment, isAligned: false)
     }
 
-    /// Ends the session. Servo tracking (alt-azimuth mounts) and a nudge are stopped, because the mount would otherwise keep turning
-    /// at the last rate; a sidereal tracking equatorial mount keeps tracking, and a running slew is left to finish.
+    /// Ends the session. Servo tracking (alt-azimuth mounts), a nudge and a stop that is still pending (tracking that ran into a
+    /// limit, a nudge whose stop did not get through) are stopped, because the mount would otherwise keep turning at the last rate;
+    /// a sidereal tracking equatorial mount keeps tracking, and a running slew is left to finish.
     public func disconnect() {
         if !connected { return }
         connected = false
-        if motion == .nudging || (motion == .tracking && resolvedStrategy == .servo) {
+        if motion == .nudging || pendingStop || (motion == .tracking && resolvedStrategy == .servo) {
             // Best effort: the link is probably gone. Each axis gets its own try, so that a failure on one does not leave the other running.
             for axis in SkyWatcherAxis.allCases {
                 do {
@@ -429,9 +430,8 @@ public final class SkyWatcherDriver: MountDriver {
         try requireConnected()
         try stopAxes()
         try waitUntilStopped()
-        for axis in SkyWatcherAxis.allCases {
-            try link.exchange(.setPosition, axis: axis, data: SkyWatcherCodec.encodePosition(0), operation: "set position")
-        }
+        // The zero of an axis moves with the first `E` that reaches it (also when its reply is lost), so from here on the alignment
+        // and the motion state no longer match the encoders, whatever becomes of the other axis.
         slew = nil
         nudge = nil
         anchor = nil
@@ -441,6 +441,9 @@ public final class SkyWatcherDriver: MountDriver {
         pendingStop = false
         lastServo = nil
         clearAlignment()
+        for axis in SkyWatcherAxis.allCases {
+            try link.exchange(.setPosition, axis: axis, data: SkyWatcherCodec.encodePosition(0), operation: "set position")
+        }
         let reading = try readAxes()
         startupAxisAngles = SkyWatcherAxisAngles(axis1Degrees: reading.axis1, axis2Degrees: reading.axis2)
     }
@@ -532,8 +535,17 @@ public final class SkyWatcherDriver: MountDriver {
         try readStatus(.axis2)
     }
 
+    /// Sends the stop to both axes. Each axis gets its command even if the other's failed; the first error is thrown afterwards.
     private func stopAxes() throws {
-        for axis in SkyWatcherAxis.allCases { try link.exchange(.stopMotion, axis: axis, data: "", operation: "stop") }
+        var first: Error?
+        for axis in SkyWatcherAxis.allCases {
+            do {
+                try link.exchange(.stopMotion, axis: axis, data: "", operation: "stop")
+            } catch {
+                if first == nil { first = error }
+            }
+        }
+        if let first { throw first }
     }
 
     /// Stops both axes without braking (the protocol's instant stop), for a move that has run into a limit of the mount.
@@ -600,7 +612,7 @@ public final class SkyWatcherDriver: MountDriver {
     // MARK: Choosing axis angles
 
     /// The axis angles for `place` at `at`, within the limits; throws the mount's limit errors. `overheadSlack` degrees are allowed
-    /// above the overhead limit (tracking uses it, see `trackingOverheadSlackDegrees`).
+    /// above the overhead limit (tracking and a nudge that does not raise the altitude use it, see `servoOverheadSlack`).
     private func choose(_ place: EquatorialCoordinate, _ at: Date, _ near: Reading, keepSide: Bool,
                         overheadSlack: Double = 0.0) throws -> Choice {
         let limits = configuration.limits
@@ -803,12 +815,29 @@ public final class SkyWatcherDriver: MountDriver {
                                          -SkyWatcherDriver.maximumDeclination, SkyWatcherDriver.maximumDeclination))
     }
 
+    /// The degrees above the overhead limit that the axes may be sent to for `place` at `at`. Tracking has the whole slack. A nudge
+    /// has it only while it does not raise the altitude from where the mount is, so that a mount that rests above the limit (see
+    /// `trackingOverheadSlackDegrees`) can be nudged back down, and a nudge further up still ends at the limit. A goto has none.
+    private func servoOverheadSlack(_ reading: Reading, _ place: EquatorialCoordinate, _ at: Date) -> Double {
+        switch motion {
+        case .tracking:
+            return SkyWatcherDriver.trackingOverheadSlackDegrees
+        case .nudging:
+            let latitude = location.latitude
+            let now = SkyWatcherSky.altitude(pointing(reading), localSiderealTime: lst(reading.time), latitude: latitude)
+            let next = SkyWatcherSky.altitude(place, localSiderealTime: lst(at), latitude: latitude)
+            return next <= now ? SkyWatcherDriver.trackingOverheadSlackDegrees : 0.0
+        default:
+            return 0.0
+        }
+    }
+
     /// Sets the speeds of both axes so that the mount reaches the place `anchorAt` gives for the time `lead` seconds after `reading`.
     /// Closed loop: the rate includes the correction of the distance to where the anchor is now.
     private func servoStep(_ reading: Reading, lead: Double, anchorAt: (Date) -> EquatorialCoordinate) throws {
         let at = reading.time.addingTimeInterval(lead)
-        let wanted = try choose(anchorAt(at), at, reading, keepSide: true,
-                                overheadSlack: motion == .tracking ? SkyWatcherDriver.trackingOverheadSlackDegrees : 0.0)
+        let place = anchorAt(at)
+        let wanted = try choose(place, at, reading, keepSide: true, overheadSlack: servoOverheadSlack(reading, place, at))
         // Beyond the azimuth limit of an alt-azimuth mount `choose` answers with the same direction from another turn, a jump of
         // nearly a full turn. Tracking would be stopped by the rate check below, but a nudge is only clamped to the rate limit and
         // would unwind the cable at full speed: both end here as at any other limit.

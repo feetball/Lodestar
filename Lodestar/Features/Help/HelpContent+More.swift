@@ -1,18 +1,42 @@
 import Foundation
 
 extension HelpContent {
+    private static let cameraAndLens = HelpTopic(
+        topic: .cameraAndLens, category: .equipment, title: "Cameras and lenses", systemImage: "camera",
+        summary: "A profile for each camera and lens, and a quick switch between them.",
+        keywords: ["camera", "lens", "profile", "sensor", "focal length", "aperture", "pixel pitch", "fisheye", "seestar", "dwarf", "vespera", "smart telescope", "preset", "exif", "photo", "frame", "crop factor", "image circle"],
+        blocks: [
+            .paragraph("Lodestar draws the frame of your picture on the sky, and works out how long you can expose, from the camera and lens you describe. A **profile** holds one camera and lens. Keep one for each body and lens you use, and switch between them in a tap."),
+            .steps([
+                "Open **Settings** \u{25B8} **Camera & Lens**. The profile with the check mark is the one in use. Tap another to use it, or tap the pencil to edit it.",
+                "Tap **Add Preset\u{2026}** for a smart telescope (Seestar, Dwarf or Vespera) or a plain full-frame camera to start from. The numbers are the makers\u{2019} published ones. Check them and tap **Save**.",
+                "Or tap **From a Photo\u{2026}** and choose a picture you took. Lodestar reads the camera, focal length and aperture from it, picks the closest sensor from the crop factor and estimates the pixel pitch. It shows what it read, so you can correct it before you save. The picture is not kept, and no permission is needed.",
+                "To remove a profile, swipe it to the left, or open it and tap **Delete Camera\u{2026}**. One profile always stays.",
+            ]),
+            .bullets([
+                "**Lens type**: **Rectilinear** is any ordinary lens. The three fisheye types draw the frame as a curve, because a fisheye sees more than a rectangle can show. For a circular fisheye whose picture is a circle smaller than the sensor, enter the circle\u{2019}s diameter as the **Image circle**.",
+                "The **pixel pitch** is the spacing of the sensor\u{2019}s photosites. The NPF exposure rule and the image scale need it. Enter the resolution and Lodestar works it out from the sensor size.",
+                "With more than one profile, a **Frame** button on the Aim screen switches between them.",
+                "The exposure tools use the real focal length of a profile, fisheye or not. A mosaic needs a rectilinear lens: with a fisheye profile the mosaic planner says so.",
+            ]),
+            .tip("A smart telescope has fixed optics, so its preset is usually all you need."),
+            .caution("The frame and the exposure numbers are only as good as the profile. If the frame on the sky looks too big or too small, check the focal length and the sensor."),
+        ],
+        related: [.aimScreen, .planFraming, .trailsAndExposure, .glossary])
+
     private static let mounts = HelpTopic(
         topic: .mounts, category: .equipment, title: "GoTo mounts", systemImage: "antenna.radiowaves.left.and.right",
         summary: "Slew a GoTo mount to your target over Wi-Fi.",
-        keywords: ["telescope", "slew", "wifi", "onstep", "synscan", "nexstar", "alpaca", "simulated"],
+        keywords: ["telescope", "slew", "wifi", "onstep", "synscan", "nexstar", "alpaca", "simulated", "meridian", "flip", "hour angle"],
         blocks: [
-            .paragraph("A GoTo mount turns the camera to your target for you. Lodestar connects to it over Wi-Fi and works with OnStep and LX200 mounts, Celestron NexStar and SynScan hand controllers, ASCOM Alpaca, and the Sky-Watcher AZ-GTi and Star Adventurer GTi. Switch the Sky-Watcher mounts on at their home position, and align them on one to three stars before the first **Go to**. For NexStar and SynScan, align on the hand controller first. When Lodestar goes to the background, it stops the mount and disconnects."),
+            .paragraph("A GoTo mount turns the camera to your target for you. Lodestar connects to it over Wi-Fi and works with OnStep and LX200 mounts, Celestron NexStar and SynScan hand controllers, ASCOM Alpaca, and the Sky-Watcher AZ-GTi and Star Adventurer GTi. Switch the Sky-Watcher mounts on at their home position, and align them on one to three stars before the first **Go to**. For NexStar and SynScan, align on the hand controller first. When Lodestar goes to the background, it stops a slew or nudge and disconnects. A mount that is tracking at that moment keeps tracking, and Lodestar no longer watches its limits, so check on it or switch it off. An alt-azimuth Sky-Watcher mount stops instead, because Lodestar does its tracking. A locked screen sends it to the background, so while a mount is connected Lodestar keeps the iPhone from locking by itself, on every screen, as long as **Keep screen awake** is on in **Settings** \u{25B8} **Feedback**."),
             .steps([
                 "In **Settings**, under **GoTo Mount**, tap **Mount Control**. Choose your mount, then tap **Connect**.",
                 "When iOS asks whether Lodestar may find devices on your local network, allow it. Lodestar talks to the mount on your local network only. Nothing is sent to the internet.",
                 "In **Aim**, tap **Mount**. The button appears after the first connection. Its strip shows the mount\u{2019}s name and where it points.",
                 "**Go to** and **Sync** ask for confirmation first. **Nudge** opens the arrows. **Stop** is always there.",
             ]),
+            .paragraph("While a German equatorial mount tracks, a chip in the strip counts down to the meridian, the line from north to south across the sky, where the mount has to flip: **Meridian in 25 min**. It changes color under 15 minutes and reads **Past the meridian: flip** after it. Lodestar only tells you and never flips the mount. A Sky-Watcher mount counts down to its own limit past the meridian, and other mounts to the meridian itself."),
             .tip("To practice without hardware, tap **Simulated OnStep mount** or **Simulated Sky-Watcher mount** under **Connect**."),
             .caution("Lodestar cannot see cables, people or obstacles, and a mount can swing through a wide arc. Keep hands and cables clear before a slew, and tap **Stop** if anything looks wrong. Lodestar never slews to the Sun, but it does not check the path, so do not use GoTo by day unless your optics have a certified solar filter."),
         ],
@@ -31,19 +55,21 @@ extension HelpContent {
             .tip("Turn on **Camera preview at night** to see the camera picture in red too. It is brighter than the sky alone, so it costs some night vision."),
             .caution("Apps cannot tint the keyboard, menus or alerts, so they keep their normal colors. For a fully red screen, set up iOS **Color Filters**: go to **Settings** \u{25B8} **Accessibility** \u{25B8} **Display & Text Size** \u{25B8} **Color Filters**, turn on **Color Tint**, drag **Intensity** and **Hue** all the way to the right, then go to **Accessibility Shortcut** and choose **Color Filters**. Triple-click the side button to switch the red screen on and off."),
         ],
-        related: [.gettingStarted, .troubleshooting])
+        related: [.gettingStarted, .shortcuts, .troubleshooting])
 
     private static let onlineData = HelpTopic(
         topic: .onlineData, category: .more, title: "Optional online data", systemImage: "arrow.down.circle",
-        summary: "Optional downloads for satellites, comets and cloud cover.",
-        keywords: ["internet", "download", "satellites", "starlink", "comets", "clouds", "forecast", "network"],
+        summary: "Optional downloads for satellites, comets, cloud cover and terrain.",
+        keywords: ["internet", "download", "satellites", "starlink", "comets", "clouds", "forecast", "network", "terrain",
+                   "elevation"],
         blocks: [
-            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets and a cloud forecast. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
+            .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets, a cloud forecast and terrain horizons. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
             .bullets([
-                "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
+                "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim, and when the ISS or Tiangong crosses the Sun or the Moon, in the Events calendar. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",
                 "**Comets** join the object list, the sky chart and Aim. About 164 KB from the Minor Planet Center.",
-                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
+                "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover, dew, wind, fog and temperature on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
+                "**Terrain horizons** work out the skyline of the hills around a saved site from elevation data. Nothing downloads until you ask in the site\u{2019}s editor: up to four tiles of about 11 MB each from AWS Open Data, deleted after the calculation. The tile server sees which 1\u{00B0} tiles you request, which is where the site is to within about 100 km.",
             ]),
             .tip("**Update now** refreshes a feed. CelesTrak answers repeated requests for unchanged data with an error, so the satellite lists wait at least two hours between requests. When it is too soon, the button is grayed out and says when the next update is possible."),
             .caution("Switching a feed off deletes what it downloaded. If a feed shows **The last update failed.**, Lodestar keeps the data it already has. Wait, then try **Update now** again."),
@@ -64,6 +90,25 @@ extension HelpContent {
             .tip("The Apple Watch app also has a small **Tonight** screen of its own."),
         ],
         related: [.tonight, .onlineData])
+
+    private static let shortcuts = HelpTopic(
+        topic: .shortcuts, category: .more, title: "Shortcuts, Control Center and torch", systemImage: "waveform",
+        summary: "Ask Siri to aim, switch night mode from Control Center, follow a satellite pass, and use the red torch.",
+        keywords: ["siri", "shortcut", "voice", "control center", "lock screen", "live activity", "dynamic island", "torch", "flashlight", "red light", "satellite", "iss"],
+        blocks: [
+            .paragraph("Lodestar works with Siri, the Shortcuts app and Control Center, so you can reach it without hunting through your phone in the dark. Everything runs on the iPhone. Nothing is sent to the internet."),
+            .bullets([
+                "**Aim at an object.** Say \u{201C}Aim Lodestar at Andromeda\u{201D}. Lodestar opens on **Aim** with that object as the target. You can say a name, a Messier or NGC number, or a planet.",
+                "**When is it dark.** Say \u{201C}When is it dark in Lodestar\u{201D}. Siri reads tonight\u{2019}s darkness, when the Moon rises and sets, and when the Milky Way core is up, for the place Lodestar last used. It does not open the app. Open Lodestar once so that it knows where you are.",
+                "**Night mode.** Say \u{201C}Turn on Lodestar night mode\u{201D}. Lodestar opens in red.",
+                "**Red torch.** Say \u{201C}Lodestar red torch\u{201D}. The whole screen turns red, for finding your gear without spoiling your night vision.",
+            ]),
+            .paragraph("The same actions are in the **Shortcuts** app, where you can add them to your own shortcuts or the Action button. On iOS 18 and later, you can also add **Night Mode**, **Red Torch** and **Aim** from Lodestar to Control Center or the Lock Screen. Each one opens Lodestar."),
+            .paragraph("**Satellite passes.** When you tap **Follow in Aim** or **Wait at the peak** on a pass, a Live Activity appears on the Lock Screen and in the Dynamic Island. It counts down to the rise and then to the peak, and shows how high the pass gets and where to look. It ends with the pass, or when you stop following. If you turn off Live Activities for Lodestar in iOS Settings, the countdown stays in Aim."),
+            .paragraph("**The red torch.** Open it from **Settings** \u{25B8} **Tools** or **Night Mode**, or with Siri or Control Center. Drag the bar to set the brightness. Tap once to ask for white light and tap **White light** to confirm. Tap again to go back to red. Double-tap to close. The screen stays awake while the torch is on."),
+            .tip("If the phone is on your camera mount in the dark, put the Night Mode control in Control Center, so you can switch it with one swipe."),
+        ],
+        related: [.nightMode, .widgets, .aimScreen])
 
     private static let troubleshooting = HelpTopic(
         topic: .troubleshooting, category: .more, title: "Troubleshooting", systemImage: "wrench.and.screwdriver",
@@ -99,8 +144,10 @@ extension HelpContent {
                 HelpTerm(term: "Azimuth", meaning: "The compass direction of an object, in degrees clockwise from north. East is 90\u{00B0}, south 180\u{00B0} and west 270\u{00B0}."),
                 HelpTerm(term: "Conjunction", meaning: "Two objects that look close together in the sky, such as a planet and the Moon."),
                 HelpTerm(term: "Declination", meaning: "The sky\u{2019}s latitude, in degrees north (+) or south (\u{2212}) of the celestial equator."),
+                HelpTerm(term: "Camera profile", meaning: "A camera and lens saved in Settings: the sensor, focal length, aperture, pixel size and lens type. The one in use gives the frame on the sky and the exposure numbers. See Cameras and lenses."),
                 HelpTerm(term: "Elongation", meaning: "How far a planet or comet is from the Sun in the sky. A small elongation means it is lost in the Sun\u{2019}s glare."),
                 HelpTerm(term: "Field of view", meaning: "How much sky your camera\u{2019}s picture covers, worked out from the sensor and the focal length. It is written as width \u{00D7} height in degrees."),
+                HelpTerm(term: "Fisheye", meaning: "A lens that sees a very wide view by bending straight lines. Its frame on the sky is a curve, and a circular fisheye\u{2019}s is a circle."),
                 HelpTerm(term: "Greatest elongation", meaning: "The moment Mercury or Venus is farthest from the Sun in the sky. It is the best time to see it."),
                 HelpTerm(term: "Gyro Lock", meaning: "A heading from the gyroscope instead of the compass, so tripod heads and camera bodies can no longer disturb it. It drifts slowly. See Compass, Gyro Lock and accuracy."),
                 HelpTerm(term: "Magnitude", meaning: "How bright an object is. The lower the number, the brighter it is, and negative numbers are very bright. The faintest stars seen with the eye are about magnitude 6."),
@@ -120,5 +167,5 @@ extension HelpContent {
         related: [.planFraming, .alignment])
 
     /// The topics of "Equipment" and "More".
-    static let more: [HelpTopic] = [mounts, nightMode, onlineData, widgets, troubleshooting, glossary]
+    static let more: [HelpTopic] = [cameraAndLens, mounts, nightMode, onlineData, widgets, shortcuts, troubleshooting, glossary]
 }

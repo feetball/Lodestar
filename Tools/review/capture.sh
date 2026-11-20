@@ -64,8 +64,11 @@ capture() {
   done
 
   # Only the app's process id goes to /dev/null: why a launch fails is worth seeing in the log.
-  # The state of the previous launch must not answer for this one (it would say ready, or name another screen).
-  [ -n "${DATA:-}" ] && rm -f "$DATA/Documents/review-state.txt"
+  # The state of the previous launch must not answer for this one (it would say ready, or name another screen). Before
+  # the first launch of a run the folder is looked up here, so that a state left by an earlier run on this Simulator
+  # is removed as well; if the app has no data folder yet, there is nothing to remove.
+  [ -n "${DATA:-}" ] || DATA="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data 2>/dev/null)"
+  [ -z "$DATA" ] || rm -f "$DATA/Documents/review-state.txt"
   xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE" -LodestarScreenshot $COMMON $args night=$night >/dev/null
   DATA="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data 2>/dev/null)"
   rm -f "$DATA/Documents/review-cmd.txt"

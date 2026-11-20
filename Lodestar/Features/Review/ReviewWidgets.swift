@@ -7,12 +7,12 @@ import LodestarKit
 
 /// The widgets' views, drawn at the sizes of each family on the screen of the Simulator.
 ///
-/// The widget views live in `WidgetShared` and `LodestarWidgets`, which are compiled into the widget extension and the
-/// watch app but not into the app. The review workflow copies those sources into the app's folder and builds with
-/// `-DREVIEW_WIDGETS` (see `.github/workflows/review.yml`), so this file draws the very views the extension draws. The
-/// Home Screen families get the app's background and the default content margin; the Lock Screen families sit on a
-/// grey wallpaper, as they do on the Lock Screen. The widgets have no night palette (they follow the system, and the
-/// extension cannot know that the app is in night mode), so the red variant shows them under a red filter.
+/// The widget views live in `WidgetShared` and `LodestarWidgets`. The app compiles `WidgetShared` already, but not the
+/// two Tonight view files of `LodestarWidgets`. The review workflow copies those two into the app's folder and builds
+/// with `-DREVIEW_WIDGETS` (see `.github/workflows/review.yml`), so this file draws the very views the extension
+/// draws. The Home Screen families get the app's background and the default content margin; the Lock Screen families
+/// sit on a grey wallpaper, as they do on the Lock Screen. The widgets have no night palette (they follow the system,
+/// and the extension cannot know that the app is in night mode), so the red variant shows them under a red filter.
 ///
 /// WidgetKit's `widgetFamily` environment value can be read but not set, so the review build changes the views to read
 /// `reviewWidgetFamily` instead and adds that value (see the workflow).
@@ -152,8 +152,9 @@ private struct ReviewWidgetsLook: ViewModifier {
 
 #else
 
-/// The widget views are not compiled into the app: build with `OTHER_SWIFT_FLAGS=-DREVIEW_WIDGETS` after copying
-/// `WidgetShared` and `LodestarWidgets` next to this file (see `.github/workflows/review.yml`).
+/// The Tonight widget's view files are not compiled into the app: build with `OTHER_SWIFT_FLAGS=-DREVIEW_WIDGETS` after
+/// copying `LodestarWidgets/TonightSystemView.swift` and `TonightWidget.swift` next to this file (see
+/// `.github/workflows/review.yml`).
 struct ReviewWidgetsScreen: View {
     let screen: ReviewScreen
 

@@ -252,6 +252,33 @@ final class TonightLinesTests: XCTestCase {
         XCTAssertEqual(TonightEntry.needsLocation(at: now, issue: issue).content, .needsLocation(.deniedOrRestricted))
     }
 
+    func testAUserWhoAllowedLocationIsToldToWaitNotToOpenTheAppOrSettings() {
+        let issue = TonightLocationIssue.waitingForFix
+        XCTAssertEqual(TonightNeedsLocationText.full(issue), "Waiting for a location fix")
+        XCTAssertTrue(TonightNeedsLocationText.spoken(issue).contains("Waiting"))
+        let texts = [TonightNeedsLocationText.full(issue), TonightNeedsLocationText.short(issue),
+                     TonightNeedsLocationText.corner(issue), TonightNeedsLocationText.spoken(issue)]
+        for text in texts {
+            XCTAssertFalse(text.isEmpty)
+            XCTAssertFalse(text.contains("Open"), text)
+            XCTAssertFalse(text.contains("Settings"), text)
+            XCTAssertFalse(text.contains("allow"), text)
+        }
+        for other in [TonightLocationIssue.notAsked, .deniedOrRestricted] {
+            XCTAssertNotEqual(TonightNeedsLocationText.full(issue), TonightNeedsLocationText.full(other))
+            XCTAssertNotEqual(TonightNeedsLocationText.short(issue), TonightNeedsLocationText.short(other))
+            XCTAssertNotEqual(TonightNeedsLocationText.corner(issue), TonightNeedsLocationText.corner(other))
+            XCTAssertNotEqual(TonightNeedsLocationText.spoken(issue), TonightNeedsLocationText.spoken(other))
+        }
+        XCTAssertEqual(TonightEntry.needsLocation(at: now, issue: issue).content, .needsLocation(.waitingForFix))
+    }
+
+    func testTheCrossedOutArrowIsOnlyForLocationThatIsOffOrNotAllowedYet() {
+        XCTAssertEqual(TonightNeedsLocationText.symbol(.notAsked), "location.slash")
+        XCTAssertEqual(TonightNeedsLocationText.symbol(.deniedOrRestricted), "location.slash")
+        XCTAssertEqual(TonightNeedsLocationText.symbol(.waitingForFix), "location")
+    }
+
     // MARK: Numbers
 
     func testDurations() {

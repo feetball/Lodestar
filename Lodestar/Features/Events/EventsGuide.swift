@@ -33,7 +33,80 @@ extension EventsGuide {
             return lunarEclipse(eclipse)
         case .solarEclipse(let eclipse):
             return solarEclipse(eclipse, local: eclipse.local)
+        case .greatRedSpotTransit:
+            return greatRedSpot()
+        case .jupiterMoonEvent(let event):
+            return jupiterMoon(event)
+        case .planetStation(let station):
+            return self.station(station)
         }
+    }
+
+    // MARK: Jupiter and the stations
+
+    private static func greatRedSpot() -> EventsGuide {
+        EventsGuide(
+            about: "The Great Red Spot is a storm in Jupiter\u{2019}s southern hemisphere, wider than the Earth, that "
+                + "astronomers have watched since 1831. Jupiter turns once in about 9 hours 56 minutes, so the spot comes "
+                + "round to the middle of the disc, the central meridian, about every 10 hours; on the evenings when that "
+                + "happens in the dark, you can catch it.",
+            why: "Planet imagers time their sessions by it: the spot is easiest to see and sharpest, with the least "
+                + "foreshortening, within about 50 minutes of its transit.",
+            tips: [
+                "Start recording 50 minutes before the transit time and stop 50 minutes after it.",
+                "Jupiter turns 36\u{00B0} an hour, so surface detail smears in a video longer than about two minutes: take "
+                    + "many short videos instead of one long one.",
+                "Use the longest focal length you have, a telescope at f/15 to f/30, and stack the sharpest frames of each "
+                    + "video.",
+                "The spot\u{2019}s longitude drifts by a few degrees a month, which moves its transit by a few minutes. "
+                    + "If the time is off, enter the longitude you read from a recent image in Settings.",
+            ])
+    }
+
+    private static func jupiterMoon(_ event: GalileanMoonEvent) -> EventsGuide {
+        let name = event.moon.displayName
+        let about: String
+        switch event.phenomenon {
+        case .transit:
+            about = "\(name) passes in front of Jupiter. Against the bright cloud tops it is hard to see, a pale dot "
+                + "that is lost in the glare, and its shadow is the better target."
+        case .shadowTransit:
+            about = "The shadow of \(name) falls on Jupiter\u{2019}s cloud tops and crosses the disc as a small, sharp "
+                + "black dot. It is easy to see in a small telescope and easy to photograph."
+        case .occultation:
+            about = "\(name) passes behind Jupiter and is hidden by the disc until it comes out again on the other side."
+        case .eclipse:
+            about = "\(name) moves into Jupiter\u{2019}s shadow and fades from view, or comes out of it and reappears "
+                + "out of nothing, a few seconds apart from where the sunlight cuts off."
+        }
+        return EventsGuide(
+            about: about + " Times are worked out with a simple method and are good to about "
+                + "\(Int(GalileanMoons.accuracyMinutes)) minutes.",
+            why: "The four moons keep moving around Jupiter: a transit, a shadow or a disappearance is a fine subject "
+                + "for a video or a sequence of stills.",
+            tips: [
+                "Start 10 minutes before the time given and keep recording past it, as the event can come early or late.",
+                "For the shadow, shoot a video every few minutes and stack each one, then play the stacks as a sequence.",
+                "A 200 to 600 mm lens shows the four moons as a row of dots; a telescope shows the disc and the shadow.",
+            ])
+    }
+
+    private static func station(_ station: PlanetStation) -> EventsGuide {
+        let planet = station.planet.displayName
+        let begins = station.kind == .retrogradeBegins
+        return EventsGuide(
+            about: "\(planet) stands still among the stars for a few days: "
+                + (begins ? "its eastward motion stops and it starts to move west"
+                          : "its westward motion stops and it moves east again")
+                + ". The planet is not turning round: the Earth overtakes it, or it overtakes us, and the line of sight "
+                + "swings back and forth against the stars.",
+            why: "A planet\u{2019}s loop among the stars makes an unusual picture: photograph the same star field every "
+                + "week or two for the months of the loop and stack the frames into one.",
+            tips: [
+                "Keep the same lens and framing, on a tripod or a tracker, and mark the spot so you can come back to it.",
+                "Take the picture near the same time of night each week, when the planet is high.",
+                "A wide frame with a landmark or a bright star in it makes the stack easier to line up.",
+            ])
     }
 
     // MARK: Meteor showers
@@ -157,6 +230,12 @@ extension EventsGuide {
 
     // MARK: Seasons
 
+    /// The Sun tip of the equinox and solstice pages. A low, dim Sun is still far too bright for the eye or the sensor,
+    /// so the filter is required at every height and the viewfinder is never used.
+    private static let sunSafetyTip = "Always fit a certified solar filter over the front of the lens before you shoot "
+        + "the Sun, even when it is low and dim, and never look at it through the viewfinder. Use the screen on the "
+        + "back instead."
+
     private static func season(_ kind: SeasonKind, isSouthernHemisphere: Bool) -> EventsGuide {
         switch kind {
         case .marchEquinox, .septemberEquinox:
@@ -170,7 +249,7 @@ extension EventsGuide {
                 tips: [
                     "Scout the spot a day or two before. The Sun moves along the horizon by about its own width a day.",
                     "Use a long lens from far away for a large Sun next to the landmark.",
-                    "Shoot the Sun only when it is low and dim, and use a solar filter for anything higher.",
+                    sunSafetyTip,
                 ])
         case .juneSolstice, .decemberSolstice:
             let summer = (kind == .juneSolstice) != isSouthernHemisphere
@@ -185,7 +264,7 @@ extension EventsGuide {
                 tips: [
                     "Check where the Sun rises and sets on this date, and scout the spot beforehand.",
                     nightTip,
-                    "Shoot the Sun only when it is low and dim, and use a solar filter for anything higher.",
+                    sunSafetyTip,
                 ])
         }
     }

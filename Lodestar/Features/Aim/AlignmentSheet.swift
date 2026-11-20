@@ -17,10 +17,18 @@ struct AlignmentSheet: View {
     @State private var notice: AimAlignmentNotice?
     /// Whether the sync also tells a connected GoTo mount that it points at the object.
     @State private var syncsMount = true
+    /// Whether the footer shows how the mount's sync went after the object is dropped, which removes the row with the
+    /// toggle that shows it while an object is chosen.
+    @State private var showsMountOutcome = false
+    /// While Sync waits for a steady camera: how much of the steady window has passed, from 0 to 1; `nil` otherwise.
+    @State private var holdProgress: Double?
 
     /// Seconds between the refreshes of the candidates' positions and of their order.
     private static let candidateRefreshInterval = 30.0
     private static let sortInterval = 2.5
+    /// Time zero of the clock that times the hold-still wait. It is static so that every reading is measured from the
+    /// same moment, however often SwiftUI makes the view value again.
+    private static let clockOrigin = ContinuousClock.now
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,10 +41,18 @@ struct AlignmentSheet: View {
                     }
                     if let selected {
                         AimReferenceCard(model: model, candidate: selected)
+                        if let text = AimAlignmentSpacing.warningText(candidate: selected.horizontal, existing: app.alignment.points) {
+                            Label(text, systemImage: "exclamationmark.triangle.fill")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(palette.warning)
+                        }
                     } else {
                         candidateList
                     }
-                    AimAlignmentSummaryCard(alignment: app.alignment, onRemove: remove(at:), onReset: reset)
+                    AimAlignmentSummaryCard(alignment: app.alignment, alignedAt: app.alignedAt,
+                                            gyroLock: app.motion.headingSource == .gyroLock,
+                                            onRemove: remove(at:), onReset: reset)
+                        .disabled(holdProgress != nil)
                 }
                 .padding(16)
             }
@@ -50,6 +66,10 @@ struct AlignmentSheet: View {
         }
         .task {
             await keepRowsSorted()
+        }
+        // Leaving the sheet or choosing another object ends the task, which cancels the wait.
+        .task(id: holdProgress != nil) {
+            await holdStill()
         }
         .onDisappear {
             model.alignmentTarget = nil
@@ -76,7 +96,9 @@ struct AlignmentSheet: View {
     /// The sync button, always in reach.
     private var footer: some View {
         VStack(spacing: 8) {
-            if let selected {
+            if selected != nil, let holdProgress {
+                AimHoldStillFooter(progress: holdProgress) { self.holdProgress = nil }
+            } else if let selected {
                 MountAlignmentSyncRow(isOn: $syncsMount, objectName: selected.object.name)
                 Button {
                     sync()
@@ -88,6 +110,9 @@ struct AlignmentSheet: View {
                 Button("Choose another object") { deselect() }
                     .buttonStyle(.lodestarSecondary)
             } else {
+                if showsMountOutcome {
+                    MountAlignmentSyncOutcome()
+                }
                 Text("Choose a bright star or planet from the list.")
                     .font(.footnote)
                     .foregroundStyle(palette.secondaryText)
@@ -145,23 +170,75 @@ struct AlignmentSheet: View {
     private func reset() {
         app.resetAlignment()
         notice = nil
+        sortRows()
     }
 
     private func select(_ candidate: AimAlignmentCandidate) {
         selected = candidate
         notice = nil
+        showsMountOutcome = false
         model.alignmentTarget = candidate.object
     }
 
     private func deselect() {
+        holdProgress = nil
         selected = nil
         model.alignmentTarget = nil
         sortRows()
     }
 
-    /// Records the camera's attitude together with the object's true apparent position at this instant.
+    /// Starts waiting for a steady camera; the sync follows by itself (see `holdStill()`).
     private func sync() {
-        guard let selected, let sample = app.motion.latestSample(), let observer = app.observerContext?.observer else {
+        guard selected != nil, app.motion.latestSample() != nil, app.observerContext?.observer != nil else {
+            // The same notice as a sync without sensors, which `syncNow()` words.
+            syncNow()
+            return
+        }
+        notice = nil
+        holdProgress = 0
+        AccessibilityNotification.Announcement("Hold still").post()
+    }
+
+    /// Seconds on a monotonic clock, which is what `AimHoldStill` is fed. This is not `ProcessInfo.systemUptime`, which
+    /// Apple lists as a system boot time API that the privacy manifest would have to declare.
+    private static var clockSeconds: Double {
+        (ContinuousClock.now - clockOrigin) / .seconds(1)
+    }
+
+    /// Syncs the moment the camera has been still for the whole window, and gives up after a few seconds.
+    private func holdStill() async {
+        guard holdProgress != nil else { return }
+        var wait = AimHoldStill(startedAt: Self.clockSeconds)
+        while !Task.isCancelled {
+            let mount = app.mountProfile
+            let motionSample = app.motion.latestSample()
+            let sample = motionSample.flatMap { SteadinessSample(attitude: $0.rawAttitude, mount: mount) }
+            switch wait.update(now: Self.clockSeconds, sample: sample) {
+            case .waiting(let progress):
+                // In steps of 2 %, so that the sheet is not redrawn at the polling rate for a bar that moves slowly.
+                let shown = (progress * 50).rounded(.down) / 50
+                if shown != holdProgress { holdProgress = shown }
+            case .steady:
+                holdProgress = nil
+                syncNow(sample: motionSample)
+                return
+            case .timedOut:
+                holdProgress = nil
+                notice = .failure(AimHoldStill.timeoutNotice)
+                return
+            }
+            try? await Task.sleep(for: AimHoldStill.pollInterval)
+        }
+    }
+
+    /// Records the camera's attitude together with the object's true apparent position at this instant.
+    private func syncNow() {
+        syncNow(sample: app.motion.latestSample())
+    }
+
+    /// Records the supplied sample without reading the sensors again.
+    private func syncNow(sample: MotionSample?) {
+        guard let selected, let sample, let observer = app.observerContext?.observer else {
             notice = .failure("The motion sensors are not delivering data yet. Wait a moment and sync again.")
             return
         }
@@ -184,6 +261,7 @@ struct AlignmentSheet: View {
     /// The star is centred in the camera, which sits on the GoTo mount: the mount takes it as its position as well.
     private func syncMountIfWanted(to object: CelestialObject, observer: Observer) {
         guard syncsMount, MountService.shared.isConnected, MountService.shared.capabilities?.canSync == true else { return }
+        showsMountOutcome = true
         Task { await MountService.shared.syncMount(to: object, observer: observer) }
     }
 
@@ -199,6 +277,7 @@ struct AlignmentSheet: View {
         do {
             app.alignment = try app.alignment.removingPoint(at: index, mount: app.mountProfile)
             notice = nil
+            sortRows()
         } catch let error as AlignmentError {
             notice = .failure(error.aimMessage(forObject: "the object"))
         } catch {
@@ -233,8 +312,10 @@ struct AlignmentSheet: View {
 
     private func sortRows() {
         let boresight = model.engine.frame()?.pointing.boresightVector
+        let points = app.alignment.points
         let unsorted = candidates.map { candidate in
-            AimAlignmentRow(candidate: candidate, separation: boresight.map { $0.angle(to: candidate.horizontal.unitVector) })
+            AimAlignmentRow(candidate: candidate, separation: boresight.map { $0.angle(to: candidate.horizontal.unitVector) },
+                            nearest: AlignmentHygiene.bestSeparation(candidate: candidate.horizontal, existing: points))
         }
         rows = unsorted.sorted { lhs, rhs in
             switch (lhs.separation, rhs.separation) {

@@ -20,8 +20,8 @@ final class EventsModel {
 
     /// Starts a run when the stored events do not fit `context` and `now`. Cheap to call often: a run in progress or a
     /// result that still fits makes it return at once.
-    func refresh(context: ObserverContext, now: Date) {
-        let key = EventsKey(context: context, now: now)
+    func refresh(context: ObserverContext, now: Date, greatRedSpot: GreatRedSpot = .reference) {
+        let key = EventsKey(context: context, now: now, greatRedSpot: greatRedSpot)
         if let loadedKey, loadedKey.covers(key) {
             // The stored events fit again: a run for another key would replace them with events that do not.
             task?.cancel()
@@ -47,8 +47,10 @@ final class EventsModel {
         }
     }
 
-    /// The events that have not happened yet at `now`, in time order.
+    /// The events that have not happened yet at `now`, in time order. The Great Red Spot and moon events of Jupiter come
+    /// by the dozen and stay in the calendar and on Jupiter's own screen.
     func upcoming(after now: Date) -> [EventsEntry] {
-        (entries ?? []).filter { $0.event.date >= now }
+        (entries ?? []).filter { $0.event.date >= now && $0.event.kind != .greatRedSpotTransit
+            && $0.event.kind != .jupiterMoonEvent }
     }
 }

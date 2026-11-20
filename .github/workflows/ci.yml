@@ -14,9 +14,10 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request makes the older run pointless; a run for a merge to main is a result worth keeping.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-and-test:
@@ -67,8 +68,8 @@ jobs:
       - name: Test the widgets' shared code
         run: swift test --package-path WidgetTests
 
-      # A wall-clock check of a Debug build (200 000 Kepler solutions in under 5 s) that the shared runners sometimes
-      # miss by a few tenths of a second; kept as its own step so that it stays visible without failing the job.
+      # A wall-clock check of a Debug build (200 000 Kepler solutions in under 30 s) that the shared runners sometimes
+      # miss; kept as its own step so that it stays visible without failing the job.
       - name: Time the comet orbit solver (informational)
         continue-on-error: true
         run: swift test --package-path LodestarKit --filter CometsOrbitTests/testSolverIsFast

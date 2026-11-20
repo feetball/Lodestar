@@ -50,6 +50,20 @@ enum EventsDetailModel {
             return lunarFacts(eclipse)
         case .solarEclipse(let eclipse):
             return solarFacts(eclipse, hasObserver: entry.event.visibility != nil, timeZone: timeZone)
+        case .greatRedSpotTransit(let transit):
+            return [EventsDetailRow(label: "Well placed",
+                                    value: "\(EventsFormat.window(transit.wellPlaced, in: timeZone)) "
+                                        + "(\u{00B1}\(Int(GreatRedSpot.wellPlacedMinutes)) min)"),
+                    EventsDetailRow(label: "Longitude (System II)",
+                                    value: AngleFormatter.formatDegrees(transit.longitude, decimals: 0))]
+        case .jupiterMoonEvent:
+            return [EventsDetailRow(label: "Accuracy", value: "About \u{00B1}\(Int(GalileanMoons.accuracyMinutes)) minutes")]
+        case .planetStation(let station):
+            return [EventsDetailRow(label: "Planet", value: station.planet.displayName),
+                    EventsDetailRow(label: "Motion", value: String(station.kind.displayName.prefix(1)).uppercased()
+                                        + String(station.kind.displayName.dropFirst())),
+                    EventsDetailRow(label: "Ecliptic longitude",
+                                    value: AngleFormatter.formatDegrees(station.longitude, decimals: 1))]
         }
     }
 
@@ -190,8 +204,9 @@ enum EventsDetailModel {
 
     // MARK: When
 
-    /// The times of the event in the observer's zone: the instant, the best window and where the subject stands.
-    static func times(of entry: EventsEntry, timeZone: TimeZone) -> [EventsDetailRow] {
+    /// The times of the event in the observer's zone: the instant, the best window (with its date unless it is
+    /// tonight's at `now`) and where the subject stands.
+    static func times(of entry: EventsEntry, now: Date, timeZone: TimeZone) -> [EventsDetailRow] {
         let event = entry.event
         var rows: [EventsDetailRow] = []
         let instantLabel: String
@@ -204,11 +219,16 @@ enum EventsDetailModel {
         case .fullMoonSpecial: instantLabel = "Full Moon"
         case .lunarEclipse: instantLabel = "Greatest eclipse"
         case .solarEclipse: instantLabel = "Greatest eclipse (anywhere)"
+        case .greatRedSpotTransit: instantLabel = "Crosses the central meridian"
+        case .jupiterMoonEvent: instantLabel = "Time"
+        case .planetStation: instantLabel = "Station"
         }
         rows.append(EventsDetailRow(label: instantLabel, value: EventsFormat.dayAndTime(event.date, in: timeZone)))
         guard let visibility = event.visibility else { return rows }
         if let window = visibility.bestWindow {
-            rows.append(EventsDetailRow(label: windowLabel(of: event), value: EventsFormat.window(window, in: timeZone)))
+            let text = EventsFormat.window(window, in: timeZone)
+            let value = EventsFormat.windowDay(window, now: now, in: timeZone).map { "\($0) \u{00B7} \(text)" } ?? text
+            rows.append(EventsDetailRow(label: windowLabel(of: event), value: value))
             if let best = visibility.bestTime {
                 rows.append(EventsDetailRow(label: bestTimeLabel(of: event), value: AppFormat.time(best, in: timeZone)))
             }
@@ -247,9 +267,9 @@ enum EventsDetailModel {
 
     // MARK: Visibility
 
-    /// One or two sentences on whether the event can be seen from the observer's place; `nil` for events that are
-    /// not seen in the sky.
-    static func visibilitySentence(of entry: EventsEntry, timeZone: TimeZone) -> String? {
+    /// One or two sentences on whether the event can be seen from the observer's place, with the date of the window
+    /// unless it is tonight's at `now`; `nil` for events that are not seen in the sky.
+    static func visibilitySentence(of entry: EventsEntry, now: Date, timeZone: TimeZone) -> String? {
         guard let visibility = entry.event.visibility, let isVisible = entry.isVisibleFromHere else { return nil }
         if case .solarEclipse(let eclipse) = entry.event.details, eclipse.local?.kind == LocalSolarEclipseKind.none {
             return "No part of the eclipse can be seen from here."
@@ -260,11 +280,14 @@ enum EventsDetailModel {
                 return "The Moon is below the horizon during the eclipse as seen from here."
             case .solarEclipse:
                 return "The Sun is below the horizon during the eclipse as seen from here."
+            case .greatRedSpotTransit, .jupiterMoonEvent:
+                return "Jupiter is too low or the sky too bright while this happens."
             default:
                 return "There is no good viewing window from here: the target stays too low or the sky too bright that night."
             }
         }
-        return "Visible from here between \(EventsFormat.window(window, in: timeZone))."
+        let day = EventsFormat.windowDay(window, now: now, in: timeZone).map { "on \($0), " } ?? ""
+        return "Visible from here \(day)between \(EventsFormat.window(window, in: timeZone))."
     }
 
     /// What a viewing window needs, in words; `nil` for eclipses (which only need the Moon or Sun above the horizon)

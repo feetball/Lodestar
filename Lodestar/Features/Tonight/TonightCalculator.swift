@@ -7,6 +7,10 @@ enum TonightCalculator {
     static let minimumTargetAltitude = NightPlanner.defaultMinimumAltitude
     /// The most targets the list shows.
     static let targetLimit = 12
+    /// The ranking bonus per hour a target is clear of the site's skyline (only with a skyline).
+    static let clearHoursWeight = 0.1
+    /// The hours of clearance beyond which the bonus stops growing.
+    static let clearHoursCap = 6.0
 
     /// Plans the night that `input` asks for: twilight, Moon, Milky Way, planets and the best targets.
     static func report(for input: TonightInput) -> TonightReport {
@@ -38,7 +42,7 @@ enum TonightCalculator {
             summary: summary, timeZone: context.timeZone,
             timeline: TonightTimelineModel(summary: summary, timeZone: context.timeZone),
             targets: targets(for: summary, catalog: input.catalog, skyline: skyline,
-                             movingTargets: smallBodies?.targets ?? []),
+                             movingTargets: smallBodies?.targets ?? [], filter: input.imagingFilter),
             tonightStart: tonightStart, nightsFromTonight: nights, tonightExpiry: tonightExpiry,
             appliesSkyline: skyline != nil,
             smallBodies: smallBodies?.bright)
@@ -66,16 +70,28 @@ enum TonightCalculator {
     // MARK: Best targets
 
     private static func targets(for summary: NightSummary, catalog: Catalog?, skyline: HorizonProfile?,
-                                movingTargets: [TonightTarget]) -> TonightTargetsOutcome {
+                                movingTargets: [TonightTarget], filter: ImagingFilter) -> TonightTargetsOutcome {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
-        return .ranked(movingTargets + rankedTargets(in: catalog, summary: summary, skyline: skyline))
+        // With a skyline the hours of the comets and asteroids are the hours above it too. They come first, as always,
+        // but get the Moon's assessment at their best time through the same call as the deep-sky objects, so that a
+        // comet beside a bright Moon is not listed without a word about it.
+        let moving = movingTargets.map { target -> TonightTarget in
+            var target = target
+            if skyline != nil { target.unobstructedHours = target.hoursAboveMinimum }
+            target.moon = ObjectMoonGeometry(of: target.object, observer: summary.observer, at: target.peakTime)
+                .assess(filter: filter, kind: MoonImpact.assessmentKind(of: target.object))
+            return target
+        }
+        return .ranked(moving + rankedTargets(in: catalog, summary: summary, skyline: skyline, filter: filter))
     }
 
     /// The listed deep-sky objects that climb to at least `minimumTargetAltitude` in the dark, best first, at
-    /// most `targetLimit` of them. With a skyline an object counts only while it is above the skyline too.
-    private static func rankedTargets(in catalog: Catalog, summary: NightSummary,
-                                      skyline: HorizonProfile?) -> [TonightTarget] {
+    /// most `targetLimit` of them. With a skyline an object counts only while it is above the skyline too. The Moon
+    /// counts as well: a target's score is multiplied by `MoonImpact.moonFreeWeight(level:)` of what the Moon does
+    /// to it, through `filter`, at its best time.
+    private static func rankedTargets(in catalog: Catalog, summary: NightSummary, skyline: HorizonProfile?,
+                                      filter: ImagingFilter) -> [TonightTarget] {
         var objects: [CelestialObject] = []
         var places: [EquatorialCoordinate] = []
         var motions: [ProperMotion?] = []
@@ -94,13 +110,20 @@ enum TonightCalculator {
             visibilities = NightPlanner.visibility(ofFixed: places, properMotions: motions, during: summary,
                                                    darkness: .astronomical, minimumAltitude: minimumTargetAltitude)
         }
-        var candidates: [(object: CelestialObject, visibility: TargetVisibility, peak: Double, score: Double)] = []
+        var candidates: [(object: CelestialObject, visibility: TargetVisibility, peak: Double, score: Double,
+                          moon: ObjectMoonAssessment)] = []
         for (object, visibility) in zip(objects, visibilities) {
             // Hidden targets are those with no usable stretch; their altitude says nothing (see API-horizon.md).
             if skyline != nil, visibility.intervalsAboveMinimum.isEmpty { continue }
             guard let peak = visibility.maxAltitudeDuringDarkness, peak >= minimumTargetAltitude,
-                  visibility.bestTime != nil else { continue }
-            candidates.append((object, visibility, peak, score(of: object, peakAltitude: peak)))
+                  let bestTime = visibility.bestTime else { continue }
+            let moon = ObjectMoonGeometry(of: object, observer: summary.observer, at: bestTime)
+                .assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
+            // The hours clear of the skyline count only when there is a skyline; an open horizon ranks as it always did.
+            let clearHours: Double? = skyline == nil ? nil : visibility.unobstructedHours
+            let weight = MoonImpact.moonFreeWeight(level: moon.level)
+            candidates.append((object, visibility, peak,
+                               score(of: object, peakAltitude: peak, clearHours: clearHours) * weight, moon))
         }
         candidates.sort { lhs, rhs in
             lhs.score != rhs.score ? lhs.score > rhs.score : lhs.object.id < rhs.object.id
@@ -111,7 +134,9 @@ enum TonightCalculator {
             return TonightTarget(
                 object: candidate.object, peakAltitude: candidate.peak, peakTime: time,
                 peakAzimuth: frame.horizontal(of: candidate.object, refraction: false).azimuth,
-                hoursAboveMinimum: candidate.visibility.hoursAboveMinimum)
+                hoursAboveMinimum: candidate.visibility.hoursAboveMinimum,
+                unobstructedHours: skyline == nil ? nil : candidate.visibility.unobstructedHours,
+                moon: candidate.moon)
         }
     }
 
@@ -123,13 +148,16 @@ enum TonightCalculator {
     }
 
     /// Rates an object for a wide-field camera: higher in the dark is better, and so are brighter and larger.
-    /// Each part runs from 0 to 1; brightness counts most.
-    private static func score(of object: CelestialObject, peakAltitude: Double) -> Double {
+    /// Each part runs from 0 to 1; brightness counts most. With a skyline, `clearHours` (the hours above it in the
+    /// dark) adds `clearHoursWeight` per hour up to `clearHoursCap` hours, at most 0.6, so that a target that stays
+    /// clear of the trees and ridges for hours outranks one that only peeks over them.
+    static func score(of object: CelestialObject, peakAltitude: Double, clearHours: Double? = nil) -> Double {
         let altitude = AstroMath.clamp((peakAltitude - minimumTargetAltitude) / (90 - minimumTargetAltitude), 0, 1)
         // Magnitude 3 and brighter is full marks, magnitude 11 and fainter none.
         let brightness = object.magnitude.flatMap { $0.isFinite ? AstroMath.clamp((11 - $0) / 8, 0, 1) : nil } ?? 0
         // 5′ is a speck, 2° or more a big target for a wide lens.
         let size = object.angularSize.map { AstroMath.clamp(log10($0.majorArcminutes / 5) / 1.4, 0, 1) } ?? 0
-        return altitude + 1.5 * brightness + 0.8 * size
+        let clearance = clearHours.flatMap { $0.isFinite ? clearHoursWeight * min($0, clearHoursCap) : nil } ?? 0
+        return altitude + 1.5 * brightness + 0.8 * size + clearance
     }
 }
