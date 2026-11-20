@@ -78,6 +78,12 @@ final class AppModel {
         didSet { if keepsScreenAwake != oldValue { syncServices() } }
     }
 
+    /// Whether the red torch covers the app (Settings, Siri, Shortcuts and Control Center show it). While it does, the
+    /// screen is at the torch's brightness and stays awake, and the camera is off.
+    var isTorchShown = false {
+        didSet { if isTorchShown != oldValue { syncServices() } }
+    }
+
     /// Whether the Sun is below −6° at the observer (drives automatic night mode).
     private(set) var isSunBelowCivilTwilight = false
 
@@ -108,6 +114,7 @@ final class AppModel {
         online = OnlineDataService(catalog: catalog)
         satelliteAim = SatelliteAimSession()
         online.locationProvider = { [weak self] in self?.observerContext?.location }
+        satelliteAim.isNightProvider = { [weak self] in self?.isNightModeActive ?? false }
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
@@ -211,6 +218,7 @@ final class AppModel {
             startMaintenance()
             online.onForeground()
             upgradeEstimatedTimeZones()
+            satelliteAim.refreshLiveActivity()
         case .background:
             settingsStore.saveNow()
             clock.stop()
@@ -252,6 +260,31 @@ final class AppModel {
     func clearTarget() {
         pendingTargetID = nil
         target = nil
+    }
+
+    /// Makes the object with this catalog identifier the target and shows the Aim tab, once the catalog is loaded. An
+    /// identifier the catalog does not know changes nothing.
+    func aim(objectID: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            await catalog.load()
+            if let object = catalog.object(id: objectID) { aim(at: object) }
+        }
+    }
+
+    /// Carries out what an intent, a Control Center control or a shortcut asked for.
+    func perform(_ command: LodestarCommand) {
+        switch command {
+        case .showAim:
+            selectedTab = .aim
+        case .showTorch:
+            isTorchShown = true
+        case .nightMode(let change):
+            let isOn = change.resultingIsOn(currentlyOn: settings.nightMode == .on)
+            settingsStore.settings.nightMode = isOn ? .on : .off
+        case .aim(let objectID):
+            aim(objectID: objectID)
+        }
     }
 
     /// Downloaded comets and asteroids replaced the catalog's small bodies: a target that is one of them follows its
@@ -314,16 +347,21 @@ final class AppModel {
         let wantsPreview = settings.cameraPreviewEnabled && backCameraAlongLens
             && (!isNightModeActive || settings.cameraPreviewAtNight)
         let aimWantsCamera = selectedTab == .aim && wantsPreview && observerContext != nil
-        if active && onboarded && (aimWantsCamera || keepsCameraRunning) {
+        if active && onboarded && !isTorchShown && (aimWantsCamera || keepsCameraRunning) {
             camera.start(nightFilter: isNightModeActive ? settings.nightIntensity : nil)
         } else {
             camera.stop()
         }
 
-        // Screen: dim at night, keep awake while aiming.
+        // Screen: dim at night, keep awake while aiming; the torch has its own brightness and keeps the screen awake.
         if active {
-            screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
-            screen.setIdleTimerDisabled((selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
+            if isTorchShown {
+                screen.setBrightnessOverride(settings.torchBrightness)
+            } else {
+                screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
+            }
+            screen.setIdleTimerDisabled(
+                isTorchShown || (selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
         } else {
             screen.restore()
         }

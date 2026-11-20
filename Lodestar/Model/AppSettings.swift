@@ -165,6 +165,8 @@ struct AppSettings: Codable, Equatable, Sendable {
     var redFilterOverlay = false
     var cameraPreviewEnabled = true
     var cameraPreviewAtNight = false
+    /// The screen brightness of the red torch.
+    var torchBrightness: Double = 0.3
 
     // Feedback
     var hapticsEnabled = true
@@ -230,6 +232,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         redFilterOverlay = value(.redFilterOverlay, d.redFilterOverlay)
         cameraPreviewEnabled = value(.cameraPreviewEnabled, d.cameraPreviewEnabled)
         cameraPreviewAtNight = value(.cameraPreviewAtNight, d.cameraPreviewAtNight)
+        torchBrightness = value(.torchBrightness, d.torchBrightness)
         hapticsEnabled = value(.hapticsEnabled, d.hapticsEnabled)
         audioCuesEnabled = value(.audioCuesEnabled, d.audioCuesEnabled)
         keepScreenAwake = value(.keepScreenAwake, d.keepScreenAwake)
@@ -262,6 +265,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         exposureISO = min(max(exposureISO, Self.exposureISORange.lowerBound), Self.exposureISORange.upperBound)
         nightIntensity = clamp(nightIntensity, 0.25...1, 0.7)
         nightBrightness = clamp(nightBrightness, 0.01...1, 0.2)
+        torchBrightness = clamp(torchBrightness, 0.01...1, 0.3)
         starMagnitudeLimit = clamp(starMagnitudeLimit, 1...6.5, 5)
         deepSkyProminence = min(max(deepSkyProminence, 1), 4)
         temperatureCelsius = clamp(temperatureCelsius, -60...60, 10)
