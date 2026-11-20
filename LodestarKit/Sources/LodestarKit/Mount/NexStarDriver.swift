@@ -4,10 +4,12 @@ import Foundation
 ///
 /// Values are clamped to their ranges when the configuration is created.
 public struct NexStarConfiguration: Hashable, Sendable {
-    /// The frame of the coordinates on the wire. Nil (the default) picks it from the controller family at connect time:
-    /// Sky-Watcher SynScan firmware 3.37 / 4.37.03 or later documents J2000 for GOTO, sync and position replies
-    /// ("SynScan Serial Communication Protocol" 3.3), Celestron hand controls take the current epoch ("JNow", mean of
-    /// date). Set it to override, for example `MountEpoch.meanOfDate` for a SynScan hand control with old firmware.
+    /// The frame of the coordinates on the wire. Nil (the default) picks it from the controller family and the firmware
+    /// version at connect time: Sky-Watcher SynScan firmware 3.37 / 4.37.03 or later documents J2000 for GOTO, sync
+    /// and position replies ("SynScan Serial Communication Protocol" 3.3); older SynScan firmware and Celestron hand
+    /// controls take the current epoch ("JNow", mean of date). Until `connect` has read the version the driver reports
+    /// JNow, and a version it cannot read fails the connection, so the frame is never guessed. Set it to override, for
+    /// example `MountEpoch.j2000` for a SynScan hand control that takes J2000 below those versions.
     public let epoch: MountEpoch?
     /// How long one command may take (1 to 30 s). Celestron documents up to 3.5 s, SynScan up to 5 s, in the worst case.
     public let exchangeTimeoutSeconds: Double
@@ -77,7 +79,7 @@ public final class NexStarDriver: MountDriver {
     public func connect() throws -> MountCapabilities {
         let found = try readVersion()
         version = found
-        resolvedEpoch = configuration.epoch ?? (found.flavor == .synscan ? .j2000 : .meanOfDate)
+        resolvedEpoch = configuration.epoch ?? (found.expectsJ2000Coordinates ? .j2000 : .meanOfDate)
         let isSynScan = found.flavor == .synscan
         precise = configuration.usesPrecisePositions ?? (isSynScan || found.isAtLeast(1, 6))
         canReadTracking = isSynScan || found.isAtLeast(2, 3)
