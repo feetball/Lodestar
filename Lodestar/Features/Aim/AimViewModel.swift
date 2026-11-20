@@ -9,7 +9,8 @@ import Observation
 /// frame when they draw, so the view tree is not invalidated 60 times a second.
 ///
 /// With a `previewOffset` the sky, the target and the guidance are worked out for a later (or earlier) moment while the
-/// phone's pointing stays live; the screen ends the preview (`leave()`) when the tab or the app goes away.
+/// phone's pointing stays live; the screen ends the preview (`leave()`) when the tab goes away or the app moves to the
+/// background.
 @MainActor
 @Observable
 final class AimViewModel {
@@ -168,6 +169,14 @@ final class AimViewModel {
         wasOnTarget = nil
     }
 
+    /// Forgets where the target is until the next sky rebuild brings its place, and starts the on-target state afresh.
+    /// Its place is out of date once the previewed moment changes or the screen has been away; with no guidance in
+    /// between, the jump to the new place cannot be taken for reaching or losing the target.
+    func dropTargetPosition() {
+        engine.clearTargetPosition()
+        wasOnTarget = nil
+    }
+
     // MARK: Background work
 
     /// Rebuilds the sky for `inputs` now and then every few seconds until cancelled. Restart it (`.task(id:)`)
@@ -183,6 +192,9 @@ final class AimViewModel {
                 AimSkyContent.build(catalog: catalog, inputs: inputs, date: date)
             }.value
             guard !Task.isCancelled else { return }
+            // The screen restarts this task with its next update, which can come after the preview was stepped; a sky
+            // built for the moment just left must not put the old target position back.
+            guard inputs.previewOffset == previewOffset else { return }
             skyContent = content
             engine.update(target: content.snapshot.target)
             try? await Task.sleep(for: .seconds(Self.skyRefreshInterval))
@@ -298,7 +310,7 @@ final class AimViewModel {
         if offset != 0 { app.satelliteAim.stop() }
         previewOffset = offset
         // The target jumps with the clock: reaching or losing it because of that is not worth a buzz.
-        wasOnTarget = nil
+        dropTargetPosition()
         // The panel of a mosaic moves with it.
         refreshMosaicGuidance(force: true)
     }
