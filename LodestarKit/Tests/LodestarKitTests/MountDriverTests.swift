@@ -242,6 +242,53 @@ final class MountDriverTests: XCTestCase {
         XCTAssertEqual(override.epoch, .j2000)
     }
 
+    func testSynScanFirmwareBelowTheJ2000ReleasesIsSentTheCurrentEpoch() throws {
+        let cases: [((Int, Int, Int), MountEpoch)] = [
+            ((4, 38, 6), .j2000), ((4, 37, 3), .j2000), ((4, 37, 2), .meanOfDate), ((4, 36, 0), .meanOfDate),
+            ((3, 37, 0), .j2000), ((3, 36, 0), .meanOfDate), ((3, 2, 0), .meanOfDate),
+        ]
+        for (version, expected) in cases {
+            let f = nexStar(.synscan, version.0, version.1, version.2)
+            let driver = NexStarDriver(transport: f.simulator, clock: f.clock)
+            XCTAssertEqual(driver.epoch, .meanOfDate, "\(version) before connect")
+            _ = try driver.connect()
+            XCTAssertEqual(driver.epoch, expected, "\(version)")
+        }
+    }
+
+    func testAnExplicitEpochWinsOverTheFirmwareGate() throws {
+        let old = nexStar(.synscan, 4, 36, 0)
+        let forcedJ2000 = NexStarDriver(transport: old.simulator, clock: old.clock,
+                                        configuration: NexStarConfiguration(epoch: .j2000))
+        _ = try forcedJ2000.connect()
+        XCTAssertEqual(forcedJ2000.epoch, .j2000)
+        let recent = nexStar(.synscan, 4, 38, 6)
+        let forcedCurrent = NexStarDriver(transport: recent.simulator, clock: recent.clock,
+                                          configuration: NexStarConfiguration(epoch: .meanOfDate))
+        _ = try forcedCurrent.connect()
+        XCTAssertEqual(forcedCurrent.epoch, .meanOfDate)
+    }
+
+    func testAVersionThatCannotBeReadFailsTheConnectionAndLeavesTheCurrentEpoch() throws {
+        /// Answers the version command with six characters that are not all hexadecimal digits.
+        final class GarbledVersion: MountTransport {
+            private var pending: [UInt8] = []
+            func send(_ bytes: [UInt8]) throws { pending = Array("04250G#".utf8) }
+            func receive(maxCount: Int, timeoutSeconds: Double) throws -> [UInt8] {
+                if pending.isEmpty { throw MountError.timeout(operation: "receive") }
+                let chunk = Array(pending.prefix(maxCount))
+                pending.removeFirst(chunk.count)
+                return chunk
+            }
+            func discardPendingInput() throws { pending = [] }
+        }
+        let clock = ManualMountClock(start: Support.start)
+        let driver = NexStarDriver(transport: GarbledVersion(), clock: clock)
+        XCTAssertEqual(mountError { _ = try driver.connect() }, .malformedReply(detail: "version"))
+        XCTAssertNil(driver.version)
+        XCTAssertEqual(driver.epoch, .meanOfDate)
+    }
+
     func testTrackingIsSwitchedBackOnInTheModeThatWasRunning() throws {
         let equatorial = nexStar(trackingMode: 2)
         let driver = NexStarDriver(transport: equatorial.simulator, clock: equatorial.clock)
