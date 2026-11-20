@@ -26,12 +26,11 @@ enum ObjectsTonight {
     static func twilight(observer: Observer, timeZone: TimeZone, date: Date) -> NightTwilight {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400)
-        let previous = TwilightCalculator.night(startingOn: yesterday, observer: observer, timeZone: timeZone)
-        if date < previous.interval.end, date < (previous.sunrise ?? previous.interval.end) {
-            return previous
+        let twilightOfNight = { (day: Date) -> NightTwilight in
+            TwilightCalculator.night(startingOn: day, observer: observer, timeZone: timeZone)
         }
-        return TwilightCalculator.night(startingOn: date, observer: observer, timeZone: timeZone)
+        let underWay = TwilightCalculator.nightUnderWay(at: date, calendar: calendar, twilightOfNight: twilightOfNight)
+        return underWay?.twilight ?? twilightOfNight(date)
     }
 
     /// The night under way at `now` (the coming one by day).

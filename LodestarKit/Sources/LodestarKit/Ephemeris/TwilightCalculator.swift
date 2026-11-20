@@ -106,6 +106,29 @@ public enum TwilightCalculator {
             interval: interval, solarMidnight: midnight, sunAltitudeAtMidnight: lowest.altitude)
     }
 
+    /// The night that "tonight" means at `date`, when it is the one that began at local noon on the day before.
+    ///
+    /// A night starts at noon, so from midnight until the Sun rises the night under way is the one that began on the
+    /// previous date: at 3 am it is "tonight" still. From sunrise on, and by day, "tonight" is the coming night, the
+    /// one that starts at noon on `date`'s own day. Where the Sun does not rise, the night under way lasts until
+    /// noon. Every screen and widget that names a night "tonight" asks this.
+    ///
+    /// - Parameters:
+    ///   - date: The instant to judge.
+    ///   - calendar: The calendar that defines the days, in the time zone of the place.
+    ///   - twilightOfNight: The twilight of the night that starts on the day containing the date it is given; usually
+    ///     `night(startingOn:observer:timeZone:)`, or a lookup that remembers the nights it has computed.
+    /// - Returns: An instant on the date that night starts on, and its twilight; `nil` when "tonight" is the night
+    ///   that starts on the day of `date` itself.
+    public static func nightUnderWay(
+        at date: Date, calendar: Calendar, twilightOfNight: (Date) -> NightTwilight
+    ) -> (day: Date, twilight: NightTwilight)? {
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400)
+        let previous = twilightOfNight(yesterday)
+        guard date < previous.interval.end, date < (previous.sunrise ?? previous.interval.end) else { return nil }
+        return (yesterday, previous)
+    }
+
     /// Local noon on the calendar day of `date` to local noon on the next day. A date outside the years
     /// 1 to 4001 (`Date.distantPast ... Date.distantFuture`), or one that is not finite, is replaced by
     /// the nearest limit (or the reference date), where the calendar arithmetic is well defined.

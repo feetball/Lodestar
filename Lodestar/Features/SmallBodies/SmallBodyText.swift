@@ -19,7 +19,7 @@ enum SmallBodyText {
     static let targetsNote = "Comets and asteroids come first when they are bright and high enough tonight."
 
     static let footnote = "Magnitudes are estimates, good to a magnitude or two. "
-        + "Only bodies at least 25\u{00B0} from the Sun are listed."
+        + "Only bodies at least \(Int(SmallBodyEphemeris.defaultMinimumElongation))\u{00B0} from the Sun are listed."
 
     /// Half a day in seconds: the elements of a file are given for 0h of a day.
     private static let halfDay: TimeInterval = 43_200
