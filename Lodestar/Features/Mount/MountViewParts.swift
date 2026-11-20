@@ -130,6 +130,60 @@ enum MountStatusText {
     }
 }
 
+// MARK: - Site
+
+/// Which observing site the mount's altitude limit, the Sun check and the place sent to the mount follow. It is the
+/// site chosen in Settings, which is not always the place where the mount stands.
+struct MountSiteRow: View {
+    @Environment(AppModel.self) private var app
+    private var service: MountService { MountService.shared }
+
+    var body: some View {
+        // While a change of site waits for the person's decision, the mount still follows the old one.
+        let name = service.pendingSite == nil ? app.observerContext?.name : service.site?.name
+        InfoRow(label: "Site for limits and GoTo checks", value: name ?? "Not known yet")
+    }
+}
+
+/// Says that another site was chosen while the mount is connected, and offers to hand it to the mount. Nothing is sent
+/// to the mount before the person taps; Go to and Sync wait until then.
+struct MountSiteChangeRow: View {
+    @Environment(\.palette) private var palette
+    private var service: MountService { MountService.shared }
+
+    var body: some View {
+        if let pending = service.pendingSite {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(explanation(pending: pending.name), systemImage: "mappin.and.ellipse")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(palette.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    service.usePendingSite()
+                } label: {
+                    Text("Use \(pending.name) for the mount")
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(2)
+                }
+                .buttonStyle(.lodestarSecondary)
+                .disabled(service.isMoving || service.isWorking)
+            }
+            .accessibilityElement(children: .contain)
+        }
+    }
+
+    private func explanation(pending: String) -> String {
+        let old = service.site?.name ?? "its old site"
+        var text = "The site is now \(pending), but the mount still uses \(old). Go to and Sync wait until you use "
+            + "\(pending) for the mount or choose \(old) again in Settings."
+        if service.driverDetail?.alignment?.stars.isEmpty == false {
+            text += " Using \(pending) clears the star alignment if it is more than a quarter of a degree away."
+        }
+        return text
+    }
+}
+
 // MARK: - Confirmation
 
 /// A GoTo or a sync waiting for the person's yes.
@@ -191,6 +245,7 @@ struct MountConfirmationSheet: View {
                                      date: Date())
             VStack(alignment: .leading, spacing: 8) {
                 InfoRow(label: "Target", value: confirmation.object.name)
+                MountSiteRow()
                 InfoRow(label: "Altitude now", value: AppFormat.altitude(target.altitude))
                 InfoRow(label: "Your altitude limit", value: AppFormat.altitude(service.settings.altitudeLimit))
                 if let start = plan.start {

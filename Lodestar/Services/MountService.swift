@@ -75,6 +75,12 @@ final class MountService {
     private(set) var alignmentHomeError: Double?
     /// A connection has succeeded at some time (the simulated mount counts). Until then the Aim screen has no Mount button.
     private(set) var hasConnectedBefore = false
+    /// The observing site that the mount's altitude limit, Sun check and place follow: the one the mount was connected
+    /// with, or the last one the person accepted for it. While `pendingSite` is set it is not the site the app shows.
+    private(set) var site: ObserverContext?
+    /// The site chosen in the app since the mount connected, which a connected mount has not been given. Go to and Sync
+    /// wait until the person accepts it with `usePendingSite()` or chooses the mount's site again.
+    private(set) var pendingSite: ObserverContext?
 
     var settings = MountUserSettings() {
         didSet {
@@ -96,7 +102,7 @@ final class MountService {
     @ObservationIgnored private var session: MountSession?
     /// Changes whenever a session starts or ends; work that belongs to an older session sees the difference and stops.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var observer: Observer?
+    private var observer: Observer? { site?.observer }
     /// The place the Sky-Watcher driver was last given.
     @ObservationIgnored private var handedLocation: GeographicLocation?
     @ObservationIgnored private var connectTask: Task<Void, Never>?
@@ -274,6 +280,7 @@ final class MountService {
         guard capabilities.canSlew else { return MountError.notSupported(feature: .slew).userMessage }
         guard let object else { return "Choose a target first." }
         if MountTargets.isSun(object) { return MountTargets.sunRefusal }
+        if let reason = pendingSiteReason { return reason }
         if let observer {
             let target = MountTargets.resolve(object, observer: observer, date: Date())
             if target.lowestAltitude < settings.altitudeLimit {
@@ -311,11 +318,20 @@ final class MountService {
         guard capabilities.canSync else { return MountError.notSupported(feature: .sync).userMessage }
         guard let object else { return "Choose a target first." }
         if MountTargets.isSun(object) { return MountTargets.sunRefusal }
+        if let reason = pendingSiteReason { return reason }
         switch status.phase {
         case .slewing: return MountError.slewInProgress.userMessage
         case .nudging: return MountError.busy.userMessage
         case .idle, .disconnected: return nil
         }
+    }
+
+    /// Why a GoTo or a sync waits for a decision about the site, or `nil` when no change of site is waiting. The checks
+    /// before them follow the site shown in the app, which the mount has not been given yet.
+    private var pendingSiteReason: String? {
+        guard let pending = pendingSite else { return nil }
+        let old = site?.name ?? "the old site"
+        return "The site changed to \(pending.name). Use it for the mount first, or choose \(old) again."
     }
 
     /// The limits the controller runs with. A mount that Lodestar aligns checks every alignment star itself, and its first
@@ -349,38 +365,39 @@ final class MountService {
     // MARK: Connecting
 
     /// Connects to the mount chosen on the connection screen. Does nothing while connecting or connected.
-    func connect(observer: Observer?) {
+    func connect(context: ObserverContext?) {
         let option = selectedOption
-        startConnection(option: option, form: form, observer: observer)
+        startConnection(option: option, form: form, context: context)
     }
 
     /// Connects again after the connection was lost: to the simulated mount if that was the one, else to the mount chosen
     /// on the connection screen.
-    func reconnect(observer: Observer?) {
+    func reconnect(context: ObserverContext?) {
         if let option = connectedOption, option.isDemo {
-            connectDemo(option, observer: observer)
+            connectDemo(option, context: context)
         } else {
-            connect(observer: observer)
+            connect(context: context)
         }
     }
 
     /// Connects to a simulated mount.
-    func connectDemo(_ option: MountConnectionOption = .demo, observer: Observer?) {
-        startConnection(option: option, form: MountConnectionForm(option: option), observer: observer)
+    func connectDemo(_ option: MountConnectionOption = .demo, context: ObserverContext?) {
+        startConnection(option: option, form: MountConnectionForm(option: option), context: context)
     }
 
-    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, observer: Observer?) {
+    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, context: ObserverContext?) {
         let isDemo = option.isDemo
         switch connection {
         case .connecting, .connected: return
         case .disconnected, .lost: break
         }
         clearMessages()
-        guard let observer else {
+        guard let context else {
             errorText = "Lodestar needs to know where you are to check targets against your altitude limit. "
                 + "Allow location access or choose an observing site first."
             return
         }
+        let observer = context.observer
         if !isDemo && form.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errorText = "Enter the mount's address first."
             return
@@ -390,7 +407,8 @@ final class MountService {
                 + "from 1 to 65535."
             return
         }
-        self.observer = observer
+        site = context
+        pendingSite = nil
         self.isDemo = isDemo
         generation += 1
         let token = generation
@@ -946,17 +964,54 @@ final class MountService {
     // MARK: Observer and limits
 
     /// Tells the controller where the person is, for its altitude checks and the frame of the mount's coordinates.
-    func updateObserver(_ new: Observer?) {
-        guard let new, new != observer else { return }
-        observer = new
-        guard isConnected else { return }
+    ///
+    /// The phone's own position drifting is passed on at once. A change of site, though (another saved site, or the
+    /// device's position in place of a site or the other way round), is not handed to a connected mount unasked: a
+    /// Sky-Watcher forgets its star alignment when it is given another place, and the limits and checks would leave the
+    /// place where the mount stands. Such a change waits in `pendingSite` for `usePendingSite()`.
+    func updateObserver(_ context: ObserverContext?) {
+        guard let context else { return }
+        guard context.observer != observer || context.source != site?.source else {
+            // The person chose the mount's own site again.
+            if pendingSite != nil { pendingSite = nil }
+            return
+        }
+        guard isConnected, let current = site else {
+            site = context
+            pendingSite = nil
+            return
+        }
+        let isDrift = context.source == .device && current.source == .device
+        if !isDrift, Self.isFar(context.observer.location, from: current.observer.location) {
+            pendingSite = context
+            return
+        }
+        adopt(context)
+    }
+
+    /// Hands the mount the site the person switched to, once they have said so. It waits while the mount is moving.
+    func usePendingSite() {
+        guard isConnected, !isMoving, !isWorking, let pending = pendingSite else { return }
+        adopt(pending)
+    }
+
+    /// Whether two places differ by more than the tolerance in latitude or in longitude.
+    private static func isFar(_ place: GeographicLocation, from other: GeographicLocation) -> Bool {
+        let latitude = abs(place.latitude - other.latitude)
+        let longitude = abs(AstroMath.normalizeSignedDegrees(place.longitude - other.longitude))
+        return latitude > Self.siteToleranceDegrees || longitude > Self.siteToleranceDegrees
+    }
+
+    /// Makes `context` the site of the connected mount and of its checks, and tells the controller.
+    private func adopt(_ context: ObserverContext) {
+        let new = context.observer
+        site = context
+        pendingSite = nil
         // The mount that Lodestar aligns points by the phone's location, which its driver is handed again when the phone has
         // moved. The driver forgets the alignment once the place differs by about a quarter of a degree.
         var handsOver = false
         if usesLodestarAlignment, let handed = handedLocation, status.phase != .slewing {
-            let latitude = abs(new.location.latitude - handed.latitude)
-            let longitude = abs(AstroMath.normalizeSignedDegrees(new.location.longitude - handed.longitude))
-            handsOver = latitude > Self.siteToleranceDegrees || longitude > Self.siteToleranceDegrees
+            handsOver = Self.isFar(new.location, from: handed)
         }
         if handsOver { handedLocation = new.location }
         let hadStars = !(driverDetail?.alignment?.stars.isEmpty ?? true)
