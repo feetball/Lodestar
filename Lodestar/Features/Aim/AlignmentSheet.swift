@@ -23,6 +23,9 @@ struct AlignmentSheet: View {
     /// Seconds between the refreshes of the candidates' positions and of their order.
     private static let candidateRefreshInterval = 30.0
     private static let sortInterval = 2.5
+    /// Time zero of the clock that times the hold-still wait. It is static so that every reading is measured from the
+    /// same moment, however often SwiftUI makes the view value again.
+    private static let clockOrigin = ContinuousClock.now
 
     var body: some View {
         VStack(spacing: 0) {
@@ -189,15 +192,21 @@ struct AlignmentSheet: View {
         AccessibilityNotification.Announcement("Hold still").post()
     }
 
+    /// Seconds on a monotonic clock, which is what `AimHoldStill` is fed. This is not `ProcessInfo.systemUptime`, which
+    /// Apple lists as a system boot time API that the privacy manifest would have to declare.
+    private static var clockSeconds: Double {
+        (ContinuousClock.now - clockOrigin) / .seconds(1)
+    }
+
     /// Syncs the moment the camera has been still for the whole window, and gives up after a few seconds.
     private func holdStill() async {
         guard holdProgress != nil else { return }
-        var wait = AimHoldStill(startedAt: ProcessInfo.processInfo.systemUptime)
+        var wait = AimHoldStill(startedAt: Self.clockSeconds)
         while !Task.isCancelled {
             let mount = app.mountProfile
             let motionSample = app.motion.latestSample()
             let sample = motionSample.flatMap { SteadinessSample(attitude: $0.rawAttitude, mount: mount) }
-            switch wait.update(now: ProcessInfo.processInfo.systemUptime, sample: sample) {
+            switch wait.update(now: Self.clockSeconds, sample: sample) {
             case .waiting(let progress):
                 // In steps of 2 %, so that the sheet is not redrawn at the polling rate for a bar that moves slowly.
                 let shown = (progress * 50).rounded(.down) / 50
