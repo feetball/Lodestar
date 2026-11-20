@@ -1,8 +1,8 @@
 import SwiftUI
 import LodestarKit
 
-/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, in a row or, in a wide HUD, in two
-/// columns.
+/// The buttons of the screen: target, align, mosaic, camera, night mode and zoom, and with several camera profiles the
+/// frame menu, in a row or, in a wide HUD, in two columns.
 struct AimControlsBar: View {
     let model: AimViewModel
     @Binding var sheet: AimSheet?
@@ -12,12 +12,18 @@ struct AimControlsBar: View {
 
     /// The two columns of a wide HUD.
     private static let columns = [GridItem(.fixed(66), spacing: 6), GridItem(.fixed(66), spacing: 6)]
-    /// The four columns of the bar with larger text, which has no room for all the buttons in one row.
+    /// The four columns of the bar with larger text, or with the Mount button too, which have no room for all the
+    /// buttons in one row.
     private static let wrappedColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
+    /// The most buttons that share one row.
+    private static let buttonsInRow = 7
+
+    /// Target, Align, Mosaic, Time, Camera, Night and Zoom, and Mount for people who have a GoTo mount.
+    private var buttonCount: Int { Self.buttonsInRow + (MountService.shared.showsAimButton ? 1 : 0) }
 
     var body: some View {
         if axis == .horizontal {
-            if dynamicTypeSize > .large {
+            if dynamicTypeSize > .large || buttonCount > Self.buttonsInRow {
                 LazyVGrid(columns: Self.wrappedColumns, spacing: 6) { buttons }
             } else {
                 HStack(spacing: 6) { buttons }
@@ -36,12 +42,23 @@ struct AimControlsBar: View {
         control("Target", systemImage: "scope") { sheet = .targetPicker }
             .accessibilityLabel("Choose target")
             .accessibilityValue(model.guidanceTarget?.name ?? model.satelliteSource?.title ?? "None")
-        control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) { sheet = .alignment }
-            .accessibilityLabel("Align on a star")
-            .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
+        control("Align", systemImage: "dot.viewfinder", isOn: app.alignment.isAligned) {
+            // Aligning compares the sky with the phone's sensors now: the live sky is the one to align on.
+            model.endPreview()
+            sheet = .alignment
+        }
+        .accessibilityLabel("Align on a star")
+        .accessibilityValue(app.alignment.isAligned ? "Aligned" : "Not aligned")
         control("Mosaic", systemImage: "square.grid.3x3", isOn: mosaic.isActive) { sheet = .mosaic }
             .accessibilityLabel("Plan a mosaic")
             .accessibilityValue(mosaic.isActive ? mosaic.progressText : "Off")
+        let moment = model.previewMoment
+        control("Time", systemImage: moment == nil ? "clock" : "clock.fill", isOn: moment != nil) {
+            model.toggleTimeBar()
+        }
+        .accessibilityLabel("Time preview")
+        .accessibilityValue(moment.map { "Previewing \($0.text)" } ?? (model.isTimeBarOpen ? "Open" : "Live"))
+        .accessibilityHint("Shows or hides the time bar, to preview the sky at another time.")
         // Only for people who have a GoTo mount: the first connection is made in Settings.
         if MountService.shared.showsAimButton {
             control("Mount", systemImage: "antenna.radiowaves.left.and.right", isOn: MountService.shared.isConnected) {
@@ -63,6 +80,10 @@ struct AimControlsBar: View {
         .accessibilityValue(nightMode.title)
         .accessibilityHint("Cycles between off, on and after sunset.")
         AimFieldOfViewButton(model: model, minHeight: buttonHeight)
+        // Switching between cameras at the tripod needs more than one profile.
+        if app.settings.cameraProfiles.count > 1 {
+            AimFrameMenu(minHeight: buttonHeight)
+        }
     }
 
     private func control(_ title: String, systemImage: String, isOn: Bool = false,
@@ -138,5 +159,45 @@ private struct AimFieldOfViewButton: View {
         let rounded = (factor * 10).rounded() / 10
         let digits = rounded == rounded.rounded() ? 0 : 1
         return rounded.formatted(.number.precision(.fractionLength(digits))) + "\u{00D7}"
+    }
+}
+
+/// The frame button: a menu of the camera profiles for switching between bodies and lenses at the tripod. The frame on
+/// the sky follows the one chosen.
+private struct AimFrameMenu: View {
+    @Environment(AppModel.self) private var app
+    let minHeight: CGFloat
+
+    var body: some View {
+        let settings = app.settings
+        Menu {
+            Picker("Camera and lens", selection: activeProfile) {
+                ForEach(settings.cameraProfiles) { profile in
+                    Text(profile.name).tag(profile.id)
+                }
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 20, weight: .medium))
+                Text("Frame")
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 2)
+        }
+        .menuStyle(.button)
+        .buttonStyle(AimControlButtonStyle(minHeight: minHeight))
+        .accessibilityLabel("Camera frame")
+        .accessibilityValue(settings.activeCameraProfile.name)
+        .accessibilityHint("Choose the camera and lens.")
+    }
+
+    /// The active profile; choosing another one switches the frame.
+    private var activeProfile: Binding<UUID> {
+        Binding(
+            get: { app.settings.activeCameraProfile.id },
+            set: { app.settingsStore.activateCameraProfile($0) })
     }
 }

@@ -26,6 +26,8 @@ struct OnlineFeedStatus: Equatable, Sendable {
 final class OnlineDataService {
     /// Added to a server's `Expires` so that the app's users do not all ask in the same minute (MET Norway asks for it).
     private static let maximumJitter: TimeInterval = 300
+    /// One tile of about 11 MB must arrive within this long: 5 minutes, which is 0.3 Mbit/s.
+    private static let terrainTileTimeout: TimeInterval = 300
 
     /// The state of every feed.
     private(set) var statuses: [OnlineFeed: OnlineFeedStatus]
@@ -93,6 +95,8 @@ final class OnlineDataService {
             // Delete at once, so that the files are gone even if the app is suspended before the queue has drained;
             // the queued delete covers a download that is still running and finishes after this.
             for resource in feed.resources { cache.delete(resource.key) }
+            // A computation that is still running stops at its next check; what it downloaded goes at once.
+            if feed == .terrain { terrainLoader.deleteLeftovers() }
             enqueue { service in
                 for resource in feed.resources { cache.delete(resource.key) }
                 service.loaded.remove(feed)
@@ -126,6 +130,44 @@ final class OnlineDataService {
         enqueue { service in
             await service.loadSaved(.clouds)
             await service.refresh(.clouds, manual: false)
+        }
+    }
+
+    // MARK: Terrain horizons
+
+    /// Downloads the elevation tiles around `location`, one after the other (the nearest first, at most
+    /// `TerrainHorizonLoader.maximumTiles`), and works out the terrain horizon from them. The feed must be on: nothing is
+    /// requested otherwise. The tiles are deleted when it is over. Cancel by cancelling the calling task; switching the
+    /// feed off stops it too. `progress` is called from a background thread.
+    func computeTerrainHorizon(for location: GeographicLocation,
+                               progress: @escaping @Sendable (TerrainHorizonLoader.Progress) -> Void) async -> TerrainComputation {
+        guard isEnabled(.terrain) else { return .failed("Terrain horizons are switched off.") }
+        let outcome = await terrainLoader.fetchTiles(for: location, progress: progress) { [self] in
+            await isTerrainSwitchedOff()
+        }
+        switch outcome {
+        case .failed(let message):
+            return .failed(message)
+        case .cancelled:
+            return .cancelled
+        case .tiles(let tiles, let unavailable):
+            let result = await Task.detached(priority: .userInitiated) {
+                TerrainHorizon.profile(at: location, tiles: tiles)
+            }.value
+            if Task.isCancelled || !isEnabled(.terrain) { return .cancelled }
+            return .done(result, tilesUsed: tiles.count, unavailable: unavailable)
+        }
+    }
+
+    private func isTerrainSwitchedOff() -> Bool { !isEnabled(.terrain) }
+
+    /// Fetches tiles with the app's downloader and a longer time limit than the small files have.
+    private var terrainLoader: TerrainHorizonLoader {
+        var downloader = refresher.downloader
+        downloader.totalTimeout = Self.terrainTileTimeout
+        let configured = downloader
+        return TerrainHorizonLoader { url in
+            await configured.fetch(OnlineRequest(url: url, maximumBytes: TerrainHorizonLoader.maximumTileBytes))
         }
     }
 
@@ -247,6 +289,8 @@ final class OnlineDataService {
         case .satellites, .starlink: satellites = satellites.without(feed)
         case .comets: catalog.setDownloadedSmallBodies([])
         case .clouds: forecast = nil
+        // The tiles are deleted after every computation; there is nothing in memory.
+        case .terrain: break
         }
     }
 }

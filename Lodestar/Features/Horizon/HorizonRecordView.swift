@@ -242,12 +242,20 @@ struct HorizonRecordView: View {
         }
     }
 
+    /// Whether the site has a terrain horizon, which fills the stretches that are not swept.
+    private var hasTerrainHorizon: Bool { site.terrainHorizon != nil }
+
     // MARK: Bottom
 
     private func bottomPanel(_ reading: HorizonReading) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HorizonDirectionReadout(reading: reading)
             HorizonSkylineStrip(reading: reading)
+            if hasTerrainHorizon {
+                Text(TerrainText.stripNote)
+                    .font(.footnote)
+                    .foregroundStyle(palette.secondaryText)
+            }
             coverageRow(reading)
         }
         .padding(.horizontal, 16)

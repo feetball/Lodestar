@@ -12,6 +12,9 @@ enum OnlineFeed: String, CaseIterable, Identifiable, Sendable {
     case comets
     /// MET Norway Locationforecast 2.0 `complete`: hourly cloud cover.
     case clouds
+    /// AWS Open Data Terrain Tiles: the elevation tiles around a saved site, for its terrain horizon. It has no
+    /// `resources`: nothing is refreshed, the tiles are downloaded when a site's editor asks and are deleted after use.
+    case terrain
 
     var id: String { rawValue }
 
@@ -22,6 +25,7 @@ enum OnlineFeed: String, CaseIterable, Identifiable, Sendable {
         case .starlink: return "Starlink streak warnings"
         case .comets: return "Comets"
         case .clouds: return "Cloud forecast"
+        case .terrain: return "Terrain horizons"
         }
     }
 

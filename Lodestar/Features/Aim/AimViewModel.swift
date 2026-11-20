@@ -4,9 +4,12 @@ import Observation
 
 /// The state and background work behind the Aim screen.
 ///
-/// Only low-rate values are observable (the sky rebuilt every couple of seconds, the HUD rotation, the zoom). What
-/// changes with every sensor sample is not published: the overlay and the readouts ask `engine` for the frame
-/// when they draw, so the view tree is not invalidated 60 times a second.
+/// Only low-rate values are observable (the sky rebuilt every couple of seconds, the HUD rotation, the zoom, the
+/// preview). What changes with every sensor sample is not published: the overlay and the readouts ask `engine` for the
+/// frame when they draw, so the view tree is not invalidated 60 times a second.
+///
+/// With a `previewOffset` the sky, the target and the guidance are worked out for a later (or earlier) moment while the
+/// phone's pointing stays live; the screen ends the preview (`leave()`) when the tab or the app goes away.
 @MainActor
 @Observable
 final class AimViewModel {
@@ -14,6 +17,8 @@ final class AimViewModel {
     private static let skyRefreshInterval = 2.0
     /// Seconds between searches for the target's next rise.
     private static let riseRefreshInterval = 60.0
+    /// A sky built for an instant this many seconds away from the preview's counts as built for it.
+    private static let skyFreshInterval: TimeInterval = 30
     private static let loopInterval: Duration = .milliseconds(33)
     /// Where the zoom of the virtual sky is remembered, so it survives the screen being rebuilt (night mode starting
     /// at dusk rebuilds the tabs) and relaunches.
@@ -37,6 +42,11 @@ final class AimViewModel {
     private var requestedCameraZoom: Double
     /// An object the alignment sheet asks to be guided to; it replaces the app's target while it is set.
     var alignmentTarget: CelestialObject?
+    /// How far from now the sky is previewed, in seconds: 0 is live, positive looks ahead, negative back, within
+    /// ±48 hours (`AimPreview.limit`). Change it with `stepPreview`, `previewAt` and `endPreview`.
+    private(set) var previewOffset: TimeInterval = 0
+    /// Whether the time bar above the controls is showing.
+    private(set) var isTimeBarOpen = false
 
     @ObservationIgnored private var hasHUDRotation = false
     /// Whether the engine is leading the guidance to a satellite.
@@ -60,6 +70,27 @@ final class AimViewModel {
     }
 
     // MARK: Derived state
+
+    /// Whether the sky is shown for another moment than now.
+    var isPreviewing: Bool { previewOffset != 0 }
+
+    /// The instant the sky, the target, the planets and the guidance are worked out for: the app clock moved by the
+    /// `previewOffset`. Reads the app clock, so a view that asks for it follows the clock's seconds.
+    var date: Date { AimPreview.date(now: app.clock.now, offset: previewOffset) }
+
+    /// Whether there is a preview and `skyContent` has been rebuilt for the moment it shows.
+    var isSkyBuiltForPreview: Bool {
+        guard isPreviewing, let built = skyContent?.snapshot.date else { return false }
+        return abs(built.timeIntervalSince(date)) <= Self.skyFreshInterval
+    }
+
+    /// Whether the Sun is up at the previewed moment, or `nil` without a preview and while the sky is still being rebuilt
+    /// for the moment that was just chosen.
+    var isDaylightAtPreview: Bool? {
+        guard isSkyBuiltForPreview,
+              let sun = skyContent?.snapshot.bodies.first(where: { $0.object.category == .sun }) else { return nil }
+        return AimPreview.isDaylight(sunAltitude: sun.horizontal.altitude)
+    }
 
     /// The mosaic being shot, shared with the Sky chart.
     var mosaicSession: MosaicSession { MosaicSession.shared }
@@ -104,7 +135,7 @@ final class AimViewModel {
     func skyInputs(for configuration: AimConfiguration) -> AimSkyInputs? {
         guard let context = app.observerContext, app.catalog.loadState == .loaded else { return nil }
         return AimSkyInputs(observer: context.observer, options: configuration.skyOptions, target: guidanceTarget,
-                            horizon: context.horizon, mosaic: mosaicSession.plan)
+                            horizon: context.horizon, mosaic: mosaicSession.plan, previewOffset: previewOffset)
     }
 
     // MARK: Configuration
@@ -132,7 +163,7 @@ final class AimViewModel {
             // Read again every round: the catalog is replaced when downloaded comets and asteroids arrive, which does
             // not restart this task. (It is never unloaded, so there is one whenever the inputs exist.)
             guard let catalog = app.catalog.catalog else { return }
-            let date = app.clock.now
+            let date = AimPreview.date(now: app.clock.now, offset: inputs.previewOffset)
             let content = await Task.detached(priority: .userInitiated) {
                 AimSkyContent.build(catalog: catalog, inputs: inputs, date: date)
             }.value
@@ -143,7 +174,7 @@ final class AimViewModel {
         }
     }
 
-    /// Keeps `riseInfo` (when the target next rises) current while there is a target.
+    /// Keeps `riseInfo` (when the target next rises, counted from the previewed moment) current while there is a target.
     func keepRiseInfoCurrent(_ inputs: AimSkyInputs?) async {
         guard let inputs, let target = inputs.target else {
             riseInfo = nil
@@ -151,7 +182,7 @@ final class AimViewModel {
         }
         let observer = inputs.observer
         while !Task.isCancelled {
-            let date = app.clock.now
+            let date = AimPreview.date(now: app.clock.now, offset: inputs.previewOffset)
             let info = await Task.detached(priority: .utility) {
                 AimRiseInfo.compute(for: target, observer: observer, from: date)
             }.value
@@ -205,6 +236,46 @@ final class AimViewModel {
         wasOnTarget = nil
     }
 
+    // MARK: Time preview
+
+    /// Shows or hides the time bar. Hiding it does not end a preview; the chip at the top does that.
+    func toggleTimeBar() {
+        isTimeBarOpen.toggle()
+    }
+
+    /// Moves the previewed moment by `step`, from now when the sky is live; a step back to now ends the preview.
+    func stepPreview(_ step: AimPreview.Step) {
+        setPreviewOffset(previewOffset + step.seconds)
+    }
+
+    /// Shows the sky at `date` (held within 48 hours of now).
+    func previewAt(_ date: Date) {
+        setPreviewOffset(AimPreview.offset(to: date, from: app.clock.now))
+    }
+
+    /// Back to the live sky.
+    func endPreview() {
+        setPreviewOffset(0)
+    }
+
+    /// Back to the live sky and out of the time bar: the Aim tab went away, so nothing stale is left on return.
+    func leave() {
+        endPreview()
+        if isTimeBarOpen { isTimeBarOpen = false }
+    }
+
+    private func setPreviewOffset(_ seconds: TimeInterval) {
+        let offset = AimPreview.normalized(seconds)
+        guard offset != previewOffset else { return }
+        // Looking ahead needs a sky that stands still for the moment: a followed satellite is dropped.
+        if offset != 0 { app.satelliteAim.stop() }
+        previewOffset = offset
+        // The target jumps with the clock: reaching or losing it because of that is not worth a buzz.
+        wasOnTarget = nil
+        // The panel of a mosaic moves with it.
+        refreshMosaicGuidance(force: true)
+    }
+
     // MARK: Mosaic
 
     /// Starts shooting `plan`: the guidance leads to its first panel.
@@ -231,9 +302,9 @@ final class AimViewModel {
         refreshMosaicGuidance(force: true)
     }
 
-    /// Points the guidance at the current panel's place in the sky at the clock's time. A panel of an equatorial plan
-    /// moves with the stars, so this runs about once a second while a mosaic is shot, and at once when the panel
-    /// changes. It costs microseconds: one panel, not the plan.
+    /// Points the guidance at the current panel's place in the sky at the previewed moment (the clock's time while
+    /// live). A panel of an equatorial plan moves with the stars, so this runs about once a second while a mosaic is
+    /// shot, and at once when the panel changes. It costs microseconds: one panel, not the plan.
     private func refreshMosaicGuidance(force: Bool) {
         let session = mosaicSession
         guard let plan = session.plan else {
@@ -244,7 +315,7 @@ final class AimViewModel {
             }
             return
         }
-        let now = app.clock.now
+        let now = date
         if !force, let last = lastMosaicRefresh, last.revision == session.revision, last.date == now { return }
         // A new panel starts without a remembered on-target state, so reaching it does not buzz for the old one.
         if lastMosaicRefresh?.revision != session.revision { wasOnTarget = nil }

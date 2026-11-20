@@ -143,14 +143,15 @@ final class CatalogSkyTests: XCTestCase {
         let jupiter = try XCTUnwrap(frame().currentAngularSize(of: try object("planet.jupiter")))
         XCTAssertTrue((0.45...0.9).contains(jupiter.majorArcminutes), "\(jupiter.majorArcminutes)")
         XCTAssertTrue(jupiter.description.hasSuffix("″"), jupiter.description)
-        XCTAssertTrue(try XCTUnwrap(frame().currentAngularSize(of: try object("moon"))).description.hasSuffix("′"))
+        let moonText = try XCTUnwrap(frame().currentAngularSize(of: try object("moon"))).description
+        XCTAssertTrue(moonText.contains("′") && !moonText.contains("°"), "the Moon is about half a degree: \(moonText)")
     }
 
     func testCurrentAngularSizeOfOtherObjectsIsTheCatalogSize() throws {
         let skyFrame = frame()
         let m31 = try object("dso.M31")
         XCTAssertEqual(skyFrame.currentAngularSize(of: m31), m31.angularSize)
-        XCTAssertEqual(skyFrame.currentAngularSize(of: m31)?.description, "178′ × 70′")
+        XCTAssertEqual(skyFrame.currentAngularSize(of: m31)?.description, "2° 58′ × 1° 10′")
         XCTAssertNil(skyFrame.currentAngularSize(of: try object("star.hip32349")))
         XCTAssertNil(skyFrame.currentAngularSize(of: try object("special.ncp")))
     }
