@@ -8,6 +8,8 @@ struct AimConfiguration: Equatable {
     var alignment: AlignmentModel
     /// The DSLR's picture in landscape orientation, in degrees.
     var lensFrame: FrameSize
+    /// The border of the DSLR's picture in the camera's frame: a rectangle, or a curve for a fisheye lens.
+    var lensOutline: [Vector3]
     var showConstellationLines: Bool
     var showConstellationNames: Bool
     var showDeepSkyObjects: Bool
@@ -26,7 +28,9 @@ struct AimConfiguration: Equatable {
         let mount = app.mountProfile
         self.mount = mount
         alignment = app.alignment
-        lensFrame = app.lensSetup.fieldOfView
+        let lens = app.lensSetup
+        lensFrame = lens.fieldOfView
+        lensOutline = AimLensFrame.outline(of: lens)
         showConstellationLines = settings.showConstellationLines
         showConstellationNames = settings.showConstellationNames
         showDeepSkyObjects = settings.showDeepSkyObjects

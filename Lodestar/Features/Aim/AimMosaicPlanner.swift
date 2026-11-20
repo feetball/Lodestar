@@ -20,6 +20,9 @@ struct AimMosaicRequest: Equatable, Sendable {
     var orientation: MosaicOrientation?
     /// The lens's picture in landscape orientation.
     var frame: FrameSize
+    /// Whether the lens is an ordinary (rectilinear) one: the panels of a mosaic are rectangles on the sky, so a fisheye
+    /// frame cannot be tiled.
+    var lensIsRectilinear = true
     var observer: Observer
     /// The instant the Milky Way arch and a custom centre are taken at.
     var date: Date
@@ -48,6 +51,10 @@ enum AimMosaicPlanner {
     static let customHeightRange: ClosedRange<Double> = 2...120
 
     static func plan(for request: AimMosaicRequest) -> Result<AimMosaicPlanResult, AimMosaicProblem> {
+        guard request.lensIsRectilinear else {
+            return .failure(AimMosaicProblem(
+                message: "Mosaics need a rectilinear lens. Choose another camera profile in Settings."))
+        }
         do {
             let (region, title) = try region(for: request)
             let recommended = try MosaicPlanner.recommendedOrientation(region: region, frame: request.frame,

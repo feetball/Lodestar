@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Environment(\.palette) private var palette
     /// What the Location section asks to present. Its sheets hang on the form, which is always on screen.
     @State private var locationPresentation = SettingsLocationPresentation()
+    /// What the Camera & Lens section asks to present. Its sheet hangs on the form as well.
+    @State private var cameraPresentation = SettingsCameraPresentation()
 
     var body: some View {
         NavigationStack {
@@ -14,7 +16,7 @@ struct SettingsView: View {
                 SettingsLocationSection(presentation: $locationPresentation)
                 SettingsMountSection()
                 SettingsMountControlSection()
-                SettingsCameraSection()
+                SettingsCameraSection(presentation: $cameraPresentation)
                 SettingsNightSection()
                 SettingsFeedbackSection()
                 SettingsSkyDisplaySection()
@@ -24,6 +26,7 @@ struct SettingsView: View {
                 SettingsAboutSection()
             }
             .settingsLocationSheets($locationPresentation)
+            .settingsCameraSheets($cameraPresentation)
             .themedList(palette)
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
