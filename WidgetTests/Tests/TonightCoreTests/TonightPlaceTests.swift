@@ -25,7 +25,12 @@ final class TonightPlaceTests: XCTestCase {
         let place = TonightPlace.preview()
         XCTAssertEqual(place.latitude, 40)
         XCTAssertEqual(place.timeZoneIdentifier, TimeZone.current.identifier)
-        XCTAssertEqual(place.longitude, Double(TimeZone.current.secondsFromGMT()) / 240, accuracy: 1e-9)
+        // Fifteen degrees to the hour, wrapped into (-180, 180] as a place wraps it: UTC+13 and UTC+14 would be 195° and
+        // 210° east, which is 165° and 150° west.
+        var longitude = Double(TimeZone.current.secondsFromGMT()) / 240
+        if longitude > 180 { longitude -= 360 }
+        if longitude <= -180 { longitude += 360 }
+        XCTAssertEqual(place.longitude, longitude, accuracy: 1e-9)
     }
 
     func testAPlaceSurvivesJSONAndTheStore() throws {

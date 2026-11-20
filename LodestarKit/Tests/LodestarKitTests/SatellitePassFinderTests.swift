@@ -206,7 +206,8 @@ final class SatellitePassFinderTests: XCTestCase {
             output[round] = all.map { finder.passes(of: $0) }
         }
         for round in 0..<rounds { XCTAssertEqual(results[round], expected) }
-        XCTAssertTrue(expected.allSatisfy { $0.allSatisfy { abs($0.duration) >= 0.0 } })
+        XCTAssertTrue(expected.contains { !$0.isEmpty })
+        XCTAssertTrue(expected.allSatisfy { $0.allSatisfy { $0.duration > 0.0 } })
     }
 
     func testPassesOfDeepSpaceOrbitsLastHours() throws {

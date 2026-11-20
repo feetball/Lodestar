@@ -87,6 +87,7 @@ final class SatelliteTransitFinderTests: XCTestCase {
 
     func testTransitsAreChronologicalAndDescribeTheirGeometry() throws {
         let found = try allTransits()
+        XCTAssertFalse(found.isEmpty)
         XCTAssertEqual(found.map(\.date), found.map(\.date).sorted())
         let ground = try satellite()
         for transit in found {
@@ -128,7 +129,9 @@ final class SatelliteTransitFinderTests: XCTestCase {
 
     func testObserverOnTheCentrelineSeesTheSatelliteCrossTheCentre() throws {
         let ground = try satellite()
-        for transit in try allTransits() {
+        let found = try allTransits()
+        XCTAssertFalse(found.isEmpty)
+        for transit in found {
             let centreline = try XCTUnwrap(transit.centreline)
             XCTAssertLessThan(centreline.separation, 0.01)
             let moved = Observer(location: centreline.location)
@@ -151,7 +154,9 @@ final class SatelliteTransitFinderTests: XCTestCase {
 
     func testTheCrossingDurationIsTheChordOverTheAngularSpeed() throws {
         let ground = try satellite()
-        for transit in try allTransits() {
+        let found = try allTransits()
+        XCTAssertFalse(found.isEmpty)
+        for transit in found {
             let centreline = try XCTUnwrap(transit.centreline)
             let moved = Observer(location: centreline.location)
             let again = SatelliteTransitFinder.transits(

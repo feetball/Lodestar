@@ -283,24 +283,9 @@ final class PolarAlignmentTests: XCTestCase {
 
     /// The astrometry in `PolarAlignment` is the Hipparcos data in `Resources/stars.json` (HYG v4.1).
     func testAstrometryMatchesTheBundledStarCatalog() throws {
-        struct Catalog: Decodable {
-            struct Star: Decodable {
-                let hip: Int?
-                let ra: Double
-                let de: Double
-                let pa: Double?
-                let pd: Double?
-            }
-            let stars: [Star]
-        }
-        let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Sources/LodestarKit/Resources/stars.json")
-        guard FileManager.default.isReadableFile(atPath: resources.path) else {
-            throw XCTSkip("Resources/stars.json is not reachable from the test's source location (\(resources.path))")
-        }
-        let catalog = try JSONDecoder().decode(Catalog.self, from: Data(contentsOf: resources))
+        let stars = try CatalogFixture.rawStars()
         for star in [PolarAlignment.polaris, PolarAlignment.sigmaOctantis] {
-            let entry = try XCTUnwrap(catalog.stars.first { $0.hip == star.hipparcosNumber }, star.name)
+            let entry = try XCTUnwrap(stars.first { $0.hip == star.hipparcosNumber }, star.name)
             let place = EquatorialCoordinate(rightAscension: entry.ra, declination: entry.de)
             XCTAssertEqual(star.position.angularSeparation(to: place) * 3_600, 0, accuracy: 0.05, "\(star.name): arcseconds apart")
             XCTAssertEqual(star.properMotion.raMilliarcsecondsPerYear, try XCTUnwrap(entry.pa), accuracy: 0.005, star.name)

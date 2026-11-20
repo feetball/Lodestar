@@ -193,8 +193,9 @@ final class PlanningMeridianClockTests: XCTestCase {
         let transits = MeridianClock.transit(for: ceres, around: boulderSiriusTransit, observer: boulder)
         let next = try XCTUnwrap(transits.next)
         let previous = try XCTUnwrap(transits.previous)
-        // Ceres is a main-belt asteroid: a transit comes about a sidereal day (plus its own motion) after the last.
-        XCTAssertEqual(next.timeIntervalSince(previous), siderealDay, accuracy: 600)
+        // Ceres is a main-belt asteroid: a transit comes about a sidereal day (plus its own motion, 53 s here) after the last.
+        // A solar day would be 236 s longer than the sidereal one, which the tolerance must refuse.
+        XCTAssertEqual(next.timeIntervalSince(previous), siderealDay, accuracy: 90)
     }
 
     // MARK: Flip window

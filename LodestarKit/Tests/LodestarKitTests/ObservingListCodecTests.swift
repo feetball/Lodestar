@@ -196,6 +196,17 @@ final class ObservingListCodecTests: XCTestCase {
         XCTAssertEqual(ObservingListCodec.encodeCSV(entries), expected.joined(separator: "\r\n") + "\r\n")
     }
 
+    func testCSVGuardsFormulasInEveryTextColumn() throws {
+        // Each free-text column starts with a different character that a spreadsheet would run as a formula.
+        let entry = ObservingListEntry(name: "=1+1", designation: "+2", rightAscension: 10, declination: 5, typeName: "@SUM(A1)")
+        let table = try InterchangeCSV.parse(Array(ObservingListCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 2)
+        XCTAssertEqual(table.records[1].fields, ["'=1+1", "'+2", "10.00000", "5.00000", "'@SUM(A1)"])
+        let minus = ObservingListEntry(name: "-1", designation: "M 1", typeName: "-cmd")
+        let other = try InterchangeCSV.parse(Array(ObservingListCodec.encodeCSV([minus]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(other.records[1].fields, ["'-1", "M 1", "", "", "'-cmd"])
+    }
+
     func testCSVExportReadsBackThroughTheImporter() throws {
         let list = try ObservingListCodec.decode(ObservingListCodec.encodeCSV(entries))
         XCTAssertEqual(list.format, .genericCSV)
