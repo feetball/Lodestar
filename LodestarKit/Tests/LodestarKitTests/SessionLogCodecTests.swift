@@ -126,6 +126,13 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(SessionLogCodec.encodeCSV(log().reversed()), expected.joined(separator: "\r\n") + "\r\n")
     }
 
+    func testARightAscensionThatRoundsUpToAFullTurnIsWrittenAsZero() {
+        let entry = SessionLogEntry(date: first, targetID: "custom.edge", targetName: "Edge",
+                                  rightAscension: 359.999996, declination: 10)
+        XCTAssertTrue(SessionLogCodec.encodeCSV([entry]).contains(",Edge,custom.edge,0.00000,10.00000,"))
+        XCTAssertTrue(SessionLogCodec.encodeOpenAstronomyLog([entry]).contains("<ra unit=\"deg\">0.00000</ra>"))
+    }
+
     func testCSVKeepsShortExposuresAndFastLensesAndReadsBackAsTheSameNumbers() throws {
         let entries = [
             SessionLogEntry(

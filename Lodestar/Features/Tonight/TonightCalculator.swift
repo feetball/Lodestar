@@ -5,7 +5,8 @@ import LodestarKit
 enum TonightCalculator {
     /// The lowest altitude, in degrees, at which a deep-sky object still counts as a target.
     static let minimumTargetAltitude = NightPlanner.defaultMinimumAltitude
-    /// The most targets the list shows.
+    /// The most deep-sky targets the list shows. The comets and asteroids that are good tonight come in front of them,
+    /// up to `SmallBodyTonightPlanner.targetCount`, so the whole list can be longer.
     static let targetLimit = 12
     /// The ranking bonus per hour a target is clear of the site's skyline (only with a skyline).
     static let clearHoursWeight = 0.1
@@ -50,7 +51,7 @@ enum TonightCalculator {
 
     /// An instant on the date of the night that is under way at `now`, or of the coming night once the Sun
     /// has risen on the night before.
-    private static func tonightDate(now: Date, context: ObserverContext) -> Date {
+    static func tonightDate(now: Date, context: ObserverContext) -> Date {
         let underWay = TwilightCalculator.nightUnderWay(at: now, calendar: context.calendar) { day in
             TwilightCalculator.night(startingOn: day, observer: context.observer, timeZone: context.timeZone)
         }
@@ -71,13 +72,14 @@ enum TonightCalculator {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
         // With a skyline the hours of the comets and asteroids are the hours above it too. They come first, as always,
-        // but get the Moon's assessment at their best time through the same call as the deep-sky objects, so that a
-        // comet beside a bright Moon is not listed without a word about it.
+        // but get the Moon's assessment at their best time through `moonAssessment`, the same call as the deep-sky
+        // objects, so that a comet beside a bright Moon is not listed without a word about it, and so that the
+        // skyline rule holds for them too: a Moon hidden behind the skyline at that time is down for the comet.
         let moving = movingTargets.map { target -> TonightTarget in
             var target = target
             if skyline != nil { target.unobstructedHours = target.hoursAboveMinimum }
-            target.moon = ObjectMoonGeometry(of: target.object, observer: summary.observer, at: target.peakTime)
-                .assess(filter: filter, kind: MoonImpact.assessmentKind(of: target.object))
+            target.moon = moonAssessment(of: target.object, at: target.peakTime, summary: summary, skyline: skyline,
+                                         filter: filter)
             return target
         }
         return .ranked(moving + rankedTargets(in: catalog, summary: summary, skyline: skyline, filter: filter))
@@ -114,8 +116,7 @@ enum TonightCalculator {
             if skyline != nil, visibility.intervalsAboveMinimum.isEmpty { continue }
             guard let peak = visibility.maxAltitudeDuringDarkness, peak >= minimumTargetAltitude,
                   let bestTime = visibility.bestTime else { continue }
-            let moon = ObjectMoonGeometry(of: object, observer: summary.observer, at: bestTime)
-                .assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
+            let moon = moonAssessment(of: object, at: bestTime, summary: summary, skyline: skyline, filter: filter)
             // The hours clear of the skyline count only when there is a skyline; an open horizon ranks as it always did.
             let clearHours: Double? = skyline == nil ? nil : visibility.unobstructedHours
             let weight = MoonImpact.moonFreeWeight(level: moon.level)
@@ -135,6 +136,18 @@ enum TonightCalculator {
                 unobstructedHours: skyline == nil ? nil : candidate.visibility.unobstructedHours,
                 moon: candidate.moon)
         }
+    }
+
+    /// What the Moon does to `object` at `time`. With a skyline the Moon counts as up only while it is above the
+    /// skyline, as on the Moon card and in the dark hours without the Moon, so a Moon hidden behind the trees is down
+    /// for the target as well. Without one the Moon is up while its geometric altitude is above 0°.
+    private static func moonAssessment(of object: CelestialObject, at time: Date, summary: NightSummary,
+                                       skyline: HorizonProfile?, filter: ImagingFilter) -> ObjectMoonAssessment {
+        if skyline != nil, !summary.moon.upIntervals.contains(where: { $0.contains(time) }) {
+            return ObjectMoonAssessment(level: .moonDown, broadbandLevel: .moonDown)
+        }
+        return ObjectMoonGeometry(of: object, observer: summary.observer, at: time)
+            .assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
     }
 
     private static func isDeepSky(_ object: CelestialObject) -> Bool {

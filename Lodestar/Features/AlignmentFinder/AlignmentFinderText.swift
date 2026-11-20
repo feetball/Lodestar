@@ -33,6 +33,15 @@ enum AlignmentFinderText {
 
     static let pastNote = "Times are in the time zone of the observing site. Matches that have already ended are left out."
 
+    /// The empty state of a search whose matches have all ended already, with nothing later in the period.
+    static let allEndedTitle = "Nothing left in this period"
+
+    /// The explanation of `allEndedTitle`, over `days` days.
+    static func allEndedMessage(days: Int) -> String {
+        "Every match in the next \(days) days has already ended. Choose a longer period or a wider window to look "
+            + "further ahead."
+    }
+
     static let sunNote = "There is no Aim button for the Sun. Use a solar filter and aim from the Aim tab."
 
     /// The note under a match whose target is below the skyline in the middle of it.

@@ -203,6 +203,20 @@ final class NexStarCodecTests: XCTestCase {
         XCTAssertFalse(version.isAtLeast(5, 0))
     }
 
+    func testOnlyRecentSynScanFirmwareExpectsJ2000Coordinates() {
+        let cases: [(NexStarFlavor, Int, Int, Int, Bool)] = [
+            (.synscan, 3, 36, 0, false), (.synscan, 3, 37, 0, true), (.synscan, 3, 38, 0, true),
+            (.synscan, 3, 2, 0, false), (.synscan, 4, 0, 0, false), (.synscan, 4, 36, 0, false),
+            (.synscan, 4, 37, 2, false), (.synscan, 4, 37, 3, true), (.synscan, 4, 38, 6, true),
+            (.synscan, 5, 0, 0, true), (.synscan, 2, 99, 0, false),
+            (.celestron, 4, 37, 3, false), (.celestron, 5, 28, 0, false),
+        ]
+        for (flavor, major, minor, patch, expected) in cases {
+            let version = NexStarVersion(flavor: flavor, major: major, minor: minor, patch: patch)
+            XCTAssertEqual(version.expectsJ2000Coordinates, expected, "\(flavor) \(version.description)")
+        }
+    }
+
     func testOnlyGermanEquatorialModelsAreCalledEquatorial() {
         for model in [5, 6, 13, 14, 20, 23, 24] {
             XCTAssertTrue(NexStarCodec.isEquatorialModel(model, flavor: .celestron), "Celestron \(model)")

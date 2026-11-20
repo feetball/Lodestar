@@ -10,8 +10,10 @@ import XCTest
 /// - Meeus, Example 44.a (satellites of Jupiter, the same instant): X, Y of Io −3.44 +0.21, Europa +7.44 +0.25,
 ///   Ganymede +1.24 +0.65, Callisto +7.08 +1.10, and the exercise of 1988 November 23 (Callisto and Ganymede at
 ///   conjunction with Jupiter's centre).
-/// - Flandrau Science Center (Tucson), *Skywatcher's Guide: April and May 2026*, Great Red Spot meridian transits
-///   from Sky & Telescope's tool for 2026 (91° on June 1, 1.75° a month), local times MST (UTC−7).
+/// - Flandrau Science Center (Tucson), *Skywatcher's Guide: April and May 2026*, Great Red Spot meridian transits,
+///   local times MST (UTC−7). The table does not state its longitude for the spot; the transit times put the System
+///   II central meridian at 84.4° to 85.0°, which is not Sky & Telescope's 91° on June 1 (that would make the
+///   transits 5 to 10 minutes later).
 final class EphemerisJupiterTests: XCTestCase {
     private func utc(_ text: String) -> Date { EventsTestSupport.utc(text) }
 

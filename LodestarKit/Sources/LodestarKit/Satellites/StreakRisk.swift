@@ -173,8 +173,9 @@ public struct StreakOptions: Hashable, Sendable {
     /// The altitude above which satellites are counted for `StreakAssessment.sunlitAboveSummaryAltitudeCount`
     /// ("sunlit satellites above 20° right now").
     public var summaryAltitude: Double
-    /// The time span in seconds over which `StreakAssessment.crossingsPerMinute` is estimated; the exposure is
-    /// used if it is longer.
+    /// The time span in seconds over which `StreakAssessment.crossingsPerMinute` is estimated, counted from the start
+    /// of the exposure and whatever the exposure's length (1 to `StreakRisk.maximumExposureSeconds`; 120 if it is
+    /// not finite).
     public var rateWindow: Double
     /// When set, a crossing whose magnitude is known and fainter than this is dropped (satellites with an unknown
     /// magnitude always stay).
@@ -200,7 +201,7 @@ public struct StreakAssessment: Sendable {
     /// "N sunlit satellites above 20° right now".
     public let sunlitAboveSummaryAltitudeCount: Int
     /// How many sunlit satellites cross the picture per minute, estimated from the crossings that begin within
-    /// `StreakOptions.rateWindow` (or the exposure) after the start.
+    /// `StreakOptions.rateWindow` after the start of the exposure, however long the exposure is.
     public let crossingsPerMinute: Double
     /// The span in seconds that estimate covers.
     public let rateWindow: Double

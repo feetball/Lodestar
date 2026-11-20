@@ -33,6 +33,14 @@ public struct NexStarVersion: Hashable, Sendable {
         return self.patch >= patch
     }
 
+    /// True for a SynScan hand control whose firmware takes J2000 coordinates for GOTO, sync and position replies:
+    /// 3.37 or later on the 3.x line, 4.37.03 or later on the 4.x line ("SynScan Serial Communication Protocol" 3.3).
+    /// Older SynScan firmware and every Celestron hand control work in the current epoch ("JNow").
+    public var expectsJ2000Coordinates: Bool {
+        guard flavor == .synscan else { return false }
+        return major == 3 ? isAtLeast(3, 37) : isAtLeast(4, 37, 3)
+    }
+
     /// `4.37.07` for SynScan, `5.28` for Celestron.
     public var description: String {
         switch flavor {

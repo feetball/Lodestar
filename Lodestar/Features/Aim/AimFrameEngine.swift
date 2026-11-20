@@ -113,6 +113,14 @@ final class AimFrameEngine {
         satelliteFix = fix
     }
 
+    /// Forgets where the target is, as for a new object, though it stays the same one: the position held is out of
+    /// date (the previewed moment changed, or the screen was away), so there is no guidance, and no cue for reaching
+    /// or losing the target, until `update(target:)` brings the new position.
+    func clearTargetPosition() {
+        target = nil
+        tracker.reset()
+    }
+
     /// The target's position from a freshly built snapshot; ignored if it belongs to another object.
     func update(target: SkySnapshot.Target?) {
         guard let target, target.object.id == targetID else { return }

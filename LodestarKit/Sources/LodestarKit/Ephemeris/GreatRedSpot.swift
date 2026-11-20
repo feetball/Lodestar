@@ -27,8 +27,8 @@ public struct GreatRedSpotTransit: Sendable, Hashable {
 /// spot to be at System II longitude 91° on 2026 June 1 with a drift of 1.75° per month, "based on trends noted by
 /// JUPOS". Other 2025 and 2026 sources agree within a few degrees: the BAA Jupiter Section's report no. 2 of 2025/26
 /// has L2 = 77° on 2025 September 1 (S. Mizumoto, ALPO-Japan); the IMCCE JGRS service
-/// (ssp.imcce.fr/webservices/vo-tools/jgrs, from JUPOS measurements) gives 103.5° at 2026 November 19 21:27 UT, 2.7°
-/// (4.5 minutes of transit time) ahead of this extrapolation.
+/// (ssp.imcce.fr/webservices/vo-tools/jgrs, from JUPOS measurements) gives 103.5° at 2026 November 19 21:27 UT, where
+/// this extrapolation has 101.0°: 2.5° (4 minutes of transit time) ahead of it.
 public struct GreatRedSpot: Sendable, Hashable {
     /// The longitude of the reference spot in System II at `referenceEpoch`, degrees.
     public static let referenceLongitude = 91.0
@@ -40,6 +40,11 @@ public struct GreatRedSpot: Sendable, Hashable {
     public static let referenceDriftPer30Days = 1.75
 
     /// The spot Sky & Telescope's tool assumes for 2026; see the type's comment.
+    ///
+    /// This is one straight line from `referenceEpoch` (2026 June 1), used for every date, and it has no validity
+    /// horizon: the real spot wanders, so the error grows with the distance from that day, and `transits(from:to:)`
+    /// gives exact-looking times years later all the same. Refresh `referenceLongitude`, `referenceEpoch` and
+    /// `referenceDriftPer30Days` from a current JUPOS-based source once a year.
     public static let reference = GreatRedSpot(
         normalized: referenceLongitude, epoch: referenceEpoch, driftPer30Days: referenceDriftPer30Days)
 

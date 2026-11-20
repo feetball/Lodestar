@@ -9,6 +9,8 @@ struct AimPreviewTimeSheet: View {
     let model: AimViewModel
     @Environment(\.palette) private var palette
     @Environment(\.dismiss) private var dismiss
+    /// 22:00 on the evening of the night under way, found when the sheet opens (see `eveningOfTonight()`).
+    @State private var tonightEvening: Date?
 
     private let columns = [GridItem(.adaptive(minimum: 96), spacing: 10)]
 
@@ -28,6 +30,7 @@ struct AimPreviewTimeSheet: View {
         .background(palette.background)
         .foregroundStyle(palette.primaryText)
         .presentationBackground(palette.background)
+        .onAppear { tonightEvening = eveningOfTonight() }
     }
 
     private var header: some View {
@@ -85,8 +88,8 @@ struct AimPreviewTimeSheet: View {
             LazyVGrid(columns: columns, spacing: 10) {
                 gridButton("Now", kind: .primary) { model.endPreview() }
                     .disabled(!model.isPreviewing)
-                gridButton("Tonight 22:00", kind: .secondary) {
-                    jump(to: calendar.date(bySettingHour: 22, minute: 0, second: 0, of: model.app.clock.now))
+                gridButton(tonightTitle, kind: .secondary) {
+                    jump(to: tonightEvening)
                 }
                 gridButton("Midnight", kind: .secondary) {
                     jump(to: calendar.nextDate(after: model.app.clock.now, matching: DateComponents(hour: 0, minute: 0),
@@ -94,6 +97,21 @@ struct AimPreviewTimeSheet: View {
                 }
             }
         }
+    }
+
+    /// The weekday and time of the "tonight" preset, "Fri 22:00": between midnight and sunrise tonight is the evening
+    /// just past, so the weekday says which evening the button goes to.
+    private var tonightTitle: String {
+        guard let evening = tonightEvening else { return "Tonight 22:00" }
+        return "\(evening.formatted(Date.FormatStyle(timeZone: model.previewTimeZone).weekday(.abbreviated))) 22:00"
+    }
+
+    /// 22:00 on the date of the night under way, or of the coming night once the Sun has risen, as the Tonight screen
+    /// counts it. Without a place it is 22:00 on today's date.
+    private func eveningOfTonight() -> Date? {
+        let now = model.app.clock.now
+        let night = model.app.observerContext.map { TonightCalculator.tonightDate(now: now, context: $0) } ?? now
+        return calendar.date(bySettingHour: 22, minute: 0, second: 0, of: night)
     }
 
     /// A button that fills its grid cell.

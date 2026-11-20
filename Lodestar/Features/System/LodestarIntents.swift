@@ -3,6 +3,9 @@ import Foundation
 import LodestarKit
 
 /// A sky object as Siri and Shortcuts know it: a name to say and a line to tell it from others.
+///
+/// Spotlight indexing (`IndexedEntity`) was deliberately skipped: objects are not added to the Spotlight index, and are
+/// found by name through `CelestialObjectQuery` only.
 struct CelestialObjectEntity: AppEntity {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sky Object"
     static let defaultQuery = CelestialObjectQuery()

@@ -1,5 +1,6 @@
 import Foundation
 import LodestarKit
+import os
 
 /// Where the observer's position comes from.
 enum LocationSource: Codable, Hashable, Sendable {
@@ -374,6 +375,7 @@ private struct Lossy<Wrapped: Decodable>: Decodable {
 @Observable
 final class SettingsStore {
     private static let storageKey = "lodestar.settings.v1"
+    private static let logger = Logger(subsystem: "net.kuecker.Lodestar", category: "settings")
 
     var settings: AppSettings {
         didSet {
@@ -407,8 +409,13 @@ final class SettingsStore {
     func saveNow() {
         saveTask?.cancel()
         saveTask = nil
-        guard let data = try? JSONEncoder().encode(settings) else { return }
-        defaults.set(data, forKey: Self.storageKey)
+        // An encoding failure (a value JSON cannot hold) leaves the last saved settings in place; say so, because every
+        // later change would be lost on relaunch without a sign.
+        do {
+            defaults.set(try JSONEncoder().encode(settings), forKey: Self.storageKey)
+        } catch {
+            Self.logger.error("Settings were not saved: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func scheduleSave() {

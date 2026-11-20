@@ -1,8 +1,8 @@
 /// The columns of a CSV table that `ObservingListCodec` uses, found by their header names.
 ///
 /// Header names are compared without case, punctuation and spacing; "Right Ascension (j2000)", "RA_J2000" and "ra" all
-/// name a right ascension. Columns of coordinates of the date (jNow) or of the B1950 equinox are ignored, because the
-/// codec returns J2000 places.
+/// name a right ascension. Columns of coordinates of the date (jNow) or of the 1950 equinox ("B1950", "J1950", "RA 1950")
+/// are ignored, because the codec returns J2000 places.
 struct ObservingListColumns: Equatable {
     /// What a coordinate column says about its unit.
     enum Unit: Equatable {
@@ -32,7 +32,7 @@ struct ObservingListColumns: Equatable {
     private static let alternateHeaders: Set<String> = ["alternative entries", "alternate entries", "aliases", "alias"]
     private static let rightAscensionFirstTokens: Set<String> = ["ra", "ra2000", "raj2000"]
     private static let declinationFirstTokens: Set<String> = ["dec", "dec2000", "decj2000", "declination", "decl"]
-    private static let otherEpochTokens: Set<String> = ["jnow", "b1950", "date"]
+    private static let otherEpochTokens: Set<String> = ["jnow", "b1950", "j1950", "1950", "date"]
 
     /// The header's words: lower case letters and digits, split at everything else.
     static func tokens(of header: String) -> [String] {

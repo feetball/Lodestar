@@ -123,6 +123,15 @@ struct AimStatusChips: View {
         } else {
             items.append(compassItem(quality: motion.compassQuality))
         }
+        switch app.magneticReferenceLimit {
+        case .blackout:
+            items.append(Item(id: "magnetic-model", systemImage: "safari", text: "Compass unreliable here", tone: .warning))
+        case .modelExpired:
+            items.append(Item(id: "magnetic-model", systemImage: "safari", text: "Magnetic model out of date",
+                              tone: .warning))
+        case nil:
+            break
+        }
         if let disturbance = motion.magneticDisturbance, disturbance > Self.interferenceThreshold {
             items.append(Item(id: "interference", systemImage: "bolt.horizontal.fill", text: "Magnetic interference",
                               tone: .warning))

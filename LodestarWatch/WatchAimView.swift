@@ -23,7 +23,8 @@ struct WatchAimView: View {
     private var isNight: Bool { model.latest?.message.isNight ?? false }
 }
 
-/// The colours of the page: the Tonight screen's day colours, or red shades only at night.
+/// The colours of the page: the Tonight screen's day colours, or at night pure red (no green or blue, as in the phone's
+/// night palette) in three brightnesses.
 private struct AimStyle {
     let background: Color
     let primary: Color
@@ -32,9 +33,9 @@ private struct AimStyle {
 
     static let day = AimStyle(background: TonightStyle.background, primary: TonightStyle.primaryText,
                               secondary: TonightStyle.secondaryText, onTarget: Color(red: 0.30, green: 0.85, blue: 0.45))
-    static let night = AimStyle(background: .black, primary: Color(red: 1, green: 0.22, blue: 0.18),
-                                secondary: Color(red: 0.62, green: 0.14, blue: 0.12),
-                                onTarget: Color(red: 1, green: 0.22, blue: 0.18))
+    static let night = AimStyle(background: .black, primary: Color(red: 0.92, green: 0, blue: 0),
+                                secondary: Color(red: 0.66, green: 0, blue: 0),
+                                onTarget: Color(red: 1, green: 0, blue: 0))
 }
 
 private struct AimPage: View {

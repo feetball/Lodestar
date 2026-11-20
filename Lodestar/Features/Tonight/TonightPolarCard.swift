@@ -61,7 +61,7 @@ struct TonightPolarCard: View {
     }
 
     private func spokenReading(_ reading: PolarScopeReading) -> String {
-        "\(reading.referenceStarName) is at \(TonightFormat.clockPosition(angle: reading.angle)) o'clock on the"
+        "\(reading.referenceStarName) is at the \(TonightFormat.clockPosition(angle: reading.angle)) position on the"
             + " polar scope circle, \(AngleFormatter.formatDegrees(reading.separationFromPole, decimals: 2))"
             + " from the pole"
     }
