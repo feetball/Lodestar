@@ -136,7 +136,7 @@ private struct AimMosaicDoneBanner: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        Label("All \(count) panels shot", systemImage: "checkmark.circle.fill")
+        Label(MosaicSession.allShotText(panelCount: count), systemImage: "checkmark.circle.fill")
             .font(.headline)
             .foregroundStyle(palette.positive)
             .frame(maxWidth: .infinity, minHeight: 44)

@@ -55,7 +55,7 @@ struct AimFrame {
 /// hysteresis keeps the on-target state steady; asking again for the same sample gives the same answer.
 @MainActor
 final class AimFrameEngine {
-    private let motion: MotionService
+    private let motion: any MotionSampleSource
     private var configuration: AimConfiguration
     private var tracker: GuidanceTracker
     /// Tracks the mosaic panel, with a tolerance that follows the plan's overlap.
@@ -69,7 +69,7 @@ final class AimFrameEngine {
     private var satelliteFix: SatelliteAimFix?
     private(set) var satelliteSourceID: UUID?
 
-    init(motion: MotionService, configuration: AimConfiguration) {
+    init(motion: any MotionSampleSource, configuration: AimConfiguration) {
         self.motion = motion
         self.configuration = configuration
         tracker = GuidanceTracker(onTargetThreshold: configuration.onTargetThreshold)

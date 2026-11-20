@@ -427,6 +427,10 @@ struct AimMosaicSheet: View {
     private func takeCurrentPointing() {
         if let frame = model.engine.frame() {
             customCenter = frame.pointing.boresight
+            // The centre is an altitude and azimuth of this instant, and the planner turns it into sky coordinates
+            // with `snapshotDate`: it has to be taken at the same instant (the previewed moment while the sky is
+            // previewed, as when the sheet opens), or the centre is off by the sky's turn since the sheet opened.
+            snapshotDate = model.date
         } else if customCenter == nil, let target = model.skyContent?.snapshot.target {
             customCenter = target.horizontal
         }

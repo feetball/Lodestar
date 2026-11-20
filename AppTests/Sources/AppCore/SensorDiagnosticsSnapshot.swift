@@ -1,0 +1,1 @@
+../../../Lodestar/Features/Tools/SensorDiagnosticsSnapshot.swift

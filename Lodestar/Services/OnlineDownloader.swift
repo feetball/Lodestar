@@ -86,6 +86,8 @@ struct OnlineDownloader: Sendable {
     var idleTimeout: TimeInterval = 30
     /// Seconds for the whole request.
     var totalTimeout: TimeInterval = 120
+    /// `URLProtocol` classes that answer the request instead of the network (tests only; `nil` in the app).
+    var protocolClasses: [AnyClass]?
 
     init(userAgent: String = OnlineUserAgent.current) {
         self.userAgent = userAgent
@@ -104,6 +106,7 @@ struct OnlineDownloader: Sendable {
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.tlsMinimumSupportedProtocolVersion = .TLSv12
+        if let protocolClasses { configuration.protocolClasses = protocolClasses }
 
         var urlRequest = URLRequest(url: request.url)
         urlRequest.httpMethod = "GET"

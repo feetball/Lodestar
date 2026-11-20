@@ -43,4 +43,4 @@ jobs:
           set -o pipefail
           JSON="$(swift test --package-path AppTests --show-codecov-path)"
           echo "# App logic (Lodestar/)" >> "$GITHUB_STEP_SUMMARY"
-          python3 Tools/coverage_report.py "$JSON" AppTests/Sources/AppCore/ 90 | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 Tools/coverage_report.py "$JSON" AppTests/Sources/AppCore/ 95 | tee -a "$GITHUB_STEP_SUMMARY"
