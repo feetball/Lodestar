@@ -357,15 +357,16 @@ final class AppModel {
             camera.stop()
         }
 
-        // Screen: dim at night, keep awake while aiming; the torch has its own brightness and keeps the screen awake.
+        // Screen: dim at night, keep awake while aiming and while a mount is connected (a locked screen sends the app
+        // to the background, which ends the mount's session); the torch has its own brightness and keeps it awake.
         if active {
             if isTorchShown {
                 screen.setBrightnessOverride(settings.torchBrightness)
             } else {
                 screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
             }
-            screen.setIdleTimerDisabled(
-                isTorchShown || (selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
+            let awakeBySetting = settings.keepScreenAwake && (selectedTab == .aim || MountService.shared.isConnected)
+            screen.setIdleTimerDisabled(isTorchShown || awakeBySetting || keepsScreenAwake)
         } else {
             screen.restore()
         }
