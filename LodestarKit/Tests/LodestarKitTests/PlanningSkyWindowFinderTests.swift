@@ -513,4 +513,51 @@ final class PlanningSkyWindowFinderTests: XCTestCase {
         let secondsWithMoon = Double(withMoon.components.seconds) + Double(withMoon.components.attoseconds) / 1e18
         XCTAssertLessThan(secondsWithMoon, Self.yearLimit, "took \(secondsWithMoon) s with the Moon")
     }
+
+    // MARK: Cancellation
+
+    /// A comet over the whole sky for `nights` nights from 1 January 2026, searched in a task of its own: the slowest
+    /// kind of target, which is where a search nobody waits for any more costs the most.
+    private func cometSearch(nights: Int, beforeSearching: @escaping @Sendable () async -> Void = {})
+        throws -> Task<[SkyWindowMatch], Error> {
+        let comet = try XCTUnwrap(try CatalogSmallBodyFixture.catalog().object(id: "comet.12P"))
+        let everywhere = try XCTUnwrap(SkyWindow(azimuth: .full, minimumAltitude: -90, maximumAltitude: 90))
+        let observer = boulder.observer
+        let zone = try boulder.timeZone()
+        let from = try noon(boulder, 2026, 1, 1)
+        let to = from.addingTimeInterval(Double(nights) * 86_400)
+        return Task.detached {
+            await beforeSearching()
+            return try SkyWindowFinder.matches(target: .catalogObject(comet), window: everywhere, observer: observer,
+                                               from: from, to: to, darkness: .anyTime, timeZone: zone)
+        }
+    }
+
+    func testASearchInACancelledTaskThrowsInsteadOfReturningAPartialList() async throws {
+        // The task waits to be cancelled and only then searches, so the first night already finds it cancelled.
+        let cancelled = try cometSearch(nights: SkyWindowFinder.maximumNightCount - 1) {
+            try? await Task.sleep(for: .seconds(60))
+        }
+        cancelled.cancel()
+        let outcome = await cancelled.result
+        XCTAssertThrowsError(try outcome.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+
+        // The same search in a task nobody cancelled runs to its end.
+        let finished = try await cometSearch(nights: 2).value
+        XCTAssertFalse(finished.isEmpty)
+    }
+
+    func testASearchStopsBetweenNightsWhenItsTaskIsCancelled() async throws {
+        // A comet over 399 nights takes about 4 s unoptimised (10 ms a night), so it is still running 50 ms in.
+        let search = try cometSearch(nights: SkyWindowFinder.maximumNightCount - 1)
+        try await Task.sleep(for: .milliseconds(50))
+        let clock = ContinuousClock()
+        let cancelledAt = clock.now
+        search.cancel()
+        let outcome = await search.result
+        let seconds = (clock.now - cancelledAt) / .seconds(1)
+        XCTAssertThrowsError(try outcome.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+        // It ends with the night it is on (about 10 ms of work unoptimised), not with the whole range.
+        XCTAssertLessThan(seconds, 2, "took \(seconds) s to stop")
+    }
 }
