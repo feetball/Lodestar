@@ -114,6 +114,13 @@ enum CoordinateStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String { self == .sexagesimal ? "h m s / ° ′ ″" : "Decimal" }
 }
 
+/// How fast spoken guidance talks.
+enum SpokenGuidanceRate: String, Codable, CaseIterable, Identifiable, Sendable {
+    case slow, normal
+    var id: String { rawValue }
+    var title: String { self == .slow ? "Slow" : "Normal" }
+}
+
 /// Every persisted user preference. Decoding is forward compatible: missing or invalid keys fall
 /// back to defaults, so adding a setting never wipes the user's data.
 struct AppSettings: Codable, Equatable, Sendable {
@@ -175,6 +182,11 @@ struct AppSettings: Codable, Equatable, Sendable {
     var hapticsEnabled = true
     var audioCuesEnabled = false
     var keepScreenAwake = true
+    /// Speaks the pan and tilt to make while aiming ("Pan right 12, tilt up 3").
+    var spokenGuidance = false
+    var spokenGuidanceRate: SpokenGuidanceRate = .normal
+    /// Shows the aiming on the Apple Watch while Aim is open (nothing is sent without a watch).
+    var aimOnWatch = true
 
     // Sky display
     var showConstellationLines = true
@@ -238,6 +250,9 @@ struct AppSettings: Codable, Equatable, Sendable {
         hapticsEnabled = value(.hapticsEnabled, d.hapticsEnabled)
         audioCuesEnabled = value(.audioCuesEnabled, d.audioCuesEnabled)
         keepScreenAwake = value(.keepScreenAwake, d.keepScreenAwake)
+        spokenGuidance = value(.spokenGuidance, d.spokenGuidance)
+        spokenGuidanceRate = value(.spokenGuidanceRate, d.spokenGuidanceRate)
+        aimOnWatch = value(.aimOnWatch, d.aimOnWatch)
         showConstellationLines = value(.showConstellationLines, d.showConstellationLines)
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
