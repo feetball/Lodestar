@@ -58,5 +58,8 @@ struct RootView: View {
             await app.launch()
         }
         .lodestarWidgets()
+        .fullScreenCover(isPresented: $app.isTorchShown) {
+            RedTorchView()
+        }
     }
 }
