@@ -9,16 +9,26 @@ struct SkyChartCameraPose {
     /// The border of the DSLR picture as directions, clockwise as the photographer sees it.
     let footprint: [Vector3]
 
-    /// The pose for the newest motion sample, or `nil` while the sensors deliver none.
+    /// The pose for the newest motion sample, or `nil` while the sensors deliver none or the heading is not known.
     @MainActor
     static func current(from motion: MotionService, mount: MountProfile, alignment: AlignmentModel,
                         lens: LensSetup) -> SkyChartCameraPose? {
+        guard isHeadingKnown(in: motion, mount: mount, alignment: alignment) else { return nil }
         guard let sample = motion.latestSample() else { return nil }
         let solution = PointingSolution.solve(attitude: sample.attitude, mount: mount, alignment: alignment)
         let outline = AimLensFrame.worldDirections(of: AimLensFrame.outline(of: lens, rectilinearSamplesPerEdge: 6),
                                                    pointing: solution)
         return SkyChartCameraPose(horizontal: solution.boresight, boresight: solution.boresightVector,
                                   footprint: outline)
+    }
+
+    /// Whether the azimuth of the motion samples means anything. With the compass it always does. In Gyro Lock it does
+    /// once the compass heading was transferred or a star alignment set it; after a refused transfer the samples carry
+    /// an arbitrary azimuth until the user aligns, and a pose drawn from them would point the wrong way.
+    @MainActor
+    static func isHeadingKnown(in motion: MotionService, mount: MountProfile, alignment: AlignmentModel) -> Bool {
+        guard motion.headingSource == .gyroLock else { return true }
+        return motion.isGyroHeadingReferenced || (alignment.isAligned && alignment.isApplicable(to: mount))
     }
 }
 
