@@ -117,6 +117,8 @@ final class MountService {
     @ObservationIgnored private var discoveryFlag: MountCancelFlag?
     @ObservationIgnored private var lifecycle: MountLifecycle?
     @ObservationIgnored private var markerCache: MountMarkerCache?
+    /// The text of the notice that says tracking was stopped near the Sun, while it may still be on screen.
+    @ObservationIgnored private var sunStopNotice: String?
 
     private init() {
         settings = MountPreferences.loadSettings()
@@ -688,6 +690,25 @@ final class MountService {
         } else if old.phase == .slewing && new.phase != .slewing {
             MountLifecycle.announce(Self.spokenOutcome(new.outcome))
         }
+        noteTrackingStopNearSun(from: old, to: new)
+    }
+
+    /// Keeps the reason for a stop of tracking near the Sun on screen. The engine switches tracking off when the Sun
+    /// rises into the exclusion zone of a mount that tracks, and gives the reason (`nearSun`) only in the status of the
+    /// poll that did it, which the error line drops at the next poll. The notice stays until a status says the mount
+    /// tracks again (the person switched tracking on here or on the mount), or until it is dismissed or the person
+    /// connects anew.
+    private func noteTrackingStopNearSun(from old: MountStatus, to new: MountStatus) {
+        if old.isTracking == true, new.isTracking == false, case .nearSun(_, let limit)? = new.lastError {
+            let text = "Tracking stopped: the mount was within \(AppFormat.separation(limit)) of the Sun. "
+                + "Point it away before tracking again."
+            noticeText = text
+            sunStopNotice = text
+            MountLifecycle.announce("Tracking stopped near the Sun")
+        } else if new.isTracking == true, let shown = sunStopNotice {
+            if noticeText == shown { noticeText = nil }
+            sunStopNotice = nil
+        }
     }
 
     private static func spokenOutcome(_ outcome: MountSlewOutcome?) -> String {
@@ -905,6 +926,15 @@ final class MountService {
         "The mount may still be moving. \(error.userMessage) Stop it on its hand controller or switch it off."
     }
 
+    /// What a refused nudge says. The engine words `nearSun` for a GoTo target ("won't slew there"); a nudge starts
+    /// from where the mount points, so it gets a sentence of its own with the same distances.
+    private static func nudgeFailureText(_ error: MountError) -> String {
+        guard case .nearSun(let separation, let limit) = error else { return error.userMessage }
+        return "The mount points \(AppFormat.separation(separation)) from the Sun, closer than the "
+            + "\(AppFormat.separation(limit)) safety limit, so Lodestar won't move it with the arrows. "
+            + "Move it away from the Sun first, with Go to or by hand."
+    }
+
     func setTracking(_ enabled: Bool) {
         guard isConnected else { return }
         Task {
@@ -952,7 +982,7 @@ final class MountService {
                     try controller.nudge(direction, rate: rate, durationSeconds: pulse)
                 }
                 if case .failure(let error) = result {
-                    if !gate.isCancelled { self.errorText = error.userMessage }
+                    if !gate.isCancelled { self.errorText = Self.nudgeFailureText(error) }
                     return
                 }
                 let remaining = Self.nudgeRepeat - (ContinuousClock.now - began)
@@ -978,7 +1008,7 @@ final class MountService {
         let pulse = Self.nudgePulseSeconds
         Task {
             let result = await execute { controller in try controller.nudge(direction, rate: rate, durationSeconds: pulse) }
-            if case .failure(let error) = result { errorText = error.userMessage }
+            if case .failure(let error) = result { errorText = Self.nudgeFailureText(error) }
         }
     }
 
