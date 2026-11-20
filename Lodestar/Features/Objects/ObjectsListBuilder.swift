@@ -98,7 +98,8 @@ enum ObjectsListBuilder {
     static func sections(options: ObjectsListOptions, catalog: Catalog, index: ObjectsCatalogIndex,
                          favoriteIDs: [String], recentIDs: [String],
                          positions: [String: ObjectSkyPosition],
-                         tonight: [String: UnobstructedVisibility] = [:]) -> [ObjectsListSection] {
+                         tonight: [String: UnobstructedVisibility] = [:],
+                         imagedIDs: Set<String> = []) -> [ObjectsListSection] {
         var effective = options
         if positions.isEmpty {
             effective.showsOnlyAboveHorizon = false
@@ -115,7 +116,7 @@ enum ObjectsListBuilder {
         func resolved(_ ids: [String]) -> [CelestialObject] {
             var seen = Set<String>()
             return ids.compactMap { seen.insert($0).inserted ? catalog.object(id: $0) : nil }
-                .filter { passes($0, effective, positions, tonight) }
+                .filter { passes($0, effective, positions, tonight, imagedIDs) }
         }
 
         var sections: [ObjectsListSection] = []
@@ -123,7 +124,7 @@ enum ObjectsListBuilder {
                                 tonight: tonight, catalogue: effective.catalogue)
         // A favorite comet that dropped out of the orbit data stays, as "no current orbit", unless a filter is on.
         let hasFilter = effective.showsOnlyAboveHorizon || effective.showsOnlyVisibleTonight
-            || effective.showsOnlyPopular || effective.catalogue != .all
+            || effective.showsOnlyPopular || effective.showsOnlyImaged || effective.catalogue != .all
         let lostFavorites = hasFilter ? [] : SmallBodyFavorites.withoutOrbit(favoriteIDs: favoriteIDs, catalog: catalog)
         if !favorites.isEmpty || !lostFavorites.isEmpty {
             sections.append(ObjectsListSection(kind: .favorites, objects: favorites, unavailable: lostFavorites))
@@ -138,7 +139,7 @@ enum ObjectsListBuilder {
         // sort. A catalogue's own list is in catalogue order instead.
         let isBrowse = effective.catalogue == .all
         let source = isBrowse ? index.listed : effective.catalogue.objects(in: catalog)
-        let visible = source.filter { passes($0, effective, positions, tonight) }
+        let visible = source.filter { passes($0, effective, positions, tonight, imagedIDs) }
         func sorted(_ objects: [CelestialObject]) -> [CelestialObject] {
             ordered(objects, by: effective.sortOrder, index: index, positions: positions, tonight: tonight,
                     isInNameOrder: isBrowse, catalogue: effective.catalogue)
@@ -181,7 +182,11 @@ enum ObjectsListBuilder {
 
     private static func passes(_ object: CelestialObject, _ options: ObjectsListOptions,
                                _ positions: [String: ObjectSkyPosition],
-                               _ tonight: [String: UnobstructedVisibility]) -> Bool {
+                               _ tonight: [String: UnobstructedVisibility],
+                               _ imagedIDs: Set<String>) -> Bool {
+        if options.showsOnlyImaged, !imagedIDs.contains(object.id) {
+            return false
+        }
         if options.showsOnlyAboveHorizon, positions[object.id]?.isAboveHorizon != true {
             return false
         }

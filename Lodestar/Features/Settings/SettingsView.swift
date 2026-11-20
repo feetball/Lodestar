@@ -24,6 +24,7 @@ struct SettingsView: View {
                 SettingsJupiterSection()
                 SettingsOnlineDataSection()
                 SettingsToolsSection()
+                SettingsSessionLogSection()
                 SettingsAboutSection()
             }
             .settingsLocationSheets($locationPresentation)

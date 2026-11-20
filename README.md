@@ -62,6 +62,10 @@ With the satellite feed on, a section lists when the ISS or Tiangong
   - **Alignment finder** — when does the Milky Way core, the Moon or any object stand over a ridge or in a gap
     between trees? Pick a point of your recorded skyline (or an azimuth and altitude window), a period, how dark
     it must be and what the Moon may do, and get the matching nights, with the sky chart at that time and Aim.
+- **Session log and lists** — a private diary of what you shot (frames, exposure, ISO, filter, notes) with CSV
+  and OpenAstronomyLog 2.1 export, a check mark on the objects you imaged, observing lists imported from CSV,
+  Telescopius and SkySafari files into your favorites (favorites export as CSV or a SkySafari list), and mosaic
+  panels saved as a table or a text list for a planetarium or an ASIAIR.
 - **Exposure calculator** — the longest exposure before stars trail by the NPF, 500, 400 and 300 rules for your
   camera, lens and target; for a star tracker, the drift and the limit for a polar-alignment error of 0.1° to 5°;
   for an alt-azimuth mount, the field-rotation rate and the limit at the target's place; and a shutter time for the

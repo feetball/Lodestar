@@ -47,6 +47,8 @@ final class AppModel {
     let online: OnlineDataService
     /// The satellite Aim follows or waits for, if one was chosen from a pass.
     let satelliteAim: SatelliteAimSession
+    /// What was shot on which night, kept on this device only.
+    let sessionLog: SessionLogStore
 
     /// The selected tab. Changing it starts/stops the sensors that tab needs.
     var selectedTab: AppTab = .aim {
@@ -113,6 +115,7 @@ final class AppModel {
         screen = ScreenController()
         online = OnlineDataService(catalog: catalog)
         satelliteAim = SatelliteAimSession()
+        sessionLog = SessionLogStore()
         online.locationProvider = { [weak self] in self?.observerContext?.location }
         satelliteAim.isNightProvider = { [weak self] in self?.isNightModeActive ?? false }
         #if DEBUG
@@ -221,6 +224,7 @@ final class AppModel {
             satelliteAim.refreshLiveActivity()
         case .background:
             settingsStore.saveNow()
+            sessionLog.saveNow()
             clock.stop()
             maintenanceTask?.cancel()
             maintenanceTask = nil
