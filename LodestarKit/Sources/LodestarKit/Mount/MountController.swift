@@ -244,6 +244,8 @@ public final class MountController {
             throw error
         }
         storePosition(sent, now: now)
+        // The mount's idea of where it points has just changed, so the last slew's "arrived" no longer describes it.
+        outcome = nil
         lastError = nil
         updated = now
         return MountSyncResult(offsetDegrees: offset)
@@ -320,6 +322,8 @@ public final class MountController {
         phase = .nudging
         nudgeDirection = direction
         nudgeEnds = now.addingTimeInterval(durationSeconds)
+        // The mount moves away from where the last slew ended, so that slew's "arrived" no longer describes it.
+        outcome = nil
         lastError = nil
     }
 

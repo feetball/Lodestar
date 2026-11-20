@@ -24,6 +24,32 @@ final class MountControllerCommandTests: XCTestCase {
         }
     }
 
+    func testASyncClearsTheOutcomeOfTheLastSlew() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, settings: MountSettings(maximumSyncOffsetDegrees: 5.0))
+            try rig.controller.connect()
+            try rig.controller.goto(Support.andromeda)
+            guard case .arrived? = rig.controller.awaitSettled().outcome else {
+                XCTFail("\(name): \(String(describing: rig.controller.status.outcome))")
+                continue
+            }
+            // A sync that is refused changes nothing, so the slew still ended where the screen says it did.
+            guard case .syncOffsetTooLarge? = mountError({ try rig.controller.sync(Support.deneb) }) else {
+                XCTFail("\(name): expected a refusal")
+                continue
+            }
+            guard case .arrived? = rig.controller.status.outcome else {
+                XCTFail("\(name): \(String(describing: rig.controller.status.outcome))")
+                continue
+            }
+            try rig.controller.sync(Support.andromeda)
+            XCTAssertNil(rig.controller.status.outcome, name)
+            XCTAssertEqual(rig.controller.status.phase, .idle, name)
+            // Polling afterwards does not bring it back.
+            XCTAssertNil(rig.controller.poll().outcome, name)
+        }
+    }
+
     func testSyncIsRefusedWhileMoving() throws {
         for name in Support.rigNames {
             let rig = Support.rig(name)
@@ -111,6 +137,32 @@ final class MountControllerCommandTests: XCTestCase {
             let rate = MountNudgeRate.center.degreesPerSecond
             XCTAssertTrue(moved >= rate * 1.0 && moved <= rate * 2.5, "\(name) moved \(moved) at rate \(rate)")
             XCTAssertEqual(rig.mount.position.declination, before.declination, accuracy: 1e-9, name)
+        }
+    }
+
+    func testANudgeClearsTheOutcomeOfTheLastSlew() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name)
+            try rig.controller.connect()
+            try rig.controller.goto(Support.andromeda)
+            guard case .arrived? = rig.controller.awaitSettled().outcome else {
+                XCTFail("\(name): \(String(describing: rig.controller.status.outcome))")
+                continue
+            }
+            // A nudge that is refused moves nothing, so the slew still ended where the screen says it did.
+            XCTAssertNotNil(mountError { try rig.controller.nudge(.north, durationSeconds: 0.0) }, name)
+            guard case .arrived? = rig.controller.status.outcome else {
+                XCTFail("\(name): \(String(describing: rig.controller.status.outcome))")
+                continue
+            }
+            try rig.controller.nudge(.east, rate: .center, durationSeconds: 1.0)
+            XCTAssertEqual(rig.controller.status.phase, .nudging, name)
+            XCTAssertNil(rig.controller.status.outcome, name)
+            // Neither the end of the nudge nor a poll after it brings the old arrival back.
+            rig.clock.advance(seconds: 1.5)
+            let status = rig.controller.poll()
+            XCTAssertEqual(status.phase, .idle, name)
+            XCTAssertNil(status.outcome, name)
         }
     }
 
