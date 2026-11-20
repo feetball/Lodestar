@@ -14,8 +14,9 @@ enum SmallBodyWarning: Sendable, Hashable {
 /// What the app shows about a comet or an asteroid at one instant: distances, elongation, phase, the magnitude
 /// estimate, and the warnings. Computed from `SmallBodyState`; pure, so it can be made on any thread.
 struct SmallBodyInfo: Sendable, Equatable {
-    /// Below this angle from the Sun a body is "in the twilight glow".
-    static let twilightElongation = 25.0
+    /// Below this angle from the Sun a body is "in the twilight glow": the engine's smallest elongation for a
+    /// photographable body, which is also the one the lists apply.
+    static let twilightElongation = SmallBodyEphemeris.defaultMinimumElongation
     /// Comet elements older than this many days make the position approximate.
     static let cometElementsAgeDays = 60.0
     /// Asteroid elements (the bundled ones) older than this many days make the position approximate.

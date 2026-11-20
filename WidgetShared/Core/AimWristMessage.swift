@@ -1,19 +1,40 @@
 import Foundation
+import LodestarKit
 
 /// What the iPhone app sends the Apple Watch app's Aim page while it aims: the pan and tilt still to make, how far away the
 /// target is, and a few flags, as a `WCSession` message of property-list values about twice a second. The iPhone app
-/// builds the same keys in `Lodestar/Features/Widgets/WatchAimLink.swift`.
+/// builds it with `wireMessage` (`Lodestar/Features/Widgets/WatchAimLink.swift`) and the watch app reads it with `decode`,
+/// so the keys below are written once.
 ///
 /// Decoding is defensive: a message that is not an aim message, or holds a value that is not finite or outside its range,
 /// is dropped.
 struct AimWristMessage: Equatable, Sendable {
-    /// How close the camera is to the target (the raw values of the engine's `GuidanceState`).
+    /// How close the camera is to the target: the engine's `GuidanceState`, written on the wire as its raw value.
     enum State: String, Sendable {
         case onTarget, close, far
+
+        /// The state of the engine's guidance. A new `GuidanceState` is a compile error here until the watch has
+        /// a word for it.
+        init(_ guidance: GuidanceState) {
+            switch guidance {
+            case .onTarget: self = .onTarget
+            case .close: self = .close
+            case .far: self = .far
+            }
+        }
     }
 
     static let versionKey = "aim"
     static let version = 1
+    static let sentKey = "sent"
+    static let panKey = "pan"
+    static let tiltKey = "tilt"
+    static let separationKey = "sep"
+    static let stateKey = "state"
+    static let belowHorizonKey = "below"
+    static let nearZenithKey = "zenith"
+    static let nightKey = "night"
+    static let targetKey = "target"
     /// The longest target name kept, in characters.
     static let maximumNameLength = 40
 
@@ -33,20 +54,37 @@ struct AimWristMessage: Equatable, Sendable {
     let isNight: Bool
     let targetName: String
 
+    /// The message as the iPhone app sends it: property-list values only, a few dozen bytes. A target name longer
+    /// than `maximumNameLength` is cut. `decode` reads it back.
+    var wireMessage: [String: Any] {
+        [
+            Self.versionKey: Self.version,
+            Self.sentKey: sent,
+            Self.panKey: pan,
+            Self.tiltKey: tilt,
+            Self.separationKey: separation,
+            Self.stateKey: state.rawValue,
+            Self.belowHorizonKey: isBelowHorizon,
+            Self.nearZenithKey: isNearZenith,
+            Self.nightKey: isNight,
+            Self.targetKey: String(targetName.prefix(Self.maximumNameLength)),
+        ]
+    }
+
     /// The message in `message`, or `nil` if it is not a valid aim message.
     static func decode(_ message: [String: Any]) -> AimWristMessage? {
         guard message[versionKey] as? Int == version,
-              let sent = message["sent"] as? Double, sent.isFinite,
-              let pan = message["pan"] as? Double, pan.isFinite, abs(pan) <= 180,
-              let tilt = message["tilt"] as? Double, tilt.isFinite, abs(tilt) <= 180,
-              let separation = message["sep"] as? Double, separation.isFinite, (0...180).contains(separation),
-              let stateName = message["state"] as? String, let state = State(rawValue: stateName) else { return nil }
+              let sent = message[sentKey] as? Double, sent.isFinite,
+              let pan = message[panKey] as? Double, pan.isFinite, abs(pan) <= 180,
+              let tilt = message[tiltKey] as? Double, tilt.isFinite, abs(tilt) <= 180,
+              let separation = message[separationKey] as? Double, separation.isFinite, (0...180).contains(separation),
+              let stateName = message[stateKey] as? String, let state = State(rawValue: stateName) else { return nil }
         return AimWristMessage(
             sent: sent, pan: pan, tilt: tilt, separation: separation, state: state,
-            isBelowHorizon: message["below"] as? Bool ?? false,
-            isNearZenith: message["zenith"] as? Bool ?? false,
-            isNight: message["night"] as? Bool ?? false,
-            targetName: String((message["target"] as? String ?? "").prefix(maximumNameLength)))
+            isBelowHorizon: message[belowHorizonKey] as? Bool ?? false,
+            isNearZenith: message[nearZenithKey] as? Bool ?? false,
+            isNight: message[nightKey] as? Bool ?? false,
+            targetName: String((message[targetKey] as? String ?? "").prefix(maximumNameLength)))
     }
 
     // MARK: What the watch shows

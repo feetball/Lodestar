@@ -5,15 +5,13 @@ import LodestarKit
 /// name) about twice a second while Aim leads to something and the watch app is open. Nothing is sent otherwise, and the
 /// watch drops what is stale: it shows "Waiting for iPhone" after three seconds without a message.
 ///
-/// The keys are those of `AimWristMessage` in `WidgetShared/Core/AimWristMessage.swift`, which the watch decodes.
+/// The message is `AimWristMessage` in `WidgetShared/Core/AimWristMessage.swift`, which also decodes it on the watch.
 @MainActor
 final class WatchAimLink {
     static let shared = WatchAimLink()
 
     /// Seconds between messages (2 Hz).
     static let interval: Duration = .milliseconds(500)
-    /// The longest target name sent, in characters.
-    static let maximumNameLength = 40
 
     private var lastSent: ContinuousClock.Instant?
 
@@ -31,17 +29,11 @@ final class WatchAimLink {
 
     /// The message for `guidance`: property-list values only, a few dozen bytes.
     static func message(for guidance: Guidance, targetName: String, isNight: Bool, sent: Date) -> [String: Any] {
-        [
-            "aim": 1,
-            "sent": sent.timeIntervalSince1970,
-            "pan": guidance.panDelta,
-            "tilt": guidance.tiltDelta,
-            "sep": guidance.separation,
-            "state": guidance.state.rawValue,
-            "below": guidance.targetBelowHorizon,
-            "zenith": guidance.isNearZenith,
-            "night": isNight,
-            "target": String(targetName.prefix(maximumNameLength)),
-        ]
+        AimWristMessage(
+            sent: sent.timeIntervalSince1970, pan: guidance.panDelta, tilt: guidance.tiltDelta,
+            separation: guidance.separation, state: AimWristMessage.State(guidance.state),
+            isBelowHorizon: guidance.targetBelowHorizon, isNearZenith: guidance.isNearZenith,
+            isNight: isNight, targetName: targetName
+        ).wireMessage
     }
 }
