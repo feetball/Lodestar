@@ -108,8 +108,8 @@ struct SettingsAtmosphereSection: View {
     }
 }
 
-/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner, the polar alignment helper
-/// and the red torch.
+/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner, the polar alignment
+/// helper, the alignment finder and the red torch.
 struct SettingsToolsSection: View {
     @Environment(AppModel.self) private var app
 
@@ -129,6 +129,11 @@ struct SettingsToolsSection: View {
                 PolarAlignmentView()
             } label: {
                 Label("Polar Alignment", systemImage: "sparkle")
+            }
+            NavigationLink {
+                AlignmentFinderView()
+            } label: {
+                Label("Alignment Finder", systemImage: "mountain.2")
             }
             Button {
                 app.isTorchShown = true

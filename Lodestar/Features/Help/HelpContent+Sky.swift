@@ -166,7 +166,32 @@ extension HelpContent {
             .tip("Record in daylight, when the camera picture shows the skyline. It helps you keep the line on the crosshair."),
             .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again. The terrain horizon is computed for the saved position, so compute it again after moving a site. It comes from a surface model: ridges narrower than about 30 to 90 m, trees and buildings nearby are not in it."),
         ],
-        related: [.tonight, .objects])
+        related: [.tonight, .objects, .alignmentFinder])
+
+    private static let alignmentFinder = HelpTopic(
+        topic: .alignmentFinder, category: .planning, title: "Find when the sky lines up", systemImage: "binoculars",
+        summary: "Find the nights the Milky Way core, the Moon or an object stands over a ridge or a gap.",
+        keywords: ["alignment finder", "position search", "shot alignment", "ridge", "gap", "trees", "milky way core",
+                   "moon", "sun", "azimuth", "altitude", "window", "skyline", "when", "nights", "planner"],
+        blocks: [
+            .paragraph("A good picture often needs the target in one place: the Milky Way core over a ridge, the Moon in a gap between trees. The Alignment Finder searches the coming nights for the times when it happens, and tells you which of them are dark and Moon-free enough."),
+            .steps([
+                "Open **Settings** \u{25B8} **Tools** \u{25B8} **Alignment Finder**.",
+                "Under **What**, choose the **Milky Way core**, the **Moon**, the **Sun**, or **Choose object\u{2026}** to search for any star, planet, comet or deep-sky object.",
+                "Under **Where**, choose **On my skyline** and tap or drag the strip to pick the direction of the ridge or the gap. The window is the strip of sky from the skyline up to 10\u{00B0} above it; the **Tolerance** sets how far to each side. Or choose **Azimuth & altitude** and set the centre, the width and the lowest and highest altitude of the window yourself.",
+                "Under **When**, choose 30, 90 or 365 days, how dark the sky has to be and what the Moon may do.",
+                "The nights with a match are listed below, with the time, the altitude and the azimuth of the target and the Moon. Tap **Sky chart at that time** to open the sky chart at that moment. For tonight there is also **Aim**.",
+            ]),
+            .bullets([
+                "**On my skyline** needs a recorded skyline. Without one, use **Azimuth & altitude**.",
+                "**Darkness** counts the Sun\u{2019}s altitude: **Astronomical** is below \u{2212}18\u{00B0}, **Nautical** below \u{2212}12\u{00B0}, **Any darkness** below \u{2212}6\u{00B0}. **Any time** has no condition, which suits the Moon and the Sun.",
+                "**Moon** can be left alone, kept below the horizon, or kept dim: at most the share of the disc you choose is lit.",
+                "A match marked **Behind your skyline** is in the window, but the trees or hills hide it at that moment.",
+            ]),
+            .tip("The window needs a little room. A narrow tolerance can fall between two of the finder\u{2019}s five-minute steps when the target moves fast, so start with 3\u{00B0} or more."),
+            .caution("Never aim a camera or telescope at the Sun without a solar filter. There is no Aim button for the Sun."),
+        ],
+        related: [.skyline, .tonight, .trailsAndExposure])
 
     private static let sites = HelpTopic(
         topic: .sites, category: .planning, title: "Observing sites", systemImage: "mappin.and.ellipse",
@@ -187,5 +212,7 @@ extension HelpContent {
         related: [.tonight, .skyline, .skyChart])
 
     /// The topics of "Sky and objects" and "Planning a picture".
-    static let sky: [HelpTopic] = [objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline, sites]
+    static let sky: [HelpTopic] = [
+        objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline, alignmentFinder, sites,
+    ]
 }
