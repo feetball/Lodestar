@@ -69,9 +69,11 @@ private struct ExposureCalculatorForm: View {
 
     // MARK: Inputs
 
+    /// The lens type and image circle cannot be changed here, so they stay what the camera in Settings has.
     private var currentSetup: LensSetup {
         LensSetup(sensor: sensor, focalLengthMillimeters: focalLength, aperture: aperture,
-                  pixelPitchMicrometers: pixelPitch)
+                  pixelPitchMicrometers: pixelPitch, projection: myCamera.projection,
+                  imageCircleDiameterMillimeters: myCamera.imageCircleDiameterMillimeters)
     }
 
     /// The presets, plus the user's own sensor when it is a custom size.
