@@ -130,7 +130,7 @@ struct TonightAccessoryView: View {
         case .accessoryCircular:
             ZStack {
                 AccessoryWidgetBackground()
-                Image(systemName: "location.slash")
+                Image(systemName: TonightNeedsLocationText.symbol(issue))
                     .font(.title3)
                     .widgetAccentable()
             }
@@ -152,7 +152,7 @@ struct TonightAccessoryView: View {
             .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         #if os(watchOS)
         case .accessoryCorner:
-            Image(systemName: "location.slash")
+            Image(systemName: TonightNeedsLocationText.symbol(issue))
                 .font(.title2)
                 .widgetAccentable()
                 .widgetLabel { Text(TonightNeedsLocationText.corner(issue)) }
@@ -160,7 +160,7 @@ struct TonightAccessoryView: View {
                 .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         #endif
         default:
-            Label(TonightNeedsLocationText.short(issue), systemImage: "location.slash")
+            Label(TonightNeedsLocationText.short(issue), systemImage: TonightNeedsLocationText.symbol(issue))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(TonightNeedsLocationText.spoken(issue))
         }

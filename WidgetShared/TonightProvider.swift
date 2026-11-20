@@ -8,13 +8,16 @@ extension TonightEntry: TimelineEntry {}
 /// Everything runs on the device with LodestarKit: no network, no App Group. The location comes from Core Location
 /// in the widget itself (the system shares the app's authorization), so a widget or complication always shows the
 /// device's own place, never the observer chosen in the iPhone app (the watch app may show that one). With no
-/// place, the entry says what the user has to do: open Lodestar to allow location, or allow it in Settings.
+/// place, the entry says what the user has to do: open Lodestar to allow location, allow it in Settings, or wait for
+/// the first fix.
 struct TonightProvider: TimelineProvider {
     /// How long a timeline is used before a new one is asked for (it holds entries for a day).
     static let reloadInterval: TimeInterval = 6 * 3_600
     /// How long the "allow location" state waits before trying again. Long, because it can only end once the user
     /// has acted, and the app asks for a reload whenever it comes forward.
     static let needsLocationReloadInterval: TimeInterval = 3_600
+    /// How long the "waiting for a fix" state waits before trying again. Short, because it ends by itself.
+    static let waitingForFixReloadInterval: TimeInterval = 900
 
     func placeholder(in context: Context) -> TonightEntry {
         TonightBuilder.entry(for: .preview(), at: Date())
@@ -47,8 +50,10 @@ struct TonightProvider: TimelineProvider {
             let place = await locator.currentPlace()
             let now = Date()
             guard let place else {
-                completion(Timeline(entries: [.needsLocation(at: now, issue: locator.locationIssue)],
-                                    policy: .after(now.addingTimeInterval(Self.needsLocationReloadInterval))))
+                let issue = locator.locationIssue
+                let wait = issue == .waitingForFix ? Self.waitingForFixReloadInterval : Self.needsLocationReloadInterval
+                completion(Timeline(entries: [.needsLocation(at: now, issue: issue)],
+                                    policy: .after(now.addingTimeInterval(wait))))
                 return
             }
             let entries = await Task.detached(priority: .userInitiated) {
