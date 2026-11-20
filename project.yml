@@ -67,8 +67,12 @@ targets:
     deploymentTarget: "17.0"
     attributes:
       CreatedOnToolsVersion: "16.0"
+    # WidgetShared is compiled into the app as well: the App Intents that Control Center runs from the widget extension, the
+    # Live Activity's attributes and the words of "When is it dark" are shared between the app and the extension.
     sources:
       - path: Lodestar
+        type: syncedFolder
+      - path: WidgetShared
         type: syncedFolder
     dependencies:
       - package: LodestarKit

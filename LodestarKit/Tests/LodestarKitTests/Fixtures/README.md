@@ -412,6 +412,7 @@ Nothing downloaded is executed or unpickled; the ephemeris is read as data by `j
 | `satellite_omm_sample.json`, `satellite_stations.json`, `satellite_stations.tle`, `satellite_starlink_sample.json` | CelesTrak GP snapshots (OMM JSON and TLE) taken 2026-10-18 |
 | `satellite_reference.json` | Skyfield 1.55 + DE421 passes, looks and shadow transitions for several sites |
 | `satellite_streaks.json` | Skyfield frame crossings for a 2,976-satellite constellation |
+| `satellite_iss_transit.tle` | The ISS element set of CelesTrak's `CATNR=25544&FORMAT=tle` of 2026-11-19 (epoch 2026-11-19T06:28Z, sha256 `29455c34f381c2629cbe848ef760362f97878f56cc0a92650dabc139eae0e851`), for the ISS transit tests; the expected transits come from `Tools/make_satellite_transit_reference.py` (Skyfield 1.55 + DE440s brute-force search, no use of the kit) |
 
 ## Provenance and licences
 

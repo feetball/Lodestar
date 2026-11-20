@@ -55,7 +55,7 @@ extension HelpContent {
             .tip("Turn on **Camera preview at night** to see the camera picture in red too. It is brighter than the sky alone, so it costs some night vision."),
             .caution("Apps cannot tint the keyboard, menus or alerts, so they keep their normal colors. For a fully red screen, set up iOS **Color Filters**: go to **Settings** \u{25B8} **Accessibility** \u{25B8} **Display & Text Size** \u{25B8} **Color Filters**, turn on **Color Tint**, drag **Intensity** and **Hue** all the way to the right, then go to **Accessibility Shortcut** and choose **Color Filters**. Triple-click the side button to switch the red screen on and off."),
         ],
-        related: [.gettingStarted, .troubleshooting])
+        related: [.gettingStarted, .shortcuts, .troubleshooting])
 
     private static let onlineData = HelpTopic(
         topic: .onlineData, category: .more, title: "Optional online data", systemImage: "arrow.down.circle",
@@ -65,7 +65,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Lodestar works fully offline. These optional downloads add satellite passes, Starlink streak warnings, comets, a cloud forecast and terrain horizons. All are off until you switch them on in **Settings** \u{25B8} **Online Data**, and each one says what it sends. Each provider sees your IP address. Apart from these, the network is used only for the site map from Apple Maps and for the time-zone lookup of a saved site, which sends Apple its position rounded to about 1 km when you add or edit the site, and again later if it was saved without a network."),
             .bullets([
-                "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim. About 75 KB from CelesTrak.",
+                "**Satellite passes** show when the ISS and other bright satellites cross your sky, on the Tonight screen and in Aim, and when the ISS or Tiangong crosses the Sun or the Moon, in the Events calendar. About 75 KB from CelesTrak.",
                 "**Starlink streak warnings** warn in Aim when Starlink may cross your frame during an exposure. About 4.7 MB from CelesTrak, once a day, and only on Wi-Fi or another unmetered network.",
                 "**Comets** join the object list, the sky chart and Aim. About 164 KB from the Minor Planet Center.",
                 "**Cloud forecast** shows tonight\u{2019}s hourly cloud cover, dew, wind, fog and temperature on the Tonight screen. MET Norway receives your location, rounded to about 10 km.",
@@ -90,6 +90,25 @@ extension HelpContent {
             .tip("The Apple Watch app also has a small **Tonight** screen of its own."),
         ],
         related: [.tonight, .onlineData])
+
+    private static let shortcuts = HelpTopic(
+        topic: .shortcuts, category: .more, title: "Shortcuts, Control Center and torch", systemImage: "waveform",
+        summary: "Ask Siri to aim, switch night mode from Control Center, follow a satellite pass, and use the red torch.",
+        keywords: ["siri", "shortcut", "voice", "control center", "lock screen", "live activity", "dynamic island", "torch", "flashlight", "red light", "satellite", "iss"],
+        blocks: [
+            .paragraph("Lodestar works with Siri, the Shortcuts app and Control Center, so you can reach it without hunting through your phone in the dark. Everything runs on the iPhone. Nothing is sent to the internet."),
+            .bullets([
+                "**Aim at an object.** Say \u{201C}Aim Lodestar at Andromeda\u{201D}. Lodestar opens on **Aim** with that object as the target. You can say a name, a Messier or NGC number, or a planet.",
+                "**When is it dark.** Say \u{201C}When is it dark in Lodestar\u{201D}. Siri reads tonight\u{2019}s darkness, when the Moon rises and sets, and when the Milky Way core is up, for the place Lodestar last used. It does not open the app. Open Lodestar once so that it knows where you are.",
+                "**Night mode.** Say \u{201C}Turn on Lodestar night mode\u{201D}. Lodestar opens in red.",
+                "**Red torch.** Say \u{201C}Lodestar red torch\u{201D}. The whole screen turns red, for finding your gear without spoiling your night vision.",
+            ]),
+            .paragraph("The same actions are in the **Shortcuts** app, where you can add them to your own shortcuts or the Action button. On iOS 18 and later, you can also add **Night Mode**, **Red Torch** and **Aim** from Lodestar to Control Center or the Lock Screen. Each one opens Lodestar."),
+            .paragraph("**Satellite passes.** When you tap **Follow in Aim** or **Wait at the peak** on a pass, a Live Activity appears on the Lock Screen and in the Dynamic Island. It counts down to the rise and then to the peak, and shows how high the pass gets and where to look. It ends with the pass, or when you stop following. If you turn off Live Activities for Lodestar in iOS Settings, the countdown stays in Aim."),
+            .paragraph("**The red torch.** Open it from **Settings** \u{25B8} **Tools** or **Night Mode**, or with Siri or Control Center. Drag the bar to set the brightness. Tap once to ask for white light and tap **White light** to confirm. Tap again to go back to red. Double-tap to close. The screen stays awake while the torch is on."),
+            .tip("If the phone is on your camera mount in the dark, put the Night Mode control in Control Center, so you can switch it with one swipe."),
+        ],
+        related: [.nightMode, .widgets, .aimScreen])
 
     private static let troubleshooting = HelpTopic(
         topic: .troubleshooting, category: .more, title: "Troubleshooting", systemImage: "wrench.and.screwdriver",
@@ -148,5 +167,5 @@ extension HelpContent {
         related: [.planFraming, .alignment])
 
     /// The topics of "Equipment" and "More".
-    static let more: [HelpTopic] = [cameraAndLens, mounts, nightMode, onlineData, widgets, troubleshooting, glossary]
+    static let more: [HelpTopic] = [cameraAndLens, mounts, nightMode, onlineData, widgets, shortcuts, troubleshooting, glossary]
 }

@@ -34,6 +34,12 @@ private struct WidgetsIntegration: ViewModifier {
             .onChange(of: app.observerContext, initial: true) { _, context in
                 WatchObserverLink.shared.send(context)
                 WidgetCenter.shared.reloadAllTimelines()
+                // "When is it dark" is answered for this place even when the app is not on screen.
+                LodestarIntentHost.remember(context)
+            }
+            .onChange(of: app.settings.favoriteObjectIDs, initial: true) {
+                // Siri learns the names of the favourites as things to aim at.
+                LodestarShortcuts.updateAppShortcutParameters()
             }
     }
 }
