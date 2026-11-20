@@ -14,9 +14,40 @@ enum HorizonText {
     private static let listedGaps = 3
     private static let directions = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
 
-    /// The state of a site's skyline as stored now: "Open horizon" or "Recorded · 86% covered · highest 14° in the east".
+    static let noRecordedSkyline = "No recorded skyline"
+
+    /// The state of the skyline the user recorded at a site, as stored now: "Open horizon" or "Recorded · 86% covered ·
+    /// highest 14° in the east"; "No recorded skyline" when there is none but a terrain horizon was computed.
     static func status(of site: SavedSite) -> String {
-        status(of: site.horizon, coverage: HorizonCoverageMemory.recall(for: site))
+        if site.horizon == nil, site.terrainHorizon != nil { return noRecordedSkyline }
+        return status(of: site.horizon, coverage: HorizonCoverageMemory.recall(for: site))
+    }
+
+    /// What applies at a site, as stored now, in one line: "Open horizon", "Recorded · 86% covered · highest 14° in the
+    /// east", "Terrain horizon · highest 9° in the south" or "Recorded + terrain · highest 14° in the east".
+    static func summary(of site: SavedSite) -> String {
+        summary(of: SiteHorizon.resolve(site), coverage: HorizonCoverageMemory.recall(for: site))
+    }
+
+    /// The one-line summary of a resolved skyline; `coverage` is that of the recorded sweep, left out when not known.
+    static func summary(of resolved: ResolvedHorizon, coverage: Double?) -> String {
+        guard let profile = resolved.profile, let source = resolved.source, !profile.isFlat else { return openHorizon }
+        var parts = [source == .recorded ? "Recorded" : source.label]
+        if source != .terrain, let coverage { parts.append("\(AppFormat.percent(coverage)) covered") }
+        parts.append(highest(profile))
+        return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// "Terrain horizon applied", "Recorded skyline applied": the heading of the notes that say a skyline was used.
+    static func applied(_ source: HorizonSource?) -> String { "\(source?.label ?? "Skyline") applied" }
+
+    /// The skyline as the spoken summaries name it: "recorded skyline", "terrain horizon", "recorded and terrain skyline".
+    static func spokenName(_ source: HorizonSource?) -> String {
+        switch source {
+        case .terrain: return "terrain horizon"
+        case .recordedAndTerrain: return "recorded and terrain skyline"
+        case .recorded, nil: return "recorded skyline"
+        }
     }
 
     /// "Open horizon" without a skyline, otherwise "Recorded · 86% covered · highest 14° in the east". The coverage

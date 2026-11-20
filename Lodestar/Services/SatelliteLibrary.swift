@@ -108,7 +108,7 @@ struct SatelliteLibrary: Sendable {
         switch feed {
         case .satellites: return SatelliteLibrary(stations: nil, visual: nil, starlink: starlink, generation: generation + 1)
         case .starlink: return SatelliteLibrary(stations: stations, visual: visual, starlink: nil, generation: generation + 1)
-        case .comets, .clouds: return self
+        case .comets, .clouds, .terrain: return self
         }
     }
 

@@ -8,6 +8,8 @@ struct AimConfiguration: Equatable {
     var alignment: AlignmentModel
     /// The DSLR's picture in landscape orientation, in degrees.
     var lensFrame: FrameSize
+    /// The border of the DSLR's picture in the camera's frame: a rectangle, or a curve for a fisheye lens.
+    var lensOutline: [Vector3]
     var showConstellationLines: Bool
     var showConstellationNames: Bool
     var showDeepSkyObjects: Bool
@@ -26,7 +28,9 @@ struct AimConfiguration: Equatable {
         let mount = app.mountProfile
         self.mount = mount
         alignment = app.alignment
-        lensFrame = app.lensSetup.fieldOfView
+        let lens = app.lensSetup
+        lensFrame = lens.fieldOfView
+        lensOutline = AimLensFrame.outline(of: lens)
         showConstellationLines = settings.showConstellationLines
         showConstellationNames = settings.showConstellationNames
         showDeepSkyObjects = settings.showDeepSkyObjects
@@ -75,12 +79,14 @@ struct AimSkyInputs: Equatable, Sendable {
     var horizon: HorizonProfile?
     /// The mosaic being shot, whose panels are drawn.
     var mosaic: MosaicPlan?
+    /// Seconds from now the sky is previewed at; 0 while live (see `AimViewModel.previewOffset`).
+    var previewOffset: TimeInterval = 0
 }
 
 /// The sheets the Aim screen presents. The help page is one of them, and not a sheet of its own button, because the
 /// display it opens from is rebuilt whenever it turns and would close the page.
 enum AimSheet: String, Identifiable {
-    case targetPicker, alignment, mosaic, mount, help
+    case targetPicker, alignment, mosaic, mount, help, previewTime
 
     var id: String { rawValue }
 }

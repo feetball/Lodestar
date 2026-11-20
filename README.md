@@ -12,7 +12,10 @@ tilt the tripod head until it is in your frame.
   pointing the shortest way, "Pan right 23.4° / Tilt up 12.1°" read-outs for pan-tilt heads, the
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
   closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
-  With no target it names what is in the middle of the picture, and the camera picture zooms up to 8×.
+  Keep a **camera profile** for each body and lens, start from a smart-telescope preset (Seestar, Dwarf,
+  Vespera) or read a profile from a photo's EXIF data, and switch with one tap; a **fisheye** lens gets a
+  curved or circular frame. With no target it names what is in the middle of the picture, and the camera
+  picture zooms up to 8×.
 - **Star alignment** — centre a bright star or planet in your camera once and Lodestar learns
   the compass error and the bracket's misalignment (one star: heading + tilt; two or more: a
   least-squares fit with residuals). Syncing waits until the phone has been held still, each
@@ -56,7 +59,9 @@ tilt the tripod head until it is in your frame.
   Moon by the Looney 11 rule, adjusted for phase and height, with the Moon's size in pixels. The pages of the Sun,
   Moon and planets show their size in pixels too.
 - **Real skyline** — sweep the phone along the horizon to record trees, buildings and mountains; rise and set
-  times, Tonight and the charts then use the site's own skyline.
+  times, Tonight and the charts then use the site's own skyline. Optionally, a **terrain horizon** worked out from
+  elevation data (AWS Open Data, downloaded for a saved site only when you ask) stands in where you have not
+  recorded a skyline and fills the stretches a partial sweep left open.
 - **Comets and asteroids** — 216 bright asteroids built in and, optionally, the daily comet file: brightness
   estimates, elongation warnings, a Bright Comets list, and the direction of a comet's ion tail with the camera
   tilt that lays it along the frame.
@@ -66,7 +71,8 @@ tilt the tripod head until it is in your frame.
   and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
   Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast with dew,
-  wind, fog and temperature (MET Norway, location rounded to about 10 km).
+  wind, fog and temperature (MET Norway, location rounded to about 10 km) and terrain horizons (elevation tiles from
+  AWS Open Data, only when you ask a site for one).
 - **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
@@ -81,8 +87,8 @@ tilt the tripod head until it is in your frame.
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
 - **Offline and private** — all catalogs and ephemerides are on the device; nothing is collected.
-  The optional online data downloads from CelesTrak, the Minor Planet Center and MET Norway only when you turn it
-  on, and a GoTo mount is reached over the local network only.
+  The optional online data downloads from CelesTrak, the Minor Planet Center, MET Norway and AWS Open Data only
+  when you turn it on, and a GoTo mount is reached over the local network only.
 
 ## Requirements
 
@@ -207,8 +213,10 @@ Lodestar has no accounts, analytics, ads or tracking, and it never collects your
 and camera data are processed on the device. The network is used by Apple (map tiles in the site picker,
 and the geocoding service, which receives a site's coordinates to look up its time zone while you add or
 edit a site) and by the optional downloads in Settings ▸ Online Data, which are off until switched on:
-CelesTrak, the Minor Planet Center and MET Norway see the IP address, and MET Norway also the location
-rounded to about 10 km. GoTo mount control talks to the mount on the local network only. See
+CelesTrak, the Minor Planet Center, MET Norway and the AWS Open Data tile server see the IP address; MET
+Norway also sees the location rounded to about 10 km, and the tile server which 1° elevation tiles you ask for
+(where a site is to within about 100 km), only when you ask a site for its terrain horizon. GoTo mount control
+talks to the mount on the local network only. See
 `docs/privacy.md` and `Lodestar/Resources/PrivacyInfo.xcprivacy`.
 
 ## Data and credits
@@ -216,5 +224,6 @@ rounded to about 10 km. GoTo mount control talks to the mount on the local netwo
 Star data: HYG Database v4.1 (CC BY-SA 4.0). Deep-sky data: OpenNGC (CC BY-SA 4.0). Constellation
 figures and Milky Way outlines: d3-celestial (BSD-3-Clause). Geomagnetic model: NOAA/BGS WMM2025
 (public domain). Planetary theory VSOP87 (Bretagnon & Francou); Pluto and lunar theory after
-J. Meeus. Night lights: NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP). Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
+J. Meeus. Night lights: NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP). Optional terrain elevation data: AWS Open Data Terrain Tiles (SRTM and GMTED2010 courtesy of the U.S.
+Geological Survey, and national surveys). Full details, licences and regeneration instructions: [ATTRIBUTION.md](ATTRIBUTION.md)
 and [Tools/README.md](Tools/README.md). The derived data files remain under CC BY-SA 4.0.

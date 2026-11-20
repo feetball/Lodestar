@@ -169,9 +169,11 @@ final class AppModel {
                                    timeZone: .autoupdatingCurrent, name: "Current Location", source: .device)
         case .site(let id):
             guard let site = settings.savedSites.first(where: { $0.id == id }) else { return nil }
+            // The recorded skyline and the terrain horizon, as they apply together (see SiteHorizon).
+            let skyline = SiteHorizon.resolve(site)
             return ObserverContext(observer: Observer(location: site.location, atmosphere: atmosphere),
                                    timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id),
-                                   horizon: site.horizon)
+                                   horizon: skyline.profile, horizonSource: skyline.source)
         }
     }
 
@@ -180,17 +182,8 @@ final class AppModel {
         MountProfile.presets.first { $0.id == settings.mountPresetID } ?? .backCameraPortrait
     }
 
-    /// The camera body + lens used for the framing rectangle and exposure tools.
-    var lensSetup: LensSetup {
-        let sensor: SensorFormat
-        if let preset = SensorFormat.presets.first(where: { $0.id == settings.sensorID }) {
-            sensor = preset
-        } else {
-            sensor = SensorFormat.custom(width: settings.customSensorWidth, height: settings.customSensorHeight)
-        }
-        return LensSetup(sensor: sensor, focalLengthMillimeters: settings.focalLength,
-                         aperture: settings.aperture, pixelPitchMicrometers: settings.pixelPitch)
-    }
+    /// The camera body + lens used for the framing rectangle and exposure tools: the active camera profile.
+    var lensSetup: LensSetup { settings.activeCameraProfile.lensSetup }
 
     // MARK: Lifecycle
 
