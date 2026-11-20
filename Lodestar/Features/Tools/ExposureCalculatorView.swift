@@ -203,12 +203,13 @@ private struct ExposureCalculatorForm: View {
     /// How often the target's and the Moon's place are worked out again while the calculator is open.
     private static let skyRefreshInterval: Duration = .seconds(30)
 
-    /// Works out the sky right away and then every `skyRefreshInterval` until the task is cancelled.
+    /// Works out the sky right away and then every `skyRefreshInterval` until the task is cancelled. It uses the live
+    /// time, not the sky chart's time-travel date, because the Alt-Az Mount and Moon sections show the sky now.
     private func keepSkyFresh() async {
         let observer = app.observerContext?.observer
         let target = app.target
         while !Task.isCancelled {
-            let date = app.clock.displayDate
+            let date = app.clock.now
             let computed = await Task.detached(priority: .userInitiated) {
                 ExposureSkyCalculator.compute(observer: observer, target: target, date: date)
             }.value
