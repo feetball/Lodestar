@@ -148,6 +148,16 @@ final class AimMosaicPlannerTests: XCTestCase {
         XCTAssertNotNil(failureMessage(request(.target(try atlasComet()))))
     }
 
+    func testAFisheyeLensCannotBeTiledAndTheMessageSaysWhatToDo() throws {
+        let center = HorizontalCoordinate(azimuth: 180, altitude: 45)
+        var fisheye = request(.custom(width: 30, height: 20, center: center), frame: lens(24))
+        fisheye.lensIsRectilinear = false
+        XCTAssertEqual(failureMessage(fisheye), "Mosaics need a rectilinear lens. Choose another camera profile in Settings.")
+        // The same request with an ordinary lens plans.
+        fisheye.lensIsRectilinear = true
+        _ = try planned(fisheye)
+    }
+
     // MARK: Orientation
 
     func testATallAreaRecommendsPortraitAndAWideLensKeepsItInOnePanel() throws {

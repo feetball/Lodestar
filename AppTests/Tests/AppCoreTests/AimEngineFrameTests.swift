@@ -89,7 +89,8 @@ final class AimEngineFrameTests: XCTestCase {
 
     private func configuration(mount: MountProfile = .backCameraPortrait, alignment: AlignmentModel = .identity,
                                lens: FrameSize = FrameSize(horizontal: 8, vertical: 6, diagonal: 10)) -> AimConfiguration {
-        AimConfiguration(mount: mount, alignment: alignment, lensFrame: lens, showConstellationLines: true,
+        AimConfiguration(mount: mount, alignment: alignment, lensFrame: lens, lensOutline: [],
+                         showConstellationLines: true,
                          showConstellationNames: true, showDeepSkyObjects: true, showMilkyWay: true, deepSkyProminence: 2,
                          starMagnitudeLimit: 5, wantsCameraPreview: false, isNight: false)
     }
@@ -355,6 +356,20 @@ final class AimEngineFrameTests: XCTestCase {
         XCTAssertEqual(try guidanceStates(engine, altitudes: [39, 38]), [.onTarget, .onTarget])
         try track(engine, "moon")
         XCTAssertEqual(try guidanceStates(engine, altitudes: [38]), [.close])
+    }
+
+    func testClearingTheTargetPositionKeepsTheTargetButForgetsWhereItIsAndTheOnTargetState() throws {
+        let engine = makeEngine()
+        let object = try track(engine, "dso.M31")
+        XCTAssertEqual(try guidanceStates(engine, altitudes: [39]), [.onTarget])
+        engine.clearTargetPosition()
+        let cleared = try frameAt(engine, altitude: 39)
+        XCTAssertNil(cleared.guidance)
+        XCTAssertNil(cleared.target)
+        // It is still the same target: its new position is taken, and the on-target state starts afresh (2 degrees away
+        // would stay on target with the old state; from a fresh one it is only close).
+        engine.update(target: skyTarget(object, azimuth: 0, altitude: 41))
+        XCTAssertEqual(try guidanceStates(engine, altitudes: [39]), [.close])
     }
 
     // MARK: The on-target state

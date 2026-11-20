@@ -48,6 +48,12 @@ final class AimAlignmentSupportTests: XCTestCase {
         XCTAssertEqual(AimAlignmentCandidates.planetMagnitudeLimit, 3.0)
     }
 
+    func testTheTextOfAnEmptyListNamesTheLimits() {
+        XCTAssertEqual(AimAlignmentCandidates.emptyListText,
+                       "No bright star or planet is between 15\u{00B0} and 78\u{00B0} right now. "
+                       + "Try again later or after the sky has darkened.")
+    }
+
     // MARK: Who is offered
 
     func testEveryCandidateIsBetweenTheAltitudeLimits() throws {

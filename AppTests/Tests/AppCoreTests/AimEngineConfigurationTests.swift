@@ -18,7 +18,8 @@ final class AimEngineConfigurationTests: XCTestCase {
 
     private func configuration(mount: MountProfile = .backCameraPortrait, alignment: AlignmentModel = .identity,
                                lens: FrameSize = FrameSize(horizontal: 8, vertical: 6, diagonal: 10)) -> AimConfiguration {
-        AimConfiguration(mount: mount, alignment: alignment, lensFrame: lens, showConstellationLines: true,
+        AimConfiguration(mount: mount, alignment: alignment, lensFrame: lens, lensOutline: [],
+                         showConstellationLines: true,
                          showConstellationNames: true, showDeepSkyObjects: true, showMilkyWay: true, deepSkyProminence: 2,
                          starMagnitudeLimit: 5, wantsCameraPreview: false, isNight: false)
     }
