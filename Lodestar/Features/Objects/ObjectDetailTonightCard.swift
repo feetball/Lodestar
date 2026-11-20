@@ -4,6 +4,7 @@ import LodestarKit
 /// When the object rises, culminates and sets tonight, with the altitude chart.
 struct ObjectDetailTonightCard: View {
     @Environment(\.palette) private var palette
+    @Environment(AppModel.self) private var app
 
     let object: CelestialObject
     let night: ObjectDetailNight?
@@ -38,9 +39,9 @@ struct ObjectDetailTonightCard: View {
         darknessRows(for: night)
         if night.appliesSkyline {
             Label {
-                Text("Skyline applied: the object rises when it clears your skyline and sets when it sinks behind it."
-                     + " Hours above your skyline count the dark time the object is at least"
-                     + " \(Int(ObjectsTonight.minimumAltitude))\u{00B0} high.")
+                Text("\(HorizonText.applied(app.observerContext?.horizonSource)): the object rises when it clears the skyline"
+                     + " and sets when it sinks behind it. Hours above the skyline count the dark time the object is at"
+                     + " least \(Int(ObjectsTonight.minimumAltitude))\u{00B0} high.")
                     .fixedSize(horizontal: false, vertical: true)
             } icon: {
                 Image(systemName: "mountain.2")

@@ -228,8 +228,7 @@ struct SkyChartSurface: View {
     /// The camera frame at its place on the sky, with the lens of Settings; `nil` before it is placed.
     private func makeFraming() -> SkyChartFraming? {
         guard let center = model.framingCenter else { return nil }
-        return SkyChartFraming(center: center, frame: content.frame, size: app.lensSetup.fieldOfView,
-                               positionAngle: framingAngle)
+        return SkyChartFraming(center: center, frame: content.frame, lens: app.lensSetup, positionAngle: framingAngle)
     }
 
     /// The chart as it would be drawn without the fixed frame: the model's pan, and the heading's rotation.
@@ -263,7 +262,7 @@ struct SkyChartSurface: View {
 
     private func currentPose() -> SkyChartCameraPose? {
         SkyChartCameraPose.current(from: app.motion, mount: app.mountProfile, alignment: app.alignment,
-                                   frame: app.lensSetup.fieldOfView)
+                                   lens: app.lensSetup)
     }
 
     /// The viewport as the chart is drawn right now, for turning a tap into a chart position.
@@ -450,7 +449,7 @@ struct SkyChartSurface: View {
             parts.append("\(deepSkyCount) deep-sky \(deepSkyCount == 1 ? "object" : "objects") above the horizon are drawn.")
         }
         if let skyline = content.scene.skyline {
-            parts.append("The ground below your recorded skyline is shaded; the skyline rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
+            parts.append("The ground below the \(HorizonText.spokenName(app.observerContext?.horizonSource)) is shaded; it rises up to \(Int(skyline.highestAltitude.rounded())) degrees.")
         }
         if let glow = layers.horizonGlow {
             parts.append(glow.spokenSummary)

@@ -90,7 +90,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Check how a target will sit in your picture before you set up. The Sky tab can hold your camera\u{2019}s frame in the middle while you move the sky under it."),
             .steps([
-                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from them.",
+                "Enter your camera and lens in **Settings** \u{25B8} **Camera & Lens**. The frame is drawn from the profile in use. A fisheye lens gets a curved frame.",
                 "On the **Sky** tab, open the layers menu. Turn on **Camera view**, then **Frame in the middle**.",
                 "Drag to move the frame over the sky and pinch to zoom, up to 15\u{00D7}. Zoomed in, large deep-sky objects are drawn near their real size. The frame stays on the same stars as time passes, so use the time bar to see how it will look later.",
                 "Turn the frame by twisting two fingers, or press and hold on the chart, then drag around the middle. It snaps at 0\u{00B0}, 90\u{00B0}, 180\u{00B0} and 270\u{00B0}. The **90\u{00B0}** button gives a quarter turn, for a portrait frame.",
@@ -103,7 +103,7 @@ extension HelpContent {
             ]),
             .caution("The frame is drawn from your camera and lens in Settings. If those are wrong, so is the frame. Below the horizon, only the part above it is drawn."),
         ],
-        related: [.skyChart, .aimScreen, .glossary])
+        related: [.skyChart, .aimScreen, .cameraAndLens, .glossary])
 
     private static let mosaic = HelpTopic(
         topic: .mosaic, category: .planning, title: "Mosaic planner", systemImage: "square.grid.3x3",
@@ -121,7 +121,7 @@ extension HelpContent {
             ]),
             .tip("**Export Panels\u{2026}** on the Plan card saves the panel centers, with the camera angle, as a table or as a list of right ascension and declination for a planetarium or an ASIAIR. Plans in azimuth and altitude, such as the Milky Way arch, cannot be exported."),
             .tip("An object\u{2019}s page tells you when it needs a mosaic with your lens."),
-            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars."),
+            .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars. It also needs a rectilinear lens: with a fisheye profile in Settings the planner says so."),
         ],
         related: [.planFraming, .aimScreen])
 
@@ -150,8 +150,9 @@ extension HelpContent {
 
     private static let skyline = HelpTopic(
         topic: .skyline, category: .planning, title: "Record your skyline", systemImage: "mountain.2",
-        summary: "Teach Lodestar where trees and hills hide the sky.",
-        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set"],
+        summary: "Teach Lodestar where trees and hills hide the sky, or let it work out the hills from elevation data.",
+        keywords: ["horizon", "trees", "buildings", "hills", "mountains", "obstructions", "sweep", "saved site", "rise and set",
+                   "terrain", "elevation", "terrain horizon"],
         blocks: [
             .paragraph("Trees, buildings and hills hide objects long before the true horizon. Record your site\u{2019}s real skyline once. Rise and set times, Tonight, the object pages and the sky chart then use it, and the Aim screen shades the ground below it."),
             .steps([
@@ -161,8 +162,9 @@ extension HelpContent {
                 "The screen shows how much is covered and what is still to sweep. **Start Over** begins again.",
                 "Tap **Done** to save. If the circle is not complete, Lodestar asks what to do with the gaps.",
             ]),
+            .paragraph("**Terrain horizon.** Where you cannot sweep, or have swept only part of the circle, Lodestar can work out the skyline of the hills and mountains from elevation data. Switch on **Terrain horizons** in **Settings** \u{25B8} **Online Data**, edit the saved site and, in its **Terrain Horizon** section, tap **Compute from Elevation Data\u{2026}**. Lodestar asks first, downloads up to four elevation tiles of about 11 MB each, works out the skyline and deletes the tiles. The tile server sees your IP address and which 1\u{00B0} tiles you request. Then the Aim screen, Tonight, the object pages and the sky chart use the terrain horizon wherever you have not recorded a skyline, and in the stretches a partial sweep left open. They say which skyline applies: **Recorded skyline**, **Terrain horizon** or **Recorded + terrain**. The same section offers the ground elevation of the data as the site\u{2019}s elevation, and **Remove Terrain Horizon\u{2026}**."),
             .tip("Record in daylight, when the camera picture shows the skyline. It helps you keep the line on the crosshair."),
-            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again."),
+            .caution("A skyline belongs to one spot. If you move a site by more than about 100 m, record it again. The terrain horizon is computed for the saved position, so compute it again after moving a site. It comes from a surface model: ridges narrower than about 30 to 90 m, trees and buildings nearby are not in it."),
         ],
         related: [.tonight, .objects])
 
