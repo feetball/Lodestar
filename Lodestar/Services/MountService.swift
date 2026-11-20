@@ -636,6 +636,9 @@ final class MountService {
         let old = status
         guard new != old else { return }
         status = new
+        // The engine clears the outcome of the last slew when the mount is nudged or synced. "Arrived at M 31" goes
+        // with it, and so does the name of that slew's target. A new slew clears the outcome too but sets its own name.
+        if old.outcome != nil, new.outcome == nil, new.phase != .slewing { slewTargetName = nil }
         if new.phase == .slewing && old.phase != .slewing {
             slewStartSeparation = new.separation
             MountLifecycle.announce("Slewing")
