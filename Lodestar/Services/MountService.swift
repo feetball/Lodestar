@@ -10,8 +10,9 @@ import Observation
 /// same worker, Stop goes first.
 ///
 /// Safety rules kept here: nothing moves unless a person asked for it with a tap; the Sun is never a target; targets
-/// below the altitude limit are refused before the engine sees them (and by the engine as well); the mount is stopped
-/// and disconnected when the app goes to the background; every failure becomes text in `errorText` and never a crash.
+/// below the altitude limit are refused before the engine sees them (and by the engine as well); a slew or a nudge is
+/// stopped and the mount disconnected when the app goes to the background; every failure becomes text in `errorText`
+/// and never a crash.
 @MainActor
 @Observable
 final class MountService {
@@ -585,7 +586,9 @@ final class MountService {
             motionGate?.cancel()
             motionGate = nil
             Task {
-                // Nobody can watch the mount from here, so it is stopped and let go.
+                // Whether there is a move for the stop to halt decides what the notice can say about tracking.
+                let wasMoving = isMoving
+                // Nobody can watch the mount from here, so a slew or a nudge is stopped and the mount is let go.
                 ending.interrupt()
                 let stopped = await ending.run(urgent: true) { controller in
                     if controller.status.phase != .idle { try controller.abort() }
@@ -595,13 +598,35 @@ final class MountService {
                     if case .failure(let error) = stopped.result {
                         finishSession(lost: reason + Self.stopFailureText(error))
                     } else {
-                        finishSession(lost: reason + "The mount was stopped.")
+                        finishSession(lost: reason + Self.backgroundOutcomeText(
+                            status: stopped.status, detail: stopped.detail, lodestarAligns: usesLodestarAlignment,
+                            wasMoving: wasMoving))
                     }
                 }
                 lifecycle?.endBackgroundTask()
             }
         case .disconnected, .lost:
             break
+        }
+    }
+
+    /// What the notice says about the mount once Lodestar has let go of it in the background. The stop halts a slew or
+    /// a nudge but does not switch tracking off: the firmware of OnStep, LX200, NexStar and Alpaca mounts keeps it, and
+    /// so does the driver of an equatorial Sky-Watcher mount that stood still, which leaves its sidereal tracking
+    /// running. Nothing then watches the limits that Lodestar was keeping. An alt-azimuth Sky-Watcher mount is tracked
+    /// by Lodestar's own corrections, which end with the connection, and the stop of a move halts both axes of either
+    /// Sky-Watcher mount, so for those the mount really is stopped. `status` is the controller's after the stop; its
+    /// tracking flag is only what the mount last said, which is why the Sky-Watcher cases are decided here.
+    private static func backgroundOutcomeText(status: MountStatus, detail: MountDriverDetail?, lodestarAligns: Bool,
+                                              wasMoving: Bool) -> String {
+        var tracking = status.isTracking
+        if lodestarAligns, tracking == true, wasMoving || detail?.arrangement != .equatorial {
+            tracking = false
+        }
+        switch tracking {
+        case true?: return "Tracking continues; Lodestar no longer watches the mount's limits."
+        case false?: return "The mount was stopped."
+        case nil: return "Any move was stopped. The mount may still be tracking; Lodestar no longer watches its limits."
         }
     }
 
