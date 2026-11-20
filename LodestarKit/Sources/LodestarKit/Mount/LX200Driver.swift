@@ -40,6 +40,20 @@ public struct LX200Configuration: Hashable, Sendable {
     }
 }
 
+/// How the driver decided which dialect to speak; the app can show it when a mount lacks features it should have.
+public enum LX200DialectSource: String, CaseIterable, Codable, Hashable, Sendable {
+    /// The configuration named the dialect, so the mount was not asked.
+    case configured
+    /// The product name (`:GVP#`) answered at the first try; it names an OnStep or some other product.
+    case productName
+    /// The product name answered only at the second try, after the first one timed out; it names the dialect.
+    case productNameAfterRetry
+    /// The mount gave no product name, but it answered `:GU#` with an OnStep status, which only OnStep does.
+    case statusProbe
+    /// Neither the product name nor the status answered, so the mount is driven as a plain Meade.
+    case assumedMeade
+}
+
 /// Drives an LX200-compatible mount (Meade LX200/Autostar, OnStep, SkyFi and other Wi-Fi bridges) over a byte-stream
 /// `MountTransport`. See `LX200Codec` for the command reference.
 ///
@@ -62,6 +76,9 @@ public final class LX200Driver: MountDriver {
     /// The dialect in use: configured, or detected at `connect`.
     public private(set) var dialect: LX200Dialect
 
+    /// Which path decided `dialect`; before `connect` it is the configuration or the Meade default.
+    public private(set) var dialectSource: LX200DialectSource
+
     /// The position format last seen from the mount (used for the next `:Sr`/`:Sd`).
     public private(set) var precision: LX200Precision = .high
 
@@ -74,27 +91,34 @@ public final class LX200Driver: MountDriver {
         self.configuration = configuration
         link = MountLink(transport: transport, clock: clock)
         dialect = configuration.dialect ?? .meade
+        dialectSource = configuration.dialect == nil ? .assumedMeade : .configured
     }
 
+    /// Connects and works out the dialect: the product name, asked again once if the first ask timed out (OnStep and some
+    /// Wi-Fi bridges are slow on the first exchange), then `:GU#`, which only OnStep answers, before a mount that
+    /// stays silent is driven as a plain Meade. The worst case spends three identification timeouts (3 s by default,
+    /// at most 30 s) before the position reads; a configured dialect asks once and never retries or probes.
     public func connect() throws -> MountCapabilities {
-        var name = ""
-        var firmware: String?
-        do {
-            name = MountText.sanitized(
-                try query(LX200Codec.getProductName, operation: "identify", timeoutSeconds: configuration.identifyTimeoutSeconds), limit: 40)
-            if !name.isEmpty {
-                let number = MountText.sanitized(
-                    try query(LX200Codec.getFirmwareNumber, operation: "identify", timeoutSeconds: configuration.identifyTimeoutSeconds),
-                    limit: 20)
-                if !number.isEmpty { firmware = number }
-            }
-        } catch MountError.timeout {
-            // Not every controller knows the identification commands; the position read below decides.
-        } catch MountError.malformedReply {
-            name = ""
-            firmware = nil
+        var identity = try identify()
+        var retried = false
+        if configuration.dialect == nil && identity.timedOut {
+            retried = true
+            identity = try identify()
         }
-        dialect = configuration.dialect ?? LX200Codec.dialect(productName: name)
+        let name = identity.name
+        if let configured = configuration.dialect {
+            dialect = configured
+            dialectSource = .configured
+        } else if !name.isEmpty {
+            dialect = LX200Codec.dialect(productName: name)
+            dialectSource = retried ? .productNameAfterRetry : .productName
+        } else if try answersOnStepStatus() {
+            dialect = .onstep
+            dialectSource = .statusProbe
+        } else {
+            dialect = .meade
+            dialectSource = .assumedMeade
+        }
 
         var reading = try LX200Codec.decodeRightAscension(try query(LX200Codec.getRightAscension, operation: "read right ascension"))
         if reading.precision == .low && configuration.prefersHighPrecision {
@@ -117,7 +141,7 @@ public final class LX200Driver: MountDriver {
             }
         }
         return MountCapabilities(
-            kind: .lx200, name: name.isEmpty ? "LX200-compatible mount" : name, firmware: firmware, canSlew: true, canSync: true,
+            kind: .lx200, name: name.isEmpty ? fallbackName : name, firmware: identity.firmware, canSlew: true, canSync: true,
             canAbort: true, canSetTracking: dialect == .onstep, canNudge: true, canSetSiteAndTime: true,
             gotoNeedsAlignment: false, isAligned: aligned)
     }
@@ -214,6 +238,51 @@ public final class LX200Driver: MountDriver {
     }
 
     // MARK: Exchanges
+
+    /// The name shown for a mount that gave no product name; it says so when the status probe found an OnStep.
+    private var fallbackName: String {
+        dialectSource == .statusProbe ? "OnStep-compatible mount" : "LX200-compatible mount"
+    }
+
+    /// Asks for the product name and, if there is one, the firmware number. `timedOut` is true only when the product
+    /// name itself got no answer in time; a missing firmware number does not decide anything.
+    private func identify() throws -> (name: String, firmware: String?, timedOut: Bool) {
+        var name = ""
+        var firmware: String?
+        var timedOut = false
+        do {
+            name = MountText.sanitized(
+                try query(LX200Codec.getProductName, operation: "identify", timeoutSeconds: configuration.identifyTimeoutSeconds), limit: 40)
+            if !name.isEmpty {
+                let number = MountText.sanitized(
+                    try query(LX200Codec.getFirmwareNumber, operation: "identify", timeoutSeconds: configuration.identifyTimeoutSeconds),
+                    limit: 20)
+                if !number.isEmpty { firmware = number }
+            }
+        } catch MountError.timeout {
+            // Not every controller knows the identification commands; `connect` retries and probes, and the position
+            // read below it decides whether the mount works at all.
+            timedOut = name.isEmpty
+        } catch MountError.malformedReply {
+            name = ""
+            firmware = nil
+        }
+        return (name, firmware, timedOut)
+    }
+
+    /// Whether the mount answers `:GU#` with an OnStep status string. A controller that does not know the command stays
+    /// silent or answers something that is not a status, which counts as "not OnStep".
+    private func answersOnStepStatus() throws -> Bool {
+        do {
+            _ = try LX200Codec.decodeStatus(
+                try query(LX200Codec.getStatus, operation: "probe status", timeoutSeconds: configuration.identifyTimeoutSeconds))
+            return true
+        } catch MountError.timeout {
+            return false
+        } catch MountError.malformedReply {
+            return false
+        }
+    }
 
     private func requireAccepted(_ accepted: Bool, _ what: String) throws {
         if !accepted { throw MountError.rejected(detail: "the \(what) was not accepted") }

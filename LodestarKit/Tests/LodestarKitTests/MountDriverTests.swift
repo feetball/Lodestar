@@ -88,14 +88,85 @@ final class MountDriverTests: XCTestCase {
     }
 
     func testIdentificationIsOptional() throws {
-        let f = lx200(.meade) { $0.inject("GVP", .silence) }
+        let f = lx200(.meade) { $0.inject("GVP", .silence, times: 2) }
         let driver = LX200Driver(transport: f.simulator, clock: f.clock)
         let begin = f.clock.secondsSince1970
         let capabilities = try driver.connect()
         XCTAssertEqual(capabilities.name, "LX200-compatible mount")
         XCTAssertNil(capabilities.firmware)
         XCTAssertEqual(driver.dialect, .meade)
-        // Only the short identification timeout was spent waiting.
+        XCTAssertEqual(driver.dialectSource, .assumedMeade)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 2)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GU" }.count, 1)
+        // Two product name timeouts and one status timeout were spent waiting, one second each, and nothing more.
+        let waited = f.clock.secondsSince1970 - begin
+        XCTAssertGreaterThanOrEqual(waited, 2.9)
+        XCTAssertLessThan(waited, 3.5)
+    }
+
+    func testAnOnStepThatAnswersTheProductNameLateIsStillDrivenAsOnStep() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .productNameAfterRetry)
+        XCTAssertEqual(capabilities.name, "On-Step")
+        XCTAssertEqual(capabilities.firmware, "4.24")
+        XCTAssertTrue(capabilities.canSetTracking)
+        XCTAssertEqual(capabilities.isAligned, true)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 2)
+        XCTAssertEqual(try driver.readTracking(), true)
+    }
+
+    func testAnOnStepThatAnswersTheProductNameAtOnceIsNotAskedTwice() throws {
+        let f = lx200(.onstep)
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        _ = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .productName)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 1)
+    }
+
+    func testAnOnStepThatNeverIdentifiesItselfIsFoundByItsStatusAnswer() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence, times: 2) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let begin = f.clock.secondsSince1970
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .statusProbe)
+        XCTAssertEqual(capabilities.name, "OnStep-compatible mount")
+        XCTAssertNil(capabilities.firmware)
+        XCTAssertTrue(capabilities.canSetTracking)
+        XCTAssertEqual(capabilities.isAligned, true)
+        XCTAssertEqual(try driver.readTracking(), true)
+        // Two product name timeouts, then the status answer: the budget stays at about two seconds of waiting.
+        XCTAssertLessThan(f.clock.secondsSince1970 - begin, 2.5)
+    }
+
+    func testAMountThatAnswersTheStatusProbeWithSomethingElseStaysMeade() throws {
+        let f = lx200(.onstep) {
+            $0.inject("GVP", .silence, times: 2)
+            $0.inject("GU", .replace(text: "0#"))
+        }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .meade)
+        XCTAssertEqual(driver.dialectSource, .assumedMeade)
+        XCTAssertEqual(capabilities.name, "LX200-compatible mount")
+        XCTAssertFalse(capabilities.canSetTracking)
+        XCTAssertNil(try driver.readTracking())
+    }
+
+    func testAConfiguredDialectIsNeitherRetriedNorProbed() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock, configuration: LX200Configuration(dialect: .meade))
+        let begin = f.clock.secondsSince1970
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .meade)
+        XCTAssertEqual(driver.dialectSource, .configured)
+        XCTAssertFalse(capabilities.canSetTracking)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 1)
+        XCTAssertFalse(f.simulator.commandLog.contains("GU"))
         XCTAssertLessThan(f.clock.secondsSince1970 - begin, 2.0)
     }
 
