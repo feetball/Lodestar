@@ -48,10 +48,36 @@ struct InterchangeExport {
 }
 
 extension View {
-    /// Offers `export` through the system's save sheet.
+    /// Offers `export` through the system's save sheet, and says so when the file could not be saved.
     func interchangeExporter(_ export: Binding<InterchangeExport>) -> some View {
-        fileExporter(isPresented: export.isPresented, document: export.wrappedValue.document,
-                     contentType: export.wrappedValue.contentType,
-                     defaultFilename: export.wrappedValue.filename) { _ in }
+        modifier(InterchangeExporter(export: export))
+    }
+}
+
+/// The save sheet of an `InterchangeExport` and the alert for a file that could not be written.
+private struct InterchangeExporter: ViewModifier {
+    @Binding var export: InterchangeExport
+    @State private var problem: String?
+
+    func body(content: Content) -> some View {
+        content
+            .fileExporter(isPresented: $export.isPresented, document: export.document,
+                          contentType: export.contentType, defaultFilename: export.filename) { result in
+                guard case .failure(let error) = result else { return }
+                // Closing the sheet without saving is not a failure.
+                if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled { return }
+                problem = error.localizedDescription
+            }
+            .alert("Could Not Save the File", isPresented: isShowingProblem) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(problem ?? "")
+            }
+    }
+
+    private var isShowingProblem: Binding<Bool> {
+        Binding(get: { problem != nil }, set: { isPresented in
+            if !isPresented { problem = nil }
+        })
     }
 }
