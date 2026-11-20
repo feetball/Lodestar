@@ -63,6 +63,10 @@ enum OnlineFailure: Sendable, Equatable {
 
     /// Whether the request never reached the provider, so it does not count against the request interval.
     var sentNothing: Bool { self == .offline || self == .waitingForUnmetered || self == .insecure }
+
+    /// `sentNothing`, given the HTTP status the failure came with, if any. A redirect to an address that is not HTTPS
+    /// fails as `.insecure` too, but only after the provider answered with a 3xx: that request was made.
+    func neverSent(statusCode: Int?) -> Bool { sentNothing && statusCode == nil }
 }
 
 /// The outcome of `OnlineDownloader.fetch`.
@@ -178,7 +182,7 @@ private final class OnlineDownloadDelegate: NSObject, URLSessionDataDelegate, @u
         let count = redirects
         lock.unlock()
         guard request.url?.scheme?.lowercased() == "https" else {
-            setAbort(.insecure)
+            setAbort(.insecure, status: response.statusCode)
             completionHandler(nil)
             task.cancel()
             return

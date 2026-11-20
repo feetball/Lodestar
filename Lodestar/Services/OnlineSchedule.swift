@@ -18,8 +18,8 @@ struct OnlineResourceState: Sendable {
 /// - Never two requests closer than `OnlineResource.minimumInterval` (after a success) or the retry wait (after a
 ///   failure): for CelesTrak 2 hours, which is `ElementSetGroup.minimumDownloadIntervalHours`. "Update now" follows the
 ///   same rule.
-/// - A forecast of the same place also waits for the server's `Expires`. Only the forecast does: for the other feeds the
-///   refresh interval decides.
+/// - A forecast of the same place also waits for the server's `Expires`, for a day at the most. Only the forecast does:
+///   for the other feeds the refresh interval decides.
 /// - Data is due when there is none, when it is for another place, when it is older than the refresh interval, when the
 ///   forecast's `Expires` has passed, or when its newest orbit epoch is older than `OnlineResource.staleDataDays`.
 /// - A time stamp from the future (the clock was set back since it was written) counts for nothing, so that a wrong
@@ -32,6 +32,8 @@ enum OnlineSchedule {
     static let blockedRetryInterval: TimeInterval = 3600
     /// The longest wait a `Retry-After` header can ask for.
     static let maximumRetryAfter: TimeInterval = 24 * 3600
+    /// The longest a server's `Expires` can hold back the next request, counted from when the data was saved or requested.
+    static let maximumExpiresDelay: TimeInterval = 24 * 3600
     /// How far in the future a time stamp may be before it is taken as a clock that was set back (a small step of the
     /// clock is normal).
     static let clockSlack: TimeInterval = 5 * 60
@@ -58,7 +60,9 @@ enum OnlineSchedule {
         let interval = state.lastAttemptFailed ? (state.retryWait ?? resource.retryInterval) : resource.minimumInterval
         var earliest = last.addingTimeInterval(interval)
         if resource == .forecast, let meta = state.meta, meta.key == key, let expires = meta.expires {
-            earliest = max(earliest, expires.addingTimeInterval(expiresJitter))
+            // A date far in the future (a wrong server, `Expires` in the year 2100) cannot block the forecast for good.
+            let ceiling = min(meta.savedAt, last).addingTimeInterval(maximumExpiresDelay)
+            earliest = max(earliest, min(expires.addingTimeInterval(expiresJitter), ceiling))
         }
         return earliest
     }

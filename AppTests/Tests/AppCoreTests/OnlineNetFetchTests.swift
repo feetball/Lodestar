@@ -571,7 +571,8 @@ final class OnlineNetDownloaderTests: XCTestCase {
     func testARedirectToHTTPIsInsecureAndTheTargetIsNeverRequested() async {
         let start = serve("/to-http", .redirect(to: "http://example.test/insecure"))
         serve("/insecure", .answer(text: "plain text"))
-        expectFailure(await onlineNetFetch(start), .insecure)
+        // The provider answered with the 302, so the failure carries its status: that request was made.
+        expectFailure(await onlineNetFetch(start), .insecure, status: 302)
         XCTAssertEqual(server.requestedAddresses, [start])
     }
 
@@ -579,7 +580,7 @@ final class OnlineNetDownloaderTests: XCTestCase {
         let addresses = serveChain("late-http", hops: 5)
         // The fifth redirect would be one too many, but it also leaves HTTPS: that is the failure that is reported.
         server.serve(addresses[4], .redirect(to: "http://example.test/insecure"))
-        expectFailure(await onlineNetFetch(addresses[0]), .insecure)
+        expectFailure(await onlineNetFetch(addresses[0]), .insecure, status: 302)
     }
 
     func testARedirectTargetMayHaveAnUpperCaseScheme() async {
