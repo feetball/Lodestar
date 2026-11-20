@@ -173,6 +173,27 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(table.records[1].fields.count, 19)
     }
 
+    func testCSVGuardsFormulasInEveryTextColumn() throws {
+        // Each free-text column starts with a character that a spreadsheet would run as a formula, a different one in each.
+        let entry = SessionLogEntry(
+            date: first, targetID: "@id", targetName: "=1+1", siteName: "+site", camera: "-camera", filter: "=filter",
+            notes: "=notes\nsecond line", isImaged: true
+        )
+        let table = try InterchangeCSV.parse(Array(SessionLogCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 2)
+        let header = table.records[0].fields
+        let fields = table.records[1].fields
+        XCTAssertEqual(fields.count, 19)
+        let columns: [(name: String, index: Int, text: String)] = [
+            ("Target", 2, "'=1+1"), ("Target ID", 3, "'@id"), ("Site", 6, "'+site"), ("Camera", 9, "'-camera"),
+            ("Filter", 16, "'=filter"), ("Notes", 18, "'=notes\nsecond line"),
+        ]
+        for column in columns {
+            XCTAssertEqual(header[column.index], column.name)
+            XCTAssertEqual(fields[column.index], column.text, column.name)
+        }
+    }
+
     func testExportsAreCapped() {
         let entries = (0..<(SessionLogCodec.maximumEntries + 10)).map {
             SessionLogEntry(date: Date(timeIntervalSince1970: Double($0)), targetID: "t", targetName: "T\($0)")

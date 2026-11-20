@@ -871,7 +871,10 @@ final class SkyWatcherMountTests: XCTestCase {
         }
         try rig.controller.stopNudge()
         let altitude = realAltitude(rig)
-        XCTAssertTrue((85.0 ... 88.6).contains(altitude), "\(altitude)")
+        // A nudge ends where the driver finds the limit, which is a little above it: the axes are still turning and the pointing
+        // model adds a few tenths of a degree (see `trackingOverheadSlackDegrees`). The simulator's rest is 0.30° over the limit.
+        let limit = SkyWatcherLimits.standard.maximumAltitudeDegrees
+        XCTAssertTrue((85.0 ... limit + 0.4).contains(altitude), "\(altitude)")
         XCTAssertNil(rig.driver.trackingStopReason)
         // The mount tracks at the place where the nudge ended.
         let place = rig.trueJ2000()
@@ -1238,7 +1241,8 @@ final class SkyWatcherMountTests: XCTestCase {
         XCTAssertEqual(rig.driver.alignmentPoints.count, 0)
         XCTAssertEqual(skyWatcherThrown { try rig.controller.goto(Support.altair) }, .notAligned)
         // The axes are still where they were; the new session begins from there.
-        XCTAssertTrue(rig.driver.startupAxisAngles?.axis1Degrees != 0.0)
+        let startup = try XCTUnwrap(rig.driver.startupAxisAngles)
+        XCTAssertNotEqual(startup.axis1Degrees, 0.0)
         try aligned(rig, altAzimuthAlignmentStars)
         XCTAssertTrue(try goto(rig, Support.altair) < 0.1)
     }

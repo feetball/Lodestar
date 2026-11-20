@@ -339,10 +339,16 @@ final class SkyWatcherModelTests: XCTestCase {
                                                 errors: SkyWatcherPointingErrors(axis1Index: 2.0, axis2Index: 1.1, baseTiltX: 0.5, baseTiltY: -0.4))
             let points = [0, 1].map { observe(truth, directionOf(stars(mode)[$0], mode)) }
             let fit = try SkyWatcherAlignmentSolver.solve(points, mode: mode, isSouthernHemisphere: false)
-            XCTAssertEqual(fit.model.errors.axis1Index, 2.0, accuracy: 0.5, "\(mode)")
-            XCTAssertEqual(fit.model.errors.axis2Index, 1.1, accuracy: 0.5, "\(mode)")
-            XCTAssertEqual(fit.model.errors.baseTiltX, 0.5, accuracy: 0.5, "\(mode)")
-            XCTAssertEqual(fit.model.errors.baseTiltY, -0.4, accuracy: 0.5, "\(mode)")
+            // The two stars find all four errors of an alt-azimuth mount to a few hundredths of a degree. On an equatorial
+            // mount they find the first index offset and the second tilt component, but leave much of the other two to the
+            // prior (they fit 1.52 for 1.1 and 0.04 for 0.5); the prediction checks below are what covers that mount.
+            let accuracy: (axis1: Double, axis2: Double, tiltX: Double, tiltY: Double) =
+                mode == .altAzimuth ? (0.05, 0.05, 0.05, 0.05) : (0.3, 0.5, 0.5, 0.1)
+            XCTAssertEqual(fit.model.errors.axis1Index, 2.0, accuracy: accuracy.axis1, "\(mode)")
+            XCTAssertEqual(fit.model.errors.axis2Index, 1.1, accuracy: accuracy.axis2, "\(mode)")
+            XCTAssertEqual(fit.model.errors.baseTiltX, 0.5, accuracy: accuracy.tiltX, "\(mode)")
+            XCTAssertEqual(fit.model.errors.baseTiltY, -0.4, accuracy: accuracy.tiltY, "\(mode)")
+            XCTAssertLessThan(fit.model.errors.baseTiltY, 0.0, "\(mode)")
             XCTAssertTrue(fit.maximumResidualDegrees < 0.1, "\(mode) \(fit.residualsDegrees)")
             // Two stars cannot pin the tilt down completely (the prior shrinks it), but the model predicts the other stars far better
             // than the index offsets of one star alone.
