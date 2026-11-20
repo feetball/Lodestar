@@ -10,8 +10,22 @@ struct EventsDetailView: View {
     let entry: EventsEntry
 
     @State private var now = Date()
+    /// The camera advice of a meteor shower, worked out by its camera card.
+    @State private var meteorCamera = EventsMeteorCameraState.loading
 
     private var event: AstronomicalEvent { entry.event }
+
+    /// What to aim at, main subject first. For a meteor shower with camera advice that is the advised field, because
+    /// the guide says to point the camera away from the radiant; the radiant follows as a secondary choice.
+    private var aimSubjects: [EventsCalculator.AimSubject] {
+        let subjects = EventsCalculator.aimSubjects(of: event, now: now)
+        guard case .meteorShower(let peak) = event.details, case .ready(let plan) = meteorCamera else {
+            return subjects
+        }
+        let field = EventsCalculator.AimSubject.cameraField(name: EventsMeteorCamera.fieldName(of: peak.shower),
+                                                            plan.advice.aimPoint)
+        return [field] + subjects
+    }
 
     var body: some View {
         let context = app.observerContext
@@ -23,12 +37,13 @@ struct EventsDetailView: View {
                 if case .solarEclipse = event.details {
                     EventsSafetyNotice()
                 }
-                EventsActionsCard(entry: entry, subjects: EventsCalculator.aimSubjects(of: event, now: now))
+                EventsActionsCard(entry: entry, subjects: aimSubjects)
                 if case .meteorShower(let peak) = event.details, let observerContext = context {
-                    EventsMeteorCameraCard(event: event, shower: peak.shower, context: observerContext)
+                    EventsMeteorCameraCard(event: event, shower: peak.shower, context: observerContext,
+                                           state: $meteorCamera)
                 }
                 EventsFactsCard(entry: entry, isSouthernHemisphere: isSouthern, timeZone: timeZone)
-                EventsWhenCard(entry: entry, timeZone: timeZone, placeName: context?.name)
+                EventsWhenCard(entry: entry, now: now, timeZone: timeZone, placeName: context?.name)
                 EventsContactsCard(entry: entry, timeZone: timeZone)
                 EventsGuideCards(guide: EventsGuide.make(for: entry, isSouthernHemisphere: isSouthern))
                 if case .meteorShower = event.details {
@@ -264,17 +279,18 @@ private struct EventsWhenCard: View {
     @Environment(\.palette) private var palette
 
     let entry: EventsEntry
+    let now: Date
     let timeZone: TimeZone
     let placeName: String?
 
     var body: some View {
-        let rows = EventsDetailModel.times(of: entry, timeZone: timeZone)
+        let rows = EventsDetailModel.times(of: entry, now: now, timeZone: timeZone)
         VStack(alignment: .leading, spacing: 10) {
             CardTitle(title: placeName.map { "When, from \($0)" } ?? "When", systemImage: "clock")
             ForEach(rows) { row in
                 InfoRow(label: row.label, value: row.value)
             }
-            if let sentence = EventsDetailModel.visibilitySentence(of: entry, timeZone: timeZone) {
+            if let sentence = EventsDetailModel.visibilitySentence(of: entry, now: now, timeZone: timeZone) {
                 TonightNote(text: sentence)
             }
             if let rule = EventsDetailModel.windowRule(of: entry) {

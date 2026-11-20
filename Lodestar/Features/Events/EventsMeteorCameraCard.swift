@@ -11,8 +11,8 @@ struct EventsMeteorCameraCard: View {
     let event: AstronomicalEvent
     let shower: MeteorShower
     let context: ObserverContext
-
-    @State private var state = EventsMeteorCameraState.loading
+    /// The advice, which the detail screen's Aim button reads too.
+    @Binding var state: EventsMeteorCameraState
 
     /// What the advice depends on; the GPS accuracy and the like do not start it again.
     private struct Inputs: Hashable, Sendable {
