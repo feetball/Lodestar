@@ -204,8 +204,9 @@ enum EventsDetailModel {
 
     // MARK: When
 
-    /// The times of the event in the observer's zone: the instant, the best window and where the subject stands.
-    static func times(of entry: EventsEntry, timeZone: TimeZone) -> [EventsDetailRow] {
+    /// The times of the event in the observer's zone: the instant, the best window (with its date unless it is
+    /// tonight's at `now`) and where the subject stands.
+    static func times(of entry: EventsEntry, now: Date, timeZone: TimeZone) -> [EventsDetailRow] {
         let event = entry.event
         var rows: [EventsDetailRow] = []
         let instantLabel: String
@@ -225,7 +226,9 @@ enum EventsDetailModel {
         rows.append(EventsDetailRow(label: instantLabel, value: EventsFormat.dayAndTime(event.date, in: timeZone)))
         guard let visibility = event.visibility else { return rows }
         if let window = visibility.bestWindow {
-            rows.append(EventsDetailRow(label: windowLabel(of: event), value: EventsFormat.window(window, in: timeZone)))
+            let text = EventsFormat.window(window, in: timeZone)
+            let value = EventsFormat.windowDay(window, now: now, in: timeZone).map { "\($0) \u{00B7} \(text)" } ?? text
+            rows.append(EventsDetailRow(label: windowLabel(of: event), value: value))
             if let best = visibility.bestTime {
                 rows.append(EventsDetailRow(label: bestTimeLabel(of: event), value: AppFormat.time(best, in: timeZone)))
             }
@@ -264,9 +267,9 @@ enum EventsDetailModel {
 
     // MARK: Visibility
 
-    /// One or two sentences on whether the event can be seen from the observer's place; `nil` for events that are
-    /// not seen in the sky.
-    static func visibilitySentence(of entry: EventsEntry, timeZone: TimeZone) -> String? {
+    /// One or two sentences on whether the event can be seen from the observer's place, with the date of the window
+    /// unless it is tonight's at `now`; `nil` for events that are not seen in the sky.
+    static func visibilitySentence(of entry: EventsEntry, now: Date, timeZone: TimeZone) -> String? {
         guard let visibility = entry.event.visibility, let isVisible = entry.isVisibleFromHere else { return nil }
         if case .solarEclipse(let eclipse) = entry.event.details, eclipse.local?.kind == LocalSolarEclipseKind.none {
             return "No part of the eclipse can be seen from here."
@@ -283,7 +286,8 @@ enum EventsDetailModel {
                 return "There is no good viewing window from here: the target stays too low or the sky too bright that night."
             }
         }
-        return "Visible from here between \(EventsFormat.window(window, in: timeZone))."
+        let day = EventsFormat.windowDay(window, now: now, in: timeZone).map { "on \($0), " } ?? ""
+        return "Visible from here \(day)between \(EventsFormat.window(window, in: timeZone))."
     }
 
     /// What a viewing window needs, in words; `nil` for eclipses (which only need the Moon or Sun above the horizon)

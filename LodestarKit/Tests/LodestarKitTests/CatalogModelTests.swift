@@ -216,6 +216,21 @@ final class CatalogModelTests: XCTestCase {
         XCTAssertEqual(CelestialObject.defaultCustomName, "Custom Target")
     }
 
+    func testCustomTargetNamesKeepJoinersDirectionMarksAndNewerCharacters() {
+        let position = EquatorialCoordinate(rightAscension: 0, declination: 0)
+        func name(_ raw: String) -> String { CelestialObject.custom(name: raw, j2000: position).name }
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+        let persian = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}"
+        XCTAssertEqual(name(family), family)
+        XCTAssertEqual(name(family).count, 1, "the sequence stays one character")
+        XCTAssertEqual(name(persian), persian)
+        XCTAssertEqual(name("\u{200F}\(persian)\u{200E} Nebula"), "\u{200F}\(persian)\u{200E} Nebula")
+        // U+0378 has no assigned meaning: it stands for an emoji that is newer than this system's Unicode tables.
+        XCTAssertEqual(name("Field \u{378}"), "Field \u{378}")
+        XCTAssertEqual(name("A\u{202E}B\u{2066}C\u{2069}"), "ABC", "bidi overrides and isolates can hide text")
+        XCTAssertEqual(name("A\u{200B}B\u{FEFF}C"), "ABC")
+    }
+
     func testCustomTargetNamesAreCappedAtSixtyCharacters() {
         let position = EquatorialCoordinate(rightAscension: 0, declination: 0)
         func name(_ raw: String) -> String { CelestialObject.custom(name: raw, j2000: position).name }

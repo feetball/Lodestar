@@ -20,8 +20,10 @@ final class EventsJupiterTests: XCTestCase {
         let found = PlanetStations.find(planet: .mars, from: Support.utc("2024-10-01T00:00:00Z"),
                                         to: Support.utc("2025-04-01T00:00:00Z"))
         XCTAssertEqual(found.count, 2)
-        guard found.count == 2, case let .planetStation(first) = found[0].details,
-              case let .planetStation(second) = found[1].details else { return }
+        guard found.count == 2 else { return }
+        guard case let .planetStation(first) = found[0].details, case let .planetStation(second) = found[1].details else {
+            return XCTFail("the stations of Mars carry details of another kind: \(found.map(\.details))")
+        }
         XCTAssertEqual(first.kind, .retrogradeBegins)
         XCTAssertEqual(second.kind, .directMotionResumes)
         XCTAssertEqual(first.planet, .mars)

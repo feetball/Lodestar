@@ -25,13 +25,14 @@ final class SkyWatcherRig {
 
     /// Centres `star` by hand (the simulated telescope is placed exactly on it through the axes) and syncs.
     @discardableResult
-    func syncOn(_ star: EquatorialCoordinate) throws -> MountSyncResult {
-        placeOn(star)
+    func syncOn(_ star: EquatorialCoordinate, file: StaticString = #filePath, line: UInt = #line) throws -> MountSyncResult {
+        placeOn(star, file: file, line: line)
         return try controller.sync(star)
     }
 
     /// Moves the simulated axes so that the real telescope points exactly at `star` now (what a user does with the nudge buttons).
-    func placeOn(_ star: EquatorialCoordinate) {
+    /// Fails the test, and leaves the axes where they are, when no pier side that the mount may use points at the star.
+    func placeOn(_ star: EquatorialCoordinate, file: StaticString = #filePath, line: UInt = #line) {
         let frame = frame()
         let place = MountEpoch.apparentOfDate.fromJ2000(star, frame: frame)
         let direction = SkyWatcherSky.localDirection(place, localSiderealTime: frame.localApparentSiderealTime,
@@ -39,7 +40,7 @@ final class SkyWatcherRig {
         let truth = SkyWatcherPointingModel(mode: simulator.mode, isSouthernHemisphere: simulator.location.latitude < 0,
                                             errors: simulator.effectiveErrors)
         let options = truth.solutions(direction, preferredAxis1Degrees: simulator.axis1Degrees)
-        var best = options[0]
+        var best: SkyWatcherAxisSolution?
         var bestCost = Double.greatestFiniteMagnitude
         for option in options {
             let cost = abs(option.axis1 - simulator.axis1Degrees) + abs(option.axis2 - simulator.axis2Degrees)
@@ -48,6 +49,11 @@ final class SkyWatcherRig {
                 best = option
                 bestCost = cost
             }
+        }
+        guard let best else {
+            XCTFail("the mount cannot be placed on \(star): none of its ways of pointing there is allowed: \(options)",
+                    file: file, line: line)
+            return
         }
         simulator.placeAxes(axis1Degrees: best.axis1, axis2Degrees: best.axis2)
     }

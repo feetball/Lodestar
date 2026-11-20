@@ -64,6 +64,29 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(entry.notes.count, SessionLogEntry.maximumNotesLength)
     }
 
+    func testEntryTextKeepsJoinersAndDirectionMarksAndDropsOverrides() throws {
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+        let persian = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}"
+        let entry = SessionLogEntry(
+            date: first, targetID: "custom.1", targetName: "\(persian)\u{200F}", siteName: "Camp \(family)",
+            notes: "\(family)\n\(persian)\u{200F} (\u{200E}Orion)", isImaged: true
+        )
+        XCTAssertEqual(entry.targetName, "\(persian)\u{200F}")
+        XCTAssertEqual(entry.siteName, "Camp \(family)")
+        XCTAssertEqual(entry.notes, "\(family)\n\(persian)\u{200F} (\u{200E}Orion)")
+
+        let csv = SessionLogCodec.encodeCSV([entry])
+        XCTAssertTrue(csv.contains(persian + "\u{200F}"))
+        XCTAssertTrue(csv.contains(family))
+        let oal = SessionLogCodec.encodeOpenAstronomyLog([entry])
+        XCTAssertTrue(oal.contains(family))
+        XCTAssertTrue(oal.contains(persian))
+
+        let overridden = SessionLogEntry(date: first, targetID: "t", targetName: "gpj\u{202E}.exe", notes: "a\u{202E}b")
+        XCTAssertEqual(overridden.targetName, "gpj.exe")
+        XCTAssertEqual(overridden.notes, "ab")
+    }
+
     func testCoordinatesCountOnlyAsAPair() {
         XCTAssertFalse(SessionLogEntry(date: first, targetID: "x", targetName: "x", rightAscension: 10).hasCoordinates)
         XCTAssertFalse(SessionLogEntry(date: first, targetID: "x", targetName: "x", rightAscension: .nan, declination: 5).hasCoordinates)
@@ -103,6 +126,44 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(SessionLogCodec.encodeCSV(log().reversed()), expected.joined(separator: "\r\n") + "\r\n")
     }
 
+    func testCSVKeepsShortExposuresAndFastLensesAndReadsBackAsTheSameNumbers() throws {
+        let entries = [
+            SessionLogEntry(
+                date: first, targetID: "t", targetName: "Moon", focalLength: 50, lensAperture: 0.95,
+                exposureSeconds: 1.0 / 4000, frameCount: 3
+            ),
+            SessionLogEntry(
+                date: first.addingTimeInterval(60), targetID: "t", targetName: "Moon", focalLength: 50, lensAperture: 1.4,
+                exposureSeconds: 1.0 / 8000, frameCount: 1
+            ),
+            SessionLogEntry(
+                date: first.addingTimeInterval(120), targetID: "t", targetName: "Moon", focalLength: 50, lensAperture: 2.8,
+                exposureSeconds: 0.5, frameCount: 2
+            ),
+        ]
+        let table = try InterchangeCSV.parse(Array(SessionLogCodec.encodeCSV(entries).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 4)
+        let apertures = table.records.dropFirst().map { $0.fields[11] }
+        let exposures = table.records.dropFirst().map { $0.fields[12] }
+        let totals = table.records.dropFirst().map { $0.fields[15] }
+        XCTAssertEqual(apertures, ["0.95", "1.4", "2.8"])
+        XCTAssertEqual(exposures, ["0.00025", "0.000125", "0.5"])
+        XCTAssertEqual(totals, ["0.00075", "0.000125", "1"])
+        XCTAssertEqual(Double(apertures[0]), 0.95)
+        XCTAssertEqual(Double(exposures[0]), 1.0 / 4000)
+        XCTAssertEqual(Double(exposures[1]), 1.0 / 8000)
+    }
+
+    func testCSVWritesTheLongestTotalExposureInFull() {
+        let entry = SessionLogEntry(
+            date: first, targetID: "t", targetName: "T",
+            exposureSeconds: SessionLogEntry.maximumExposureSeconds, frameCount: SessionLogEntry.maximumFrameCount
+        )
+        XCTAssertEqual(entry.totalExposureSeconds, 8_640_000_000)
+        XCTAssertTrue(SessionLogCodec.encodeCSV([entry]).contains(",86400,"))
+        XCTAssertTrue(SessionLogCodec.encodeCSV([entry]).contains(",8640000000,"))
+    }
+
     func testCSVGuardsFormulasAndKeepsMultilineNotes() throws {
         let entry = SessionLogEntry(date: first, targetID: "custom.1", targetName: "=cmd|' /C calc'!A0", notes: "line 1\nline 2", isImaged: true)
         let table = try InterchangeCSV.parse(Array(SessionLogCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
@@ -110,6 +171,27 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(table.records[1].fields[2], "'=cmd|' /C calc'!A0")
         XCTAssertEqual(table.records[1].fields[18], "line 1\nline 2")
         XCTAssertEqual(table.records[1].fields.count, 19)
+    }
+
+    func testCSVGuardsFormulasInEveryTextColumn() throws {
+        // Each free-text column starts with a character that a spreadsheet would run as a formula, a different one in each.
+        let entry = SessionLogEntry(
+            date: first, targetID: "@id", targetName: "=1+1", siteName: "+site", camera: "-camera", filter: "=filter",
+            notes: "=notes\nsecond line", isImaged: true
+        )
+        let table = try InterchangeCSV.parse(Array(SessionLogCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 2)
+        let header = table.records[0].fields
+        let fields = table.records[1].fields
+        XCTAssertEqual(fields.count, 19)
+        let columns: [(name: String, index: Int, text: String)] = [
+            ("Target", 2, "'=1+1"), ("Target ID", 3, "'@id"), ("Site", 6, "'+site"), ("Camera", 9, "'-camera"),
+            ("Filter", 16, "'=filter"), ("Notes", 18, "'=notes\nsecond line"),
+        ]
+        for column in columns {
+            XCTAssertEqual(header[column.index], column.name)
+            XCTAssertEqual(fields[column.index], column.text, column.name)
+        }
     }
 
     func testExportsAreCapped() {
@@ -124,6 +206,25 @@ final class SessionLogCodecTests: XCTestCase {
     func testOpenAstronomyLogDocumentMatchesTheValidatedFixture() throws {
         let expected = try InterchangeTestSupport.fixture("session_log_oal.xml")
         XCTAssertEqual(SessionLogCodec.encodeOpenAstronomyLog(log()), expected)
+    }
+
+    func testOpenAstronomyLogKeepsShortExposuresAndFastLenses() {
+        let fast = SessionLogEntry(
+            date: first, targetID: "t", targetName: "Moon", focalLength: 50, lensAperture: 0.95,
+            exposureSeconds: 1.0 / 4000, frameCount: 30, isImaged: true
+        )
+        let slower = SessionLogEntry(
+            date: first.addingTimeInterval(600), targetID: "t", targetName: "Moon", focalLength: 50, lensAperture: 1,
+            exposureSeconds: 0.5, isImaged: true
+        )
+        let text = SessionLogCodec.encodeOpenAstronomyLog([fast, slower])
+        XCTAssertTrue(text.contains("<model>Camera lens 50 mm f/0.95</model>"))
+        XCTAssertTrue(text.contains("Imaged: 30 × 0.00025 s, lens 50 mm f/0.95."))
+        // f/0.95 and f/1 are different lenses, which they were not when both were written as "f/1".
+        XCTAssertTrue(text.contains("<model>Camera lens 50 mm f/1</model>"))
+        XCTAssertTrue(text.contains("Imaged: 0.5 s, lens 50 mm f/1."))
+        XCTAssertTrue(text.contains("id=\"scope_2\""))
+        XCTAssertFalse(text.contains("id=\"scope_3\""))
     }
 
     func testOpenAstronomyLogWithoutEntriesHasEveryContainer() {

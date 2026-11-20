@@ -174,8 +174,7 @@ struct EventsTransitDetailView: View {
                 .font(.title2.weight(.bold))
                 .foregroundStyle(palette.primaryText)
                 .accessibilityAddTraits(.isHeader)
-            Text("\(AppFormat.day(transit.date, in: timeZone)) \u{00B7} "
-                 + SatelliteText.timeWithSeconds(transit.date, in: timeZone))
+            Text("\(AppFormat.day(transit.date, in: timeZone)) \u{00B7} \(EventsTransitText.time(item, in: timeZone))")
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(palette.secondaryText)
@@ -201,6 +200,9 @@ struct EventsTransitDetailView: View {
             InfoRow(label: "Satellite size",
                     value: EventsTransitText.size(catalogNumber: transit.catalogNumber, angularSize: transit.satelliteAngularSize))
             InfoRow(label: "Satellite range", value: EventsTransitText.range(transit.satelliteRangeKilometers))
+            if !item.hasFreshElements {
+                TonightNote(text: EventsTransitText.approximateNote, style: .footnote)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .card(palette)

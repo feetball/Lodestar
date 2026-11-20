@@ -54,15 +54,34 @@ final class WatchWireKeysTests: XCTestCase {
         XCTAssertEqual(TonightPhoneContext.longitudeKey, "lon")
         XCTAssertEqual(TonightPhoneContext.elevationKey, "elevation")
         XCTAssertEqual(TonightPhoneContext.timeZoneKey, "timeZone")
+        XCTAssertEqual(TonightPhoneContext.kindKey, "kind")
+        XCTAssertEqual(TonightPhoneContext.sentAtKey, "sentAt")
     }
 
-    func testAnObserverContextBuiltFromTheSharedKeysIsReadAsAPlace() throws {
-        let context: [String: Any] = [
-            TonightPhoneContext.latitudeKey: 40.0, TonightPhoneContext.longitudeKey: -105.27,
-            TonightPhoneContext.elevationKey: 1_650.0, TonightPhoneContext.timeZoneKey: "America/Denver",
-        ]
-        let place = try XCTUnwrap(TonightPhoneContext.place(from: context))
-        XCTAssertEqual(place, TonightPlace(latitude: 40, longitude: -105.27, elevation: 1_650,
-                                           timeZoneIdentifier: "America/Denver"))
+    func testAnObserverContextTheIPhoneBuildsIsReadAsAPlace() throws {
+        let place = try XCTUnwrap(TonightPlace(latitude: 40, longitude: -105.27, elevation: 1_650,
+                                               timeZoneIdentifier: "America/Denver"))
+        let sentAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let phonePlace = TonightPhonePlace(place: place, kind: .savedSite, sentAt: sentAt)
+        let context = TonightPhoneContext.context(for: phonePlace)
+        XCTAssertEqual(Set(context.keys), ["lat", "lon", "elevation", "timeZone", "kind", "sentAt"])
+        // The place has validated its coordinates, which may move the last digit of a longitude.
+        XCTAssertEqual(context["lat"] as? Double, place.latitude)
+        XCTAssertEqual(context["lon"] as? Double, place.longitude)
+        XCTAssertEqual(context["elevation"] as? Double, 1_650)
+        XCTAssertEqual(context["timeZone"] as? String, "America/Denver")
+        XCTAssertEqual(context["kind"] as? String, "savedSite")
+        XCTAssertEqual(context["sentAt"] as? Double, 1_800_000_000)
+        XCTAssertEqual(TonightPhoneContext.place(from: context), place)
+        XCTAssertEqual(TonightPhoneContext.phonePlace(from: context), phonePlace)
+    }
+
+    func testAnObserverContextWithoutASendTimeLeavesTheKeyOut() throws {
+        let place = try XCTUnwrap(TonightPlace(latitude: -33.87, longitude: 151.21, elevation: 20,
+                                               timeZoneIdentifier: "Australia/Sydney"))
+        let context = TonightPhoneContext.context(for: TonightPhonePlace(place: place, kind: .device, sentAt: nil))
+        XCTAssertEqual(Set(context.keys), ["lat", "lon", "elevation", "timeZone", "kind"])
+        XCTAssertEqual(context["kind"] as? String, "device")
+        XCTAssertEqual(TonightPhoneContext.place(from: context), place)
     }
 }

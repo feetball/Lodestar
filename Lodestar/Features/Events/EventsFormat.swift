@@ -69,6 +69,18 @@ enum EventsFormat {
         return "\(start)\u{00A0}\u{2013} \(end)"
     }
 
+    /// The date to print with a viewing window, such as "Tue, Aug 11": the day it starts on. `nil` for tonight's
+    /// window, one that is not over at `now` and starts before the next local noon, which needs no date. A window on
+    /// another night, or one that ended before `now`, always has one, so that it is not read as tonight's.
+    static func windowDay(_ interval: DateInterval, now: Date, in timeZone: TimeZone) -> String? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let nextNoon = calendar.nextDate(after: now, matching: DateComponents(hour: 12, minute: 0),
+                                         matchingPolicy: .nextTime) ?? now.addingTimeInterval(86_400)
+        if interval.end > now, interval.start < nextNoon { return nil }
+        return AppFormat.day(interval.start, in: timeZone)
+    }
+
     /// A window as a spoken phrase, such as "10:10 PM to 4:50 AM".
     static func spokenWindow(_ interval: DateInterval, in timeZone: TimeZone) -> String {
         "\(AppFormat.time(interval.start, in: timeZone)) to \(AppFormat.time(interval.end, in: timeZone))"

@@ -180,7 +180,7 @@ struct TonightSystemView: View {
 
     private func needsLocation(_ issue: TonightLocationIssue) -> some View {
         VStack(spacing: 6) {
-            Image(systemName: "location.slash")
+            Image(systemName: TonightNeedsLocationText.symbol(issue))
                 .font(.title2)
                 .foregroundStyle(TonightStyle.accent)
                 .widgetAccentable()

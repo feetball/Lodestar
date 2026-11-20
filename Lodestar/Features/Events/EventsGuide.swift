@@ -230,6 +230,12 @@ extension EventsGuide {
 
     // MARK: Seasons
 
+    /// The Sun tip of the equinox and solstice pages. A low, dim Sun is still far too bright for the eye or the sensor,
+    /// so the filter is required at every height and the viewfinder is never used.
+    private static let sunSafetyTip = "Always fit a certified solar filter over the front of the lens before you shoot "
+        + "the Sun, even when it is low and dim, and never look at it through the viewfinder. Use the screen on the "
+        + "back instead."
+
     private static func season(_ kind: SeasonKind, isSouthernHemisphere: Bool) -> EventsGuide {
         switch kind {
         case .marchEquinox, .septemberEquinox:
@@ -243,7 +249,7 @@ extension EventsGuide {
                 tips: [
                     "Scout the spot a day or two before. The Sun moves along the horizon by about its own width a day.",
                     "Use a long lens from far away for a large Sun next to the landmark.",
-                    "Shoot the Sun only when it is low and dim, and use a solar filter for anything higher.",
+                    sunSafetyTip,
                 ])
         case .juneSolstice, .decemberSolstice:
             let summer = (kind == .juneSolstice) != isSouthernHemisphere
@@ -258,7 +264,7 @@ extension EventsGuide {
                 tips: [
                     "Check where the Sun rises and sets on this date, and scout the spot beforehand.",
                     nightTip,
-                    "Shoot the Sun only when it is low and dim, and use a solar filter for anything higher.",
+                    sunSafetyTip,
                 ])
         }
     }

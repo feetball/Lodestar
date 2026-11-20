@@ -1,7 +1,8 @@
 import SwiftUI
 import LodestarKit
 
-/// Settings ▸ Feedback: haptics, audio cues, spoken guidance, the watch and keeping the screen awake while aiming.
+/// Settings ▸ Feedback: haptics, audio cues, spoken guidance, the watch and keeping the screen awake while aiming
+/// or while a mount is connected.
 struct SettingsFeedbackSection: View {
     @Environment(AppModel.self) private var app
 
@@ -41,7 +42,7 @@ struct SettingsFeedbackSection: View {
                 isOn: $store.settings.aimOnWatch)
             SettingsToggleRow(
                 title: "Keep screen awake",
-                caption: "Stops the iPhone from locking while the Aim screen is open.",
+                caption: "Stops the iPhone from locking while the Aim screen is open and while a mount is connected.",
                 isOn: $store.settings.keepScreenAwake)
         }
     }

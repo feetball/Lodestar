@@ -62,12 +62,15 @@ enum EventsCalculator {
         case fixed(name: String, EquatorialCoordinate)
         /// The radiant of a shower at a J2000 place.
         case radiant(name: String, EquatorialCoordinate)
+        /// The place the camera advice for a shower points at, away from the radiant, at a J2000 place.
+        case cameraField(name: String, EquatorialCoordinate)
 
         var title: String {
             switch self {
             case .body(let body): return body.displayName
             case .fixed(let name, _): return name
             case .radiant(let name, _): return name
+            case .cameraField(let name, _): return name
             }
         }
     }

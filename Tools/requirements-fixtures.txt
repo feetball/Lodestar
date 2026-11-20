@@ -1,5 +1,6 @@
-# Python dependencies for Tools/make_fixtures.py (Skyfield / JPL DE440s reference fixtures).
-# The script needs Python 3.10 or newer.
+# Python dependencies for Tools/make_fixtures.py (Skyfield / JPL DE440s reference fixtures) and for the satellite
+# scripts Tools/make_satellite_fixtures.py (passes, streaks) and Tools/make_satellite_transit_reference.py.
+# make_fixtures.py needs Python 3.10 or newer.
 #
 # Install into an isolated environment (hash-checking mode rejects anything that does not match):
 #
@@ -8,12 +9,18 @@
 #
 # Every distribution is pinned to an exact version and to the SHA-256 digests of its pure-Python
 # wheel and its source archive, copied from https://pypi.org/pypi/<name>/<version>/json.
-# (sgp4 also publishes compiled wheels; only the pure-Python wheel is allowed here because the
-# fixtures never propagate satellites, so the C accelerator is irrelevant.)
+# (sgp4 also publishes compiled wheels; only the pure-Python wheel is allowed here, so that every run propagates
+# satellites with the same code. The satellite scripts do propagate: `passes` and `streaks` of
+# make_satellite_fixtures.py and make_satellite_transit_reference.py call sgp4 through Skyfield's EarthSatellite.)
 #
-# numpy (required by Skyfield and jplephem; any release that Skyfield supports) is deliberately
-# not listed: its wheels are platform specific, and the fixtures do not depend on its version.
+# numpy (required by Skyfield and jplephem, and imported directly by make_fixtures.py,
+# make_satellite_fixtures.py, make_satellite_transit_reference.py, ephemeris/check_pluto_theory.py,
+# make_app_icon.py and review/night_leaks.py; any release that Skyfield supports) is deliberately not listed: its
+# wheels are platform specific, and the fixtures do not depend on its version.
 # Install it first from the system package manager or with `pip install numpy`.
+#
+# Pillow (9.1 or newer; make_app_icon.py and review/night_leaks.py, not the fixtures) is not listed either: it has
+# no pure-Python wheel, so it cannot be pinned by hash in this file. Install it with `pip install "Pillow>=9.1"`.
 
 skyfield==1.55 \
     --hash=sha256:9f98964855067460c94aa81a337194136f4a97a62ba8bbbfac1b8556f2b66ad4 \

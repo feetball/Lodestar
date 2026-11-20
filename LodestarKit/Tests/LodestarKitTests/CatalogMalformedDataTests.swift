@@ -150,14 +150,20 @@ final class CatalogMalformedDataTests: XCTestCase {
         // Strict parsers reject the file; lenient ones read some of these as text or garbage, and the
         // record fails to decode. Either way no record with such a number is loaded.
         for literal in ["NaN", "Infinity", "-Infinity", "nan", "inf", "+1", "01", ".5", "1.", "0x10", "1e", "--1", "1e+", "-", "Inf"] {
-            let record = #"{"hip":1,"c":"Ori","ra":\#(literal),"de":20.0,"m":2.5}"#
+            // The record has an identifier of its own: with the default star's it would be a duplicate and be rejected
+            // whatever the literal means.
+            let record = #"{"hip":2,"c":"Ori","ra":\#(literal),"de":20.0,"m":2.5}"#
             do {
                 let catalog = try Catalog(starsData: CatalogFixture.file("stars", [CatalogFixture.defaultStar, record]),
                                           dsosData: CatalogFixture.file("objects", [CatalogFixture.defaultDeepSky]),
                                           constellationsData: CatalogFixture.file("constellations", []),
                                           milkyWayData: CatalogFixture.file("levels", []))
-                // A lenient parser read the literal as a valid number: it must be a finite one.
-                XCTAssertTrue(catalog.object(id: "star.hip1")?.j2000?.rightAscension.isFinite ?? true, literal)
+                XCTAssertNotNil(catalog.object(id: "star.hip1"), literal)
+                // A lenient parser read the literal as a valid number: it must be a finite one. A record that did
+                // not decode is dropped, and the catalog has no such star.
+                if let lenient = catalog.object(id: "star.hip2") {
+                    XCTAssertEqual(lenient.j2000?.rightAscension.isFinite, true, literal)
+                }
             } catch CatalogError.malformed(let file, _) {
                 XCTAssertEqual(file, .stars, literal)
             } catch {

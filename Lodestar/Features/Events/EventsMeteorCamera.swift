@@ -67,9 +67,12 @@ enum EventsMeteorCamera {
         return MeteorCameraAdvice.expectedInFrame(observedHourlyRate: observed, shower: shower, setup: lens)
     }
 
+    /// "Perseids camera field": the name of the advised place.
+    static func fieldName(of shower: MeteorShower) -> String { "\(shower.name) camera field" }
+
     /// The custom target "Perseids camera field" at the advised place, to aim the camera at.
     static func target(shower: MeteorShower, advice: MeteorAimAdvice) -> CelestialObject {
-        CelestialObject.custom(name: "\(shower.name) camera field", j2000: advice.aimPoint)
+        CelestialObject.custom(name: fieldName(of: shower), j2000: advice.aimPoint)
     }
 
     /// "Point the camera at azimuth 210\u{00B0} (SSW), altitude 55\u{00B0}, 40\u{00B0} from the radiant."
