@@ -67,6 +67,20 @@ final class ObservingListCodecTests: XCTestCase {
         XCTAssertFalse(target.hasCoordinates)
     }
 
+    func testColumnsOfTheEquinox1950AreNeverUsed() throws {
+        for header in ["Name,RA 1950,Dec 1950", "Name,RA (J1950),Dec (J1950)", "Name,RA_1950.0,Dec_1950.0",
+                       "Name,Right Ascension (B1950),Declination (B1950)"] {
+            let target = try XCTUnwrap(ObservingListCodec.decode("\(header)\nM 31,10.68,41.27\n").targets.first, header)
+            XCTAssertEqual(target.name, "M 31", header)
+            XCTAssertFalse(target.hasCoordinates, header)
+        }
+        // With both, the J2000 columns are the ones that count.
+        let both = "Name,RA 1950,Dec 1950,RA J2000,Dec J2000\nM 31,10.0,41.0,10.68,41.27\n"
+        let target = try XCTUnwrap(ObservingListCodec.decode(both).targets.first)
+        XCTAssertEqual(try XCTUnwrap(target.rightAscension), 10.68, accuracy: tolerance)
+        XCTAssertEqual(try XCTUnwrap(target.declination), 41.27, accuracy: tolerance)
+    }
+
     // MARK: Generic CSV
 
     func testGenericCSVWithDegrees() throws {
@@ -196,6 +210,17 @@ final class ObservingListCodecTests: XCTestCase {
         XCTAssertEqual(ObservingListCodec.encodeCSV(entries), expected.joined(separator: "\r\n") + "\r\n")
     }
 
+    func testCSVGuardsFormulasInEveryTextColumn() throws {
+        // Each free-text column starts with a different character that a spreadsheet would run as a formula.
+        let entry = ObservingListEntry(name: "=1+1", designation: "+2", rightAscension: 10, declination: 5, typeName: "@SUM(A1)")
+        let table = try InterchangeCSV.parse(Array(ObservingListCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 2)
+        XCTAssertEqual(table.records[1].fields, ["'=1+1", "'+2", "10.00000", "5.00000", "'@SUM(A1)"])
+        let minus = ObservingListEntry(name: "-1", designation: "M 1", typeName: "-cmd")
+        let other = try InterchangeCSV.parse(Array(ObservingListCodec.encodeCSV([minus]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(other.records[1].fields, ["'-1", "M 1", "", "", "'-cmd"])
+    }
+
     func testCSVExportReadsBackThroughTheImporter() throws {
         let list = try ObservingListCodec.decode(ObservingListCodec.encodeCSV(entries))
         XCTAssertEqual(list.format, .genericCSV)
@@ -206,6 +231,15 @@ final class ObservingListCodecTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(list.targets[3].declination), -2.45, accuracy: tolerance)
         XCTAssertFalse(list.targets[1].hasCoordinates)
         XCTAssertFalse(list.targets[2].hasCoordinates)
+    }
+
+    func testARightAscensionThatRoundsUpToAFullTurnIsExportedAsZeroAndReadsBack() throws {
+        let entry = ObservingListEntry(name: "Edge", rightAscension: 359.999996, declination: 10)
+        let csv = ObservingListCodec.encodeCSV([entry])
+        XCTAssertTrue(csv.contains("Edge,,0.00000,10.00000,"), csv)
+        let list = try ObservingListCodec.decode(csv)
+        XCTAssertTrue(list.errors.isEmpty)
+        XCTAssertEqual(try XCTUnwrap(list.targets.first?.rightAscension), 0, accuracy: tolerance)
     }
 
     func testSkySafariExport() {

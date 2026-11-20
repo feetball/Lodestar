@@ -82,6 +82,10 @@ enum ForecastParser {
 
     private static let directionRange: ClosedRange<Double> = 0...360
 
+    /// The relative humidity and fog values a forecast value may have, in percent; anything else is dropped. The cloud
+    /// values are clamped instead (see `percent(_:_:)`).
+    private static let percentRange: ClosedRange<Double> = 0...100
+
     /// Throws `OnlineDataError` when `data` is not a forecast with cloud values.
     static func parse(_ data: Data) throws -> OnlineParsed<CloudForecast> {
         OnlineParsed(value: try parseForecast(data))
@@ -113,12 +117,12 @@ enum ForecastParser {
                                    high: percent(details, "cloud_area_fraction_high") ?? 0,
                                    temperature: number(details, "air_temperature", in: temperatureRange),
                                    dewPoint: number(details, "dew_point_temperature", in: temperatureRange),
-                                   humidity: percent(details, "relative_humidity"),
+                                   humidity: number(details, "relative_humidity", in: percentRange),
                                    windSpeed: number(details, "wind_speed", in: windRange),
                                    windGust: number(details, "wind_speed_of_gust", in: windRange),
                                    windFromDirection: number(details, "wind_from_direction", in: directionRange)
                                        .map { $0.truncatingRemainder(dividingBy: 360) },
-                                   fog: percent(details, "fog_area_fraction")))
+                                   fog: number(details, "fog_area_fraction", in: percentRange)))
         }
         guard hours.count >= minimumHours else { throw OnlineDataError("Too few forecast times.") }
         for index in 1..<hours.count where hours[index].time <= hours[index - 1].time {

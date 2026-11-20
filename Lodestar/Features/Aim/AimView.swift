@@ -32,6 +32,11 @@ private struct AimScreen: View {
     /// The sensors, the timelines and the audio run only while this tab is showing and the app is in front.
     private var isActive: Bool { app.selectedTab == .aim && app.scenePhase == .active }
 
+    /// Whether a time preview has to end: the tab was left or the app went to the background. `.inactive` (Control
+    /// Center, the notification shade, a system alert, the app switcher) is transient for the app, see
+    /// `AppModel.syncServices`, so the screen only pauses then and keeps its preview and time bar.
+    private var endsPreview: Bool { app.selectedTab != .aim || app.scenePhase == .background }
+
     /// Identifies the background work of the screen, so it restarts whenever its inputs change and stops while the
     /// screen is not in use.
     private struct WorkKey: Equatable {
@@ -64,9 +69,9 @@ private struct AimScreen: View {
             .onChange(of: app.selectedTab == .aim, initial: true) { _, isShowing in
                 model.useCameraZoom(isShowing: isShowing)
             }
-            // A preview never outlives the tab or the app being in front: coming back finds the live sky.
-            .onChange(of: isActive) { _, isNowActive in
-                if !isNowActive { model.leave() }
+            // A preview never outlives the tab or the app being in the background: coming back finds the live sky.
+            .onChange(of: endsPreview) { _, ends in
+                if ends { model.leave() }
             }
             // A satellite moves too fast to look ahead at: following one ends the preview.
             .onChange(of: model.satelliteSource?.id) { _, id in
@@ -83,6 +88,8 @@ private struct AimScreen: View {
             .task(id: isActive) {
                 guard isActive else {
                     model.stopFeedback()
+                    // The target moves on while the screen is away: its place is known again once the sky is rebuilt.
+                    model.dropTargetPosition()
                     return
                 }
                 await model.runLoop()

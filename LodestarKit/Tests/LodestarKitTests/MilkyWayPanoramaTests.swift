@@ -260,18 +260,37 @@ final class MilkyWayPanoramaTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(times.mostHorizontal).coreTilt, try XCTUnwrap(times.mostVertical).coreTilt)
     }
 
+    /// Milliseconds allowed for one arch and for one search of a night. A release build needs far less; an unoptimised debug
+    /// build is slower and a shared runner slower still, so the debug bounds are ten times larger and only catch a calculation
+    /// that has gone badly wrong.
+    private static let archLimitMilliseconds: Double = {
+        #if DEBUG
+        return 200
+        #else
+        return 20
+        #endif
+    }()
+
+    private static let searchLimitMilliseconds: Double = {
+        #if DEBUG
+        return 3_000
+        #else
+        return 300
+        #endif
+    }()
+
     func testMilkyWayHelpersAreFast() {
         let frame = SkyFrame(date: july, observer: boulder)
         _ = MilkyWayPanorama.arch(frame: frame)
         var start = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<50 { _ = MilkyWayPanorama.arch(frame: frame) }
         let archMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 50.0 / 1e6
-        XCTAssertLessThan(archMilliseconds, 20.0, "\(archMilliseconds) ms per arch")
+        XCTAssertLessThan(archMilliseconds, Self.archLimitMilliseconds, "\(archMilliseconds) ms per arch")
         let summary = NightPlanner.summary(nightStartingOn: july, observer: boulder, timeZone: denver)
         _ = MilkyWayPanorama.bestTimes(summary: summary)
         start = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<10 { _ = MilkyWayPanorama.bestTimes(summary: summary) }
         let timesMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 10.0 / 1e6
-        XCTAssertLessThan(timesMilliseconds, 300.0, "\(timesMilliseconds) ms per search")
+        XCTAssertLessThan(timesMilliseconds, Self.searchLimitMilliseconds, "\(timesMilliseconds) ms per search")
     }
 }

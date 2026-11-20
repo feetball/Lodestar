@@ -69,6 +69,15 @@ final class MosaicPanelCodecTests: XCTestCase {
         ].joined(separator: "\r\n") + "\r\n")
     }
 
+    func testAnAngleThatRoundsUpToAFullTurnIsWrittenAsZero() {
+        let edge = [MosaicPanelRecord(panel: "R1C1", row: 1, column: 1, rightAscension: 359.999996, declination: 5,
+                                      positionAngle: 359.999996, order: 1)]
+        XCTAssertEqual(MosaicPanelCodec.csv(edge), [
+            "Panel,Row,Column,RA J2000 (deg),Dec J2000 (deg),Position angle (deg),Order",
+            "R1C1,1,1,0.00000,5.00000,0.00000,1",
+        ].joined(separator: "\r\n") + "\r\n")
+    }
+
     func testTextListInShootingOrder() {
         XCTAssertEqual(MosaicPanelCodec.text(records, targetName: "M 31"), """
         M 31 R1C1, 00 00 00.0, +00 00 00

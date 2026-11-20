@@ -12,14 +12,20 @@ struct AimControlsBar: View {
 
     /// The two columns of a wide HUD.
     private static let columns = [GridItem(.fixed(66), spacing: 6), GridItem(.fixed(66), spacing: 6)]
-    /// The four columns of the bar with larger text, or with the Mount button too, which have no room for all the
-    /// buttons in one row.
+    /// The four columns of the bar with larger text, or with the Mount button or the Frame menu too, which have no room
+    /// for all the buttons in one row.
     private static let wrappedColumns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
     /// The most buttons that share one row.
     private static let buttonsInRow = 7
 
-    /// Target, Align, Mosaic, Time, Camera, Night and Zoom, and Mount for people who have a GoTo mount.
-    private var buttonCount: Int { Self.buttonsInRow + (MountService.shared.showsAimButton ? 1 : 0) }
+    /// Switching between cameras at the tripod needs more than one profile.
+    private var showsFrameMenu: Bool { app.settings.cameraProfiles.count > 1 }
+
+    /// Target, Align, Mosaic, Time, Camera, Night and Zoom, Mount for people who have a GoTo mount, and the Frame menu
+    /// with several camera profiles.
+    private var buttonCount: Int {
+        Self.buttonsInRow + (MountService.shared.showsAimButton ? 1 : 0) + (showsFrameMenu ? 1 : 0)
+    }
 
     var body: some View {
         if axis == .horizontal {
@@ -80,8 +86,7 @@ struct AimControlsBar: View {
         .accessibilityValue(nightMode.title)
         .accessibilityHint("Cycles between off, on and after sunset.")
         AimFieldOfViewButton(model: model, minHeight: buttonHeight)
-        // Switching between cameras at the tripod needs more than one profile.
-        if app.settings.cameraProfiles.count > 1 {
+        if showsFrameMenu {
             AimFrameMenu(minHeight: buttonHeight)
         }
     }

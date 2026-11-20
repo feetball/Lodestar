@@ -94,6 +94,63 @@ final class TerrainHorizonTests: XCTestCase {
         XCTAssertTrue(south.allSatisfy { $0.latitude == -90 || $0.latitude == -89 })
     }
 
+    /// The tiles that hold points of the disk of radius `rangeMeters` around a site, found by walking out from the site
+    /// along 720 bearings (on the sphere, so close to a pole the disk is not a flat circle).
+    private func tilesOfTheDisk(latitude: Double, longitude: Double, rangeMeters: Double) -> Set<TerrainTileKey> {
+        let phi = AstroMath.radians(latitude)
+        var keys = Set<TerrainTileKey>()
+        for bearing in 0..<720 {
+            let theta = AstroMath.radians(Double(bearing) / 2)
+            for share in [0, 0.25, 0.5, 0.75, 0.999] {
+                let delta = rangeMeters * share / TerrainHorizon.earthRadiusMeters
+                let phi2 = asin(sin(phi) * cos(delta) + cos(phi) * sin(delta) * cos(theta))
+                let lambda2 = AstroMath.radians(longitude)
+                    + atan2(sin(theta) * sin(delta) * cos(phi), cos(delta) - sin(phi) * sin(phi2))
+                let east = AstroMath.normalizeDegrees(AstroMath.degrees(lambda2) + 180) - 180
+                if let key = TerrainTileKey.containing(latitude: AstroMath.degrees(phi2), longitude: east) { keys.insert(key) }
+            }
+        }
+        return keys
+    }
+
+    func testRequiredTilesCoverTheWholeDiskAtHalfADegreeFromEitherPole() {
+        // A 5 km disk 55.6 km from the pole reaches 5.2° east and west of the site: the tiles of the polar row between
+        // 4.5° and 5.2° away are the ones a flat-earth span (cos clamped at 0.01) leaves out.
+        for latitude in [89.5, -89.5] {
+            let disk = tilesOfTheDisk(latitude: latitude, longitude: 10, rangeMeters: 5_000)
+            XCTAssertEqual(disk.count, 12, "the walk should touch 12 tiles at \(latitude)")
+            let listed = TerrainHorizon.requiredTiles(at: GeographicLocation(latitude: latitude, longitude: 10),
+                                                      maxDistanceMeters: 5_000)
+            XCTAssertTrue(disk.isSubset(of: Set(listed)), "missing \(disk.subtracting(Set(listed)).map(\.name)) at \(latitude)")
+            XCTAssertEqual(listed.count, Set(listed).count)
+            XCTAssertTrue(listed.allSatisfy { $0.latitude == (latitude > 0 ? 89 : -90) })
+        }
+    }
+
+    func testRequiredTilesAtDefaultRangeNearThePolesAreTheNearestSixteenOfThePolarRow() {
+        for latitude in [89.5, -89.5] {
+            let tiles = TerrainHorizon.requiredTiles(at: GeographicLocation(latitude: latitude, longitude: 10.5))
+            XCTAssertEqual(tiles.count, TerrainHorizon.maximumTileCount)
+            XCTAssertEqual(tiles.first?.longitude, 10)
+            XCTAssertEqual(Set(tiles.map(\.latitude)), [latitude > 0 ? 89 : -90])
+            XCTAssertTrue(tiles.allSatisfy { abs($0.longitude - 10) <= 8 })
+        }
+    }
+
+    func testRequiredTilesFillTheListWhenTheCircleHoldsThePole() {
+        // 1.1 km from the pole with a 5 km range: the circle holds the pole, so every longitude of the polar row is in
+        // range and the list is the sixteen nearest, the site's own tile first. A span clamped at 4.5° lists only ten.
+        for latitude in [89.99, -89.99] {
+            let tiles = TerrainHorizon.requiredTiles(at: GeographicLocation(latitude: latitude, longitude: 179.5),
+                                                     maxDistanceMeters: 5_000)
+            XCTAssertEqual(tiles.count, TerrainHorizon.maximumTileCount)
+            XCTAssertEqual(tiles.first?.longitude, 179)
+            XCTAssertEqual(Set(tiles.map(\.latitude)), [latitude > 0 ? 89 : -90])
+            // The nearest sixteen straddle the antimeridian.
+            XCTAssertTrue(tiles.contains { $0.longitude == -180 })
+        }
+    }
+
     // MARK: Flat ground
 
     func testFlatTileGivesTheDipOfTheHorizonAtTwoMetres() throws {

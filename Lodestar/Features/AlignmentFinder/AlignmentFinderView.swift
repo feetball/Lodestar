@@ -11,21 +11,24 @@ struct AlignmentFinderView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
     @State private var inputs = AlignmentFinderInputs()
-    /// The search runs from the night that was current when the screen opened.
-    @State private var openedAt = Date()
+    /// The search runs from the night that is current now, and matches that have ended are left out. It is read again
+    /// while the screen is open (see `keepNowCurrent()`), because the screen can stay open across a night.
+    @State private var now = Date()
     /// Nil while a search is under way.
     @State private var outcome: AlignmentFinderOutcome?
     @State private var isChoosingObject = false
 
     /// Pause before searching after an input changes, so holding a stepper does not search for every step.
     private static let searchDelay: Duration = .milliseconds(300)
+    /// How often `now` is read again while the screen is open.
+    private static let clockRefreshInterval: Duration = .seconds(300)
     /// The lowest altitude a window may start at, in degrees: a little below the horizon, for a skyline that dips.
     private static let lowestAltitude = -10
     private static let azimuthSteps = 360
 
     var body: some View {
         let context = app.observerContext
-        let request = context.flatMap { inputs.request(for: $0, now: openedAt) }
+        let request = context.flatMap { inputs.request(for: $0, now: now) }
         let hasSkyline = context.map { AlignmentFinderRequest.skyline(of: $0) != nil } ?? false
         Group {
             if let context {
@@ -39,6 +42,9 @@ struct AlignmentFinderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: request) {
             await search(request)
+        }
+        .task {
+            await keepNowCurrent()
         }
         // A site without a recorded skyline starts on the window of numbers; the skyline choice stays, with its
         // explanation.
@@ -63,11 +69,20 @@ struct AlignmentFinderView: View {
             whatSection
             whereSection(skyline: AlignmentFinderRequest.skyline(of: context))
             whenSection
-            AlignmentFinderResults(inputs: inputs, request: request, outcome: outcome, openedAt: openedAt,
+            AlignmentFinderResults(inputs: inputs, request: request, outcome: outcome, now: now,
                                    timeZone: context.timeZone)
         }
         .themedList(palette)
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// Reads `now` when the screen appears and every `clockRefreshInterval` while it stays open. A search starts again
+    /// only when the night changes, because `request` holds the start of the night and not `now`.
+    private func keepNowCurrent() async {
+        while !Task.isCancelled {
+            now = Date()
+            try? await Task.sleep(for: Self.clockRefreshInterval)
+        }
     }
 
     /// Runs the search for `request` once the inputs have settled, off the main thread. `.task(id:)` cancels this
@@ -228,7 +243,7 @@ private struct AlignmentFinderResults: View {
     let inputs: AlignmentFinderInputs
     let request: AlignmentFinderRequest?
     let outcome: AlignmentFinderOutcome?
-    let openedAt: Date
+    let now: Date
     let timeZone: TimeZone
 
     /// The matches that have not ended, grouped by night.
@@ -254,21 +269,8 @@ private struct AlignmentFinderResults: View {
                 SettingsSection(title: "Results") { SettingsCaption(message) }
             case .empty(let reason)?:
                 SettingsSection(title: "Results") {
-                    VStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(palette.tertiaryText)
-                            .accessibilityHidden(true)
-                        Text(AlignmentFinderText.emptyTitle(reason, for: request))
-                            .font(.headline)
-                        Text(AlignmentFinderText.emptyMessage(reason, for: request, days: inputs.range.days))
-                            .font(.subheadline)
-                            .foregroundStyle(palette.secondaryText)
-                    }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .accessibilityElement(children: .combine)
+                    emptyState(title: AlignmentFinderText.emptyTitle(reason, for: request),
+                               message: AlignmentFinderText.emptyMessage(reason, for: request, days: inputs.range.days))
                 }
             case .found(let matches, let isCutShort)?:
                 found(matches, isCutShort: isCutShort)
@@ -284,13 +286,39 @@ private struct AlignmentFinderResults: View {
         return AlignmentFinderText.needsLocation
     }
 
+    /// A magnifying glass over a title and what to do about it, for a search with nothing to show.
+    private func emptyState(title: String, message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(palette.tertiaryText)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+
     @ViewBuilder
     private func found(_ matches: [SkyWindowMatch], isCutShort: Bool) -> some View {
         let aimObject = inputs.aimObject { app.catalog.object(id: $0) }
-        ForEach(nights(of: matches)) { night in
+        let upcoming = nights(of: matches)
+        if upcoming.isEmpty {
+            SettingsSection(title: "Results") {
+                emptyState(title: AlignmentFinderText.allEndedTitle,
+                           message: AlignmentFinderText.allEndedMessage(days: inputs.range.days))
+            }
+        }
+        ForEach(upcoming) { night in
             SettingsSection(title: AlignmentFinderText.nightHeader(night.night, in: timeZone)) {
                 ForEach(night.matches, id: \.interval.start) { match in
-                    AlignmentFinderMatchRow(match: match, timeZone: timeZone, openedAt: openedAt, aimObject: aimObject)
+                    AlignmentFinderMatchRow(match: match, timeZone: timeZone, now: now, aimObject: aimObject)
                 }
             }
         }
@@ -304,7 +332,7 @@ private struct AlignmentFinderResults: View {
 
     private func nights(of matches: [SkyWindowMatch]) -> [Night] {
         var nights = [Night]()
-        for match in matches where match.interval.end >= openedAt {
+        for match in matches where match.interval.end >= now {
             if let last = nights.last, last.night.start == match.night.start {
                 nights[nights.count - 1] = Night(night: last.night, matches: last.matches + [match])
             } else {
@@ -321,11 +349,11 @@ private struct AlignmentFinderMatchRow: View {
     @Environment(\.palette) private var palette
     let match: SkyWindowMatch
     let timeZone: TimeZone
-    let openedAt: Date
+    let now: Date
     let aimObject: CelestialObject?
 
     private var isTonight: Bool {
-        match.night.start <= openedAt && openedAt < match.night.end && match.interval.end > openedAt
+        match.night.start <= now && now < match.night.end && match.interval.end > now
     }
 
     var body: some View {

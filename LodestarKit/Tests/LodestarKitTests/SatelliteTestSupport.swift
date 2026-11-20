@@ -37,11 +37,16 @@ enum SatelliteTestSupport {
 
     static func date(_ unixSeconds: Double) -> Date { Date(timeIntervalSince1970: unixSeconds) }
 
-    /// The instant of an ISO 8601 UTC time such as `2026-10-18T11:29:00Z`.
-    static func iso(_ text: String) -> Date {
+    /// The instant of an ISO 8601 UTC time such as `2026-10-18T11:29:00Z`. A text that does not parse fails the test and
+    /// gives an invalid date, so that a typo cannot turn into a plausible instant.
+    static func iso(_ text: String, file: StaticString = #filePath, line: UInt = #line) -> Date {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: text) ?? Date(timeIntervalSince1970: 0)
+        guard let date = formatter.date(from: text) else {
+            XCTFail("\"\(text)\" is not an ISO 8601 time", file: file, line: line)
+            return Date(timeIntervalSince1970: .nan)
+        }
+        return date
     }
 
     static func observer(_ latitude: Double, _ longitude: Double, _ elevation: Double = 0) -> Observer {

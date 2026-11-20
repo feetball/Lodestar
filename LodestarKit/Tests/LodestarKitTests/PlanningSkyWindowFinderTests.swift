@@ -428,6 +428,7 @@ final class PlanningSkyWindowFinderTests: XCTestCase {
                                                        azimuthTolerance: 5, altitudeAbove: 1...12))
         let over = try matches(boulder, star, gap, from: from, to: to, horizon: HorizonTestSupport.truthProfile,
                                darkness: .anyTime)
+        XCTAssertFalse(over.isEmpty)
         XCTAssertTrue(over.allSatisfy(\.isAboveSkyline))
     }
 

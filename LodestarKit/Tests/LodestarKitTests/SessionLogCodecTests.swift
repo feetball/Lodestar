@@ -126,6 +126,13 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(SessionLogCodec.encodeCSV(log().reversed()), expected.joined(separator: "\r\n") + "\r\n")
     }
 
+    func testARightAscensionThatRoundsUpToAFullTurnIsWrittenAsZero() {
+        let entry = SessionLogEntry(date: first, targetID: "custom.edge", targetName: "Edge",
+                                  rightAscension: 359.999996, declination: 10)
+        XCTAssertTrue(SessionLogCodec.encodeCSV([entry]).contains(",Edge,custom.edge,0.00000,10.00000,"))
+        XCTAssertTrue(SessionLogCodec.encodeOpenAstronomyLog([entry]).contains("<ra unit=\"deg\">0.00000</ra>"))
+    }
+
     func testCSVKeepsShortExposuresAndFastLensesAndReadsBackAsTheSameNumbers() throws {
         let entries = [
             SessionLogEntry(
@@ -171,6 +178,27 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(table.records[1].fields[2], "'=cmd|' /C calc'!A0")
         XCTAssertEqual(table.records[1].fields[18], "line 1\nline 2")
         XCTAssertEqual(table.records[1].fields.count, 19)
+    }
+
+    func testCSVGuardsFormulasInEveryTextColumn() throws {
+        // Each free-text column starts with a character that a spreadsheet would run as a formula, a different one in each.
+        let entry = SessionLogEntry(
+            date: first, targetID: "@id", targetName: "=1+1", siteName: "+site", camera: "-camera", filter: "=filter",
+            notes: "=notes\nsecond line", isImaged: true
+        )
+        let table = try InterchangeCSV.parse(Array(SessionLogCodec.encodeCSV([entry]).unicodeScalars), maximumRecords: 10)
+        XCTAssertEqual(table.records.count, 2)
+        let header = table.records[0].fields
+        let fields = table.records[1].fields
+        XCTAssertEqual(fields.count, 19)
+        let columns: [(name: String, index: Int, text: String)] = [
+            ("Target", 2, "'=1+1"), ("Target ID", 3, "'@id"), ("Site", 6, "'+site"), ("Camera", 9, "'-camera"),
+            ("Filter", 16, "'=filter"), ("Notes", 18, "'=notes\nsecond line"),
+        ]
+        for column in columns {
+            XCTAssertEqual(header[column.index], column.name)
+            XCTAssertEqual(fields[column.index], column.text, column.name)
+        }
     }
 
     func testExportsAreCapped() {

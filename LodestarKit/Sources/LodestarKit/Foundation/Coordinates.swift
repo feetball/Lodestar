@@ -167,6 +167,15 @@ public struct GeographicLocation: Hashable, Codable, Sendable {
             : 0
     }
 
+    /// Decodes the three components and applies the clamping and wrapping of `init(latitude:longitude:elevation:)`, so
+    /// that a stored or received value out of range cannot reach code that indexes a grid by it.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(latitude: try container.decode(Double.self, forKey: .latitude),
+                  longitude: try container.decode(Double.self, forKey: .longitude),
+                  elevation: try container.decode(Double.self, forKey: .elevation))
+    }
+
     /// Returns a location only if every component is finite and in range
     /// (latitude [-90, 90], longitude [-180, 360], elevation within `elevationRange`).
     public static func validated(latitude: Double, longitude: Double, elevation: Double = 0) -> GeographicLocation? {

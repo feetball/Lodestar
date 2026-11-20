@@ -114,6 +114,20 @@ final class InterchangeTextTests: XCTestCase {
         XCTAssertEqual(InterchangeText.fixed(.infinity, decimals: 2), "0.00")
     }
 
+    func testAnAngleThatRoundsUpToAFullTurnIsWrittenAsZero() {
+        // Plain `fixed` shows the carry: 359.999996 at five places is 360.00000, outside [0, 360).
+        XCTAssertEqual(InterchangeText.fixed(359.999996, decimals: 5), "360.00000")
+        XCTAssertEqual(InterchangeText.fixedAngle(359.999996, decimals: 5), "0.00000")
+        XCTAssertEqual(InterchangeText.fixedAngle(359.999996, decimals: 2), "0.00")
+        XCTAssertEqual(InterchangeText.fixedAngle(359.99999, decimals: 5), "359.99999")
+        XCTAssertEqual(InterchangeText.fixedAngle(359.999994, decimals: 5), "359.99999")
+        XCTAssertEqual(InterchangeText.fixedAngle(0, decimals: 5), "0.00000")
+        XCTAssertEqual(InterchangeText.fixedAngle(83.822083, decimals: 5), "83.82208")
+        // Only an angle of the range is wrapped; a value outside it is written as it is.
+        XCTAssertEqual(InterchangeText.fixedAngle(360, decimals: 5), "360.00000")
+        XCTAssertEqual(InterchangeText.fixedAngle(-0.000001, decimals: 5), "0.00000")
+    }
+
     func testDatesFromEpochDays() {
         XCTAssertEqual(InterchangeText.dateText(daysSinceEpoch: 0), "1970-01-01")
         XCTAssertEqual(InterchangeText.dateText(daysSinceEpoch: -1), "1969-12-31")
