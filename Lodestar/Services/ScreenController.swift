@@ -29,7 +29,8 @@ final class ScreenController {
         appliedBrightness = target
     }
 
-    /// Keeps the display awake while `disabled` is `true`; only the Aim screen should need that.
+    /// Keeps the display awake while `disabled` is `true`; the Aim screen, a connected mount, the torch and the
+    /// skyline recorder need that.
     func setIdleTimerDisabled(_ disabled: Bool) {
         let application = UIApplication.shared
         if application.isIdleTimerDisabled != disabled {
