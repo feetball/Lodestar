@@ -129,9 +129,22 @@ final class OnlineDataServiceTests: XCTestCase {
         XCTAssertTrue(service.isEnabled(.clouds))
         XCTAssertFalse(service.isEnabled(.satellites))
         XCTAssertFalse(service.isEnabled(.starlink))
-        XCTAssertEqual(service.statuses.count, 4)
+        XCTAssertFalse(service.isEnabled(.terrain))
+        XCTAssertEqual(service.statuses.count, 5)
         XCTAssertEqual(service.status(.comets), OnlineFeedStatus(isEnabled: true))
         XCTAssertEqual(service.status(.satellites), OnlineFeedStatus())
+    }
+
+    @MainActor
+    func testTheTerrainHorizonIsNotWorkedOutWhileTheFeedIsOff() async {
+        let box = OnlineDataServiceTestsBox()
+        defer { box.remove() }
+        let service = box.makeService()
+        XCTAssertFalse(service.isEnabled(.terrain))
+        let outcome = await service.computeTerrainHorizon(for: GeographicLocation(latitude: 47.5, longitude: 8.5, elevation: 400),
+                                                           progress: { _ in XCTFail("nothing is requested") })
+        guard case .failed(let message) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(message, "Terrain horizons are switched off.")
     }
 
     @MainActor

@@ -77,6 +77,7 @@ final class OnlineTextTests: XCTestCase {
         XCTAssertTrue(OnlineText.footer.contains("Switching a feed off deletes what it downloaded."))
         XCTAssertTrue(OnlineText.footer.contains("A failed download keeps the data you already have."))
         XCTAssertTrue(OnlineText.footer.contains("Nothing runs in the background"))
+        XCTAssertTrue(OnlineText.footer.contains("terrain horizons download only when you ask for one in a site's editor"))
     }
 
     func testTheFirstTimeExplanationNamesWhatLeavesThePhone() {
@@ -84,7 +85,8 @@ final class OnlineTextTests: XCTestCase {
         XCTAssertTrue(body.contains("HTTPS request"))
         XCTAssertTrue(body.contains("IP address"))
         XCTAssertTrue(body.contains("name and version"))
-        XCTAssertTrue(body.contains("Only the cloud forecast also sends your location, rounded to about 10 km."))
+        XCTAssertTrue(body.contains("Only the cloud forecast also sends your location, rounded to about 10 km,"))
+        XCTAssertTrue(body.contains("terrain horizons ask for the elevation tiles around a site"))
         XCTAssertTrue(body.contains("Switching a feed off deletes what it downloaded."))
     }
 
@@ -105,7 +107,11 @@ final class OnlineTextTests: XCTestCase {
         XCTAssertEqual(OnlineText.purpose(.starlink),
                        "Warns in Aim when Starlink satellites are likely to cross your frame during an exposure.")
         XCTAssertEqual(OnlineText.purpose(.comets), "Adds the current comets to the object list, the sky chart and Aim.")
-        XCTAssertEqual(OnlineText.purpose(.clouds), "Shows tonight's hourly cloud cover on the Tonight screen.")
+        XCTAssertEqual(OnlineText.purpose(.clouds),
+                       "Shows tonight's hourly cloud cover, dew, wind, fog and temperature on the Tonight screen.")
+        XCTAssertEqual(OnlineText.purpose(.terrain),
+                       "Works out the skyline of the hills and mountains around a saved site from elevation data, for sites "
+                       + "where you have not recorded one. Nothing downloads until you ask in a site's editor.")
     }
 
     func testEveryFeedSaysWhoSeesTheIPAddress() {

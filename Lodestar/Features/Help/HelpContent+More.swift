@@ -142,9 +142,9 @@ extension HelpContent {
             .terms([
                 HelpTerm(term: "Altitude", meaning: "How high an object is above the horizon, in degrees. 0\u{00B0} is the horizon and 90\u{00B0} is straight up."),
                 HelpTerm(term: "Azimuth", meaning: "The compass direction of an object, in degrees clockwise from north. East is 90\u{00B0}, south 180\u{00B0} and west 270\u{00B0}."),
+                HelpTerm(term: "Camera profile", meaning: "A camera and lens saved in Settings: the sensor, focal length, aperture, pixel size and lens type. The one in use gives the frame on the sky and the exposure numbers. See Cameras and lenses."),
                 HelpTerm(term: "Conjunction", meaning: "Two objects that look close together in the sky, such as a planet and the Moon."),
                 HelpTerm(term: "Declination", meaning: "The sky\u{2019}s latitude, in degrees north (+) or south (\u{2212}) of the celestial equator."),
-                HelpTerm(term: "Camera profile", meaning: "A camera and lens saved in Settings: the sensor, focal length, aperture, pixel size and lens type. The one in use gives the frame on the sky and the exposure numbers. See Cameras and lenses."),
                 HelpTerm(term: "Elongation", meaning: "How far a planet or comet is from the Sun in the sky. A small elongation means it is lost in the Sun\u{2019}s glare."),
                 HelpTerm(term: "Field of view", meaning: "How much sky your camera\u{2019}s picture covers, worked out from the sensor and the focal length. It is written as width \u{00D7} height in degrees."),
                 HelpTerm(term: "Fisheye", meaning: "A lens that sees a very wide view by bending straight lines. Its frame on the sky is a curve, and a circular fisheye\u{2019}s is a circle."),

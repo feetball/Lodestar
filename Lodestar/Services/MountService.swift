@@ -610,8 +610,6 @@ final class MountService {
             motionGate?.cancel()
             motionGate = nil
             Task {
-                // Whether there is a move for the stop to halt decides what the notice can say about tracking.
-                let wasMoving = isMoving
                 // Nobody can watch the mount from here, so a slew or a nudge is stopped and the mount is let go.
                 ending.interrupt()
                 let stopped = await ending.run(urgent: true) { controller in
@@ -624,7 +622,7 @@ final class MountService {
                     } else {
                         finishSession(lost: reason + Self.backgroundOutcomeText(
                             status: stopped.status, detail: stopped.detail, lodestarAligns: usesLodestarAlignment,
-                            wasMoving: wasMoving))
+                            wasMoving: mayBeMoving))
                     }
                 }
                 lifecycle?.endBackgroundTask()

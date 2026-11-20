@@ -26,20 +26,21 @@ final class ObjectsListOptionsTests: XCTestCase {
     // MARK: Sort order
 
     func testSortOrdersAreInMenuOrderWithTheirRawValuesAsIdentifiers() {
-        XCTAssertEqual(ObjectsSortOrder.allCases, [.name, .number, .brightness, .prominence, .altitude, .riseTime])
+        XCTAssertEqual(ObjectsSortOrder.allCases, [.name, .number, .brightness, .prominence, .altitude, .riseTime, .hoursTonight])
         XCTAssertEqual(ObjectsSortOrder.allCases.map(\.rawValue),
-                       ["name", "number", "brightness", "prominence", "altitude", "riseTime"])
+                       ["name", "number", "brightness", "prominence", "altitude", "riseTime", "hoursTonight"])
         XCTAssertEqual(ObjectsSortOrder.allCases.map(\.id), ObjectsSortOrder.allCases.map(\.rawValue))
     }
 
     func testSortOrderTitles() {
         XCTAssertEqual(ObjectsSortOrder.allCases.map(\.title),
-                       ["Name", "Catalogue Number", "Brightness", "Prominence", "Altitude Now", "Rise Time"])
+                       ["Name", "Catalogue Number", "Brightness", "Prominence", "Altitude Now", "Rise Time",
+                        "Hours Visible Tonight"])
     }
 
     func testSortOrderImages() {
         XCTAssertEqual(ObjectsSortOrder.allCases.map(\.systemImage),
-                       ["textformat", "number", "sparkle", "star.circle", "arrow.up.to.line", "sunrise"])
+                       ["textformat", "number", "sparkle", "star.circle", "arrow.up.to.line", "sunrise", "moon.stars"])
     }
 
     func testOnlyAltitudeAndRiseTimeNeedSkyPositions() {
@@ -48,6 +49,33 @@ final class ObjectsListOptionsTests: XCTestCase {
         XCTAssertFalse(ObjectsSortOrder.number.needsSkyPositions)
         XCTAssertFalse(ObjectsSortOrder.brightness.needsSkyPositions)
         XCTAssertFalse(ObjectsSortOrder.prominence.needsSkyPositions)
+    }
+
+    func testOnlyTheHoursOrderNeedsTonightsHours() {
+        XCTAssertEqual(ObjectsSortOrder.allCases.filter(\.needsTonightHours), [.hoursTonight])
+    }
+
+    func testAnOrderNeedsAnObserverWhenItNeedsPositionsOrHours() {
+        XCTAssertEqual(ObjectsSortOrder.allCases.filter(\.needsObserver), [.altitude, .riseTime, .hoursTonight])
+        XCTAssertFalse(ObjectsSortOrder.name.needsObserver)
+    }
+
+    func testTheListNeedsTonightsHoursToOrderOrToFilterByThem() {
+        XCTAssertFalse(ObjectsListOptions().needsTonightHours)
+        var ordered = ObjectsListOptions()
+        ordered.sortOrder = .hoursTonight
+        XCTAssertTrue(ordered.needsTonightHours)
+        var filtered = ObjectsListOptions()
+        filtered.showsOnlyVisibleTonight = true
+        XCTAssertTrue(filtered.needsTonightHours)
+        XCTAssertTrue(filtered.isCustomized)
+    }
+
+    func testTheImagedFilterMakesTheListCustomized() {
+        var imaged = ObjectsListOptions()
+        imaged.showsOnlyImaged = true
+        XCTAssertTrue(imaged.isCustomized)
+        XCTAssertFalse(imaged.needsTonightHours)
     }
 
     func testSortOrderCanBeRestoredFromItsRawValue() {

@@ -7,8 +7,8 @@ import XCTest
 final class OnlineFeedTests: XCTestCase {
     // MARK: Feeds
 
-    func testThereAreFourFeedsInSettingsOrder() {
-        XCTAssertEqual(OnlineFeed.allCases, [.satellites, .starlink, .comets, .clouds])
+    func testThereAreFiveFeedsInSettingsOrder() {
+        XCTAssertEqual(OnlineFeed.allCases, [.satellites, .starlink, .comets, .clouds, .terrain])
     }
 
     func testTheIdentifierIsTheRawValue() {
@@ -16,6 +16,7 @@ final class OnlineFeedTests: XCTestCase {
         XCTAssertEqual(OnlineFeed.starlink.id, "starlink")
         XCTAssertEqual(OnlineFeed.comets.id, "comets")
         XCTAssertEqual(OnlineFeed.clouds.id, "clouds")
+        XCTAssertEqual(OnlineFeed.terrain.id, "terrain")
     }
 
     func testTitlesAreTheNamesInSettings() {
@@ -23,6 +24,7 @@ final class OnlineFeedTests: XCTestCase {
         XCTAssertEqual(OnlineFeed.starlink.title, "Starlink streak warnings")
         XCTAssertEqual(OnlineFeed.comets.title, "Comets")
         XCTAssertEqual(OnlineFeed.clouds.title, "Cloud forecast")
+        XCTAssertEqual(OnlineFeed.terrain.title, "Terrain horizons")
     }
 
     func testEachFeedOwnsItsFiles() {
@@ -30,6 +32,7 @@ final class OnlineFeedTests: XCTestCase {
         XCTAssertEqual(OnlineFeed.starlink.resources, [.starlink])
         XCTAssertEqual(OnlineFeed.comets.resources, [.comets])
         XCTAssertEqual(OnlineFeed.clouds.resources, [.forecast])
+        XCTAssertEqual(OnlineFeed.terrain.resources, [], "the tiles are downloaded when a site's editor asks, not refreshed")
     }
 
     func testEveryResourceBelongsToExactlyOneFeed() {

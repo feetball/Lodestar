@@ -193,6 +193,19 @@ final class EventsAimingTests: XCTestCase {
         }
     }
 
+    func testTheFieldOfTheCameraAdviceIsACustomTargetToo() throws {
+        let place = EquatorialCoordinate(rightAscension: 20, declination: 40)
+        let catalog = try bundledCatalog()
+        for loaded in [catalog, nil] {
+            let object = try XCTUnwrap(EventsAiming.object(for: .cameraField(name: "Perseids camera field", place), in: loaded))
+            XCTAssertTrue(object.id.hasPrefix("custom."), object.id)
+            XCTAssertEqual(object.category, .custom)
+            XCTAssertEqual(object.name, "Perseids camera field")
+            XCTAssertEqual(object.j2000, place)
+        }
+        XCTAssertEqual(EventsCalculator.AimSubject.cameraField(name: "Camera field", place).title, "Camera field")
+    }
+
     func testEachCustomTargetGetsItsOwnIdentifier() throws {
         let place = EquatorialCoordinate(rightAscension: 48, declination: 58)
         let first = try XCTUnwrap(EventsAiming.object(for: .radiant(name: "Perseids radiant", place), in: nil))
@@ -254,11 +267,21 @@ final class EventsCalculatorAimTests: XCTestCase {
         XCTAssertEqual(options.timeZone?.identifier, "Europe/Madrid")
     }
 
-    func testTheCalendarOptionsAskForTheDefaultKinds() {
+    func testTheCalendarOptionsAskForEveryKindTheCalendarKnows() {
         let options = EventsCalculator.options(timeZone: TimeZone.gmt)
-        XCTAssertEqual(options.kinds, EventKind.defaultKinds)
+        XCTAssertEqual(options.kinds, EventKind.calendarKinds)
         XCTAssertFalse(options.kinds.contains(.earthApsis))
+        for kind in [EventKind.greatRedSpotTransit, .jupiterMoonEvent, .planetStation] {
+            XCTAssertTrue(options.kinds.contains(kind), "\(kind)")
+            XCTAssertFalse(EventKind.defaultKinds.contains(kind), "the other screens do not ask for \(kind)")
+        }
         XCTAssertFalse(options.visibleOnly)
+    }
+
+    func testTheCalendarOptionsCarryTheGreatRedSpot() throws {
+        XCTAssertEqual(EventsCalculator.options(timeZone: TimeZone.gmt).greatRedSpot, GreatRedSpot.reference)
+        let moved = try XCTUnwrap(GreatRedSpot(longitude: 200, epoch: GreatRedSpot.referenceEpoch))
+        XCTAssertEqual(EventsCalculator.options(timeZone: TimeZone.gmt, greatRedSpot: moved).greatRedSpot, moved)
     }
 
     // MARK: Focal length

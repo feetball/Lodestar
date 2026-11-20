@@ -378,6 +378,12 @@ final class MountServiceTests: XCTestCase {
 
     /// The place of most tests: night, the Sun far below the horizon, so that no target is near it.
     var observer: Observer!
+
+    /// The observing context the app hands the service for `place`: the device's own position, so that a change of place is
+    /// the drift of the phone, which the service passes on to a connected mount at once. `nil` for no place.
+    static func context(_ place: Observer?) -> ObserverContext? {
+        place.map { ObserverContext(observer: $0, timeZone: TimeZone(secondsFromGMT: 0)!, name: "Current Location", source: .device) }
+    }
     var fakes: [Fake] = []
     var savedSettings = MountUserSettings()
     var savedMemory = MountConnectionMemory()
@@ -442,7 +448,7 @@ final class MountServiceTests: XCTestCase {
         configure(fake)
         fakes.append(fake)
         service.connectDemo(Self.option(for: fake, id: id, title: title, lodestarAligned: lodestar),
-                            observer: place ?? observer)
+                            context: Self.context(place ?? observer))
         await mountServiceExpect("the connection to \(id)") { service.connection == .connected }
         return fake
     }
@@ -573,7 +579,7 @@ final class MountServiceTests: XCTestCase {
 
     func testConnectingNeedsAPlace() {
         let fake = Fake()
-        service.connectDemo(Self.option(for: fake), observer: nil)
+        service.connectDemo(Self.option(for: fake), context: nil)
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertEqual(service.errorText, "Lodestar needs to know where you are to check targets against your altitude "
             + "limit. Allow location access or choose an observing site first.")
@@ -583,12 +589,12 @@ final class MountServiceTests: XCTestCase {
 
     func testConnectingNeedsAnAddress() {
         service.selectedOptionID = "alpaca"
-        service.connect(observer: observer)
+        service.connect(context: Self.context(observer))
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertEqual(service.errorText, "Enter the mount's address first.")
         service.dismissError()
         service.updateForm { $0.host = "   " }
-        service.connect(observer: observer)
+        service.connect(context: Self.context(observer))
         XCTAssertEqual(service.errorText, "Enter the mount's address first.")
         XCTAssertEqual(service.connection, .disconnected)
     }
@@ -601,7 +607,7 @@ final class MountServiceTests: XCTestCase {
                 form.host = "192.168.0.1"
                 form.port = port
             }
-            service.connect(observer: observer)
+            service.connect(context: Self.context(observer))
             XCTAssertEqual(service.errorText, expected, "port \(port)")
             XCTAssertEqual(service.connection, .disconnected, "port \(port)")
         }
@@ -610,7 +616,7 @@ final class MountServiceTests: XCTestCase {
             form.host = "192.168.0.1:70000"
             form.port = 9999
         }
-        service.connect(observer: observer)
+        service.connect(context: Self.context(observer))
         XCTAssertEqual(service.errorText, expected)
         XCTAssertNil(service.connectedOption)
     }
@@ -620,7 +626,7 @@ final class MountServiceTests: XCTestCase {
     func testConnectingToAMountReachesTheConnectedState() async {
         let fake = Fake()
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake, title: "Scripted Mount"), observer: observer)
+        service.connectDemo(Self.option(for: fake, title: "Scripted Mount"), context: Self.context(observer))
         // The state changes at once; the handshake runs on the worker thread.
         XCTAssertEqual(service.connection, .connecting)
         XCTAssertEqual(service.summaryText, "Connecting\u{2026}")
@@ -668,11 +674,11 @@ final class MountServiceTests: XCTestCase {
         let first = Fake()
         first.connectGate.close()
         fakes.append(first)
-        service.connectDemo(Self.option(for: first, id: "demo-first"), observer: observer)
+        service.connectDemo(Self.option(for: first, id: "demo-first"), context: Self.context(observer))
         await mountServiceExpect("the handshake to start") { first.connectGate.isWaiting }
         let second = Fake()
         fakes.append(second)
-        service.connectDemo(Self.option(for: second, id: "demo-second"), observer: observer)
+        service.connectDemo(Self.option(for: second, id: "demo-second"), context: Self.context(observer))
         XCTAssertEqual(service.connectedOption?.id, "demo-first")
         first.connectGate.open()
         await mountServiceExpect("the connection") { service.connection == .connected }
@@ -685,7 +691,7 @@ final class MountServiceTests: XCTestCase {
         let first = await connectFake(id: "demo-first")
         let second = Fake()
         fakes.append(second)
-        service.connectDemo(Self.option(for: second, id: "demo-second"), observer: observer)
+        service.connectDemo(Self.option(for: second, id: "demo-second"), context: Self.context(observer))
         await settle()
         XCTAssertEqual(service.connection, .connected)
         XCTAssertEqual(service.connectedOption?.id, "demo-first")
@@ -699,7 +705,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.connectGate.close()
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.cancelConnect()
         XCTAssertEqual(service.connection, .disconnected)
@@ -720,7 +726,7 @@ final class MountServiceTests: XCTestCase {
         let stale = Fake()
         stale.connectGate.close()
         fakes.append(stale)
-        service.connectDemo(Self.option(for: stale, id: "demo-stale"), observer: observer)
+        service.connectDemo(Self.option(for: stale, id: "demo-stale"), context: Self.context(observer))
         await mountServiceExpect("the first handshake to start") { stale.connectGate.isWaiting }
         service.cancelConnect()
         XCTAssertEqual(service.connection, .disconnected)
@@ -749,7 +755,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.connectGate.close()
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.stop()
         XCTAssertEqual(service.connection, .disconnected)
@@ -770,7 +776,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.configure { $0.connectError = .timeout(operation: "handshake") }
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "The mount didn't answer in time (handshake).")
         XCTAssertEqual(service.connectError, .timeout(operation: "handshake"))
@@ -789,7 +795,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.configure { $0.connectError = .rejected(detail: "wrong firmware") }
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the failure") { service.errorText != nil }
         XCTAssertEqual(service.errorText, "The mount rejected the command: wrong firmware.")
         XCTAssertEqual(service.connection, .disconnected)
@@ -799,7 +805,7 @@ final class MountServiceTests: XCTestCase {
         let option = Self.option(id: "demo-broken") { _, _ in
             throw MountError.invalidInput(detail: "this mount needs a TCP connection")
         }
-        service.connectDemo(option, observer: observer)
+        service.connectDemo(option, context: Self.context(observer))
         await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "That value can't be used: this mount needs a TCP connection.")
         XCTAssertEqual(service.connectError, .invalidInput(detail: "this mount needs a TCP connection"))
@@ -808,7 +814,7 @@ final class MountServiceTests: XCTestCase {
 
     func testAnUnexpectedFailureBecomesATransportError() async {
         let option = Self.option(id: "demo-boom") { _, _ in throw Boom() }
-        service.connectDemo(option, observer: observer)
+        service.connectDemo(option, context: Self.context(observer))
         await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertEqual(service.errorText, "Could not talk to the mount: unexpected failure.")
         XCTAssertEqual(service.connectError, .transport(detail: "unexpected failure"))
@@ -818,7 +824,7 @@ final class MountServiceTests: XCTestCase {
         let broken = Fake()
         broken.configure { $0.connectError = .busy }
         fakes.append(broken)
-        service.connectDemo(Self.option(for: broken), observer: observer)
+        service.connectDemo(Self.option(for: broken), context: Self.context(observer))
         await mountServiceExpect("the failure") { service.connection == .disconnected }
         XCTAssertNotNil(service.errorText)
         await connectFake()
@@ -863,7 +869,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.configure { $0.siteError = .rejected(detail: "clock") }
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the report") { service.errorText != nil }
         XCTAssertEqual(service.errorText, "Could not send the location and time. The mount rejected the command: clock.")
         XCTAssertEqual(service.connection, .connected)
@@ -872,7 +878,7 @@ final class MountServiceTests: XCTestCase {
     // MARK: - The app's own simulated mount
 
     func testTheSimulatedMountConnectsAndStartsHighInTheSouthernSky() async {
-        service.connectDemo(observer: observer)
+        service.connectDemo(context: Self.context(observer))
         await mountServiceExpect("the simulated mount") { service.connection == .connected }
         XCTAssertTrue(service.isDemo)
         XCTAssertEqual(service.connectedOption?.id, "demo")
@@ -888,7 +894,7 @@ final class MountServiceTests: XCTestCase {
     }
 
     func testAGoToOnTheSimulatedMountSlewsAndArrives() async {
-        service.connectDemo(observer: observer)
+        service.connectDemo(context: Self.context(observer))
         await mountServiceExpect("the simulated mount") { service.connection == .connected }
         let announced = MountLifecycle.announcements.count
         // Eight degrees higher than where the simulated mount starts: about two seconds of slewing at 4 degrees a second.
@@ -959,7 +965,7 @@ final class MountServiceTests: XCTestCase {
         fake.configure { $0.readError = .timeout(operation: "position") }
         await mountServiceExpect("the loss of the connection", timeout: 30.0) { service.connection != .connected }
         fake.configure { $0.readError = nil }
-        service.reconnect(observer: observer)
+        service.reconnect(context: Self.context(observer))
         XCTAssertEqual(service.connection, .connecting)
         XCTAssertNil(service.errorText)
         await mountServiceExpect("the new connection") { service.connection == .connected }
@@ -1067,7 +1073,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.connectGate.close()
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         service.disconnect()
         XCTAssertEqual(service.connection, .disconnected)
@@ -1084,7 +1090,9 @@ final class MountServiceTests: XCTestCase {
         helper.simulateBackground()
         XCTAssertEqual(helper.backgroundTasksBegun, begun + 1, "iOS is asked for time to stop the mount")
         await mountServiceExpect("the session to end") { service.connection != .connected }
-        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount was stopped."))
+        // The mount stands still and keeps tracking, which the notice says, since nothing watches its limits any more.
+        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. "
+            + "Tracking continues; Lodestar no longer watches the mount's limits."))
         await mountServiceExpect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
         XCTAssertEqual(fake.abortCount, 0)
         XCTAssertNil(service.capabilities)
@@ -1102,10 +1110,31 @@ final class MountServiceTests: XCTestCase {
         let ended = helper.backgroundTasksEnded
         helper.simulateBackground()
         await mountServiceExpect("the session to end") { service.connection != .connected }
-        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount was stopped."))
+        // The stop halts the slew but not the tracking of this mount.
+        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. "
+            + "Tracking continues; Lodestar no longer watches the mount's limits."))
         XCTAssertEqual(fake.abortCount, 1)
         await mountServiceExpect("the background task to be ended") { helper.backgroundTasksEnded == ended + 1 }
         XCTAssertNil(service.slewTargetName)
+    }
+
+    func testGoingToTheBackgroundWithAMountThatLodestarTracksSaysItWasStopped() async throws {
+        let helper = try lifecycle()
+        let fake = await connectFake(lodestar: true)
+        helper.simulateBackground()
+        await mountServiceExpect("the session to end") { service.connection != .connected }
+        // The tracking of such a mount is Lodestar's own, and it ends with the connection.
+        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. The mount was stopped."))
+        XCTAssertEqual(fake.abortCount, 0)
+    }
+
+    func testGoingToTheBackgroundWithAMountThatDoesNotSayIfItTracksSaysSo() async throws {
+        let helper = try lifecycle()
+        _ = await connectFake { $0.configure { $0.tracking = nil } }
+        helper.simulateBackground()
+        await mountServiceExpect("the session to end") { service.connection != .connected }
+        XCTAssertEqual(service.connection, .lost("Disconnected when Lodestar went to the background. "
+            + "Any move was stopped. The mount may still be tracking; Lodestar no longer watches its limits."))
     }
 
     func testGoingToTheBackgroundWithAMountThatCannotBeStoppedSaysSo() async throws {
@@ -1124,7 +1153,7 @@ final class MountServiceTests: XCTestCase {
         let fake = Fake()
         fake.connectGate.close()
         fakes.append(fake)
-        service.connectDemo(Self.option(for: fake), observer: observer)
+        service.connectDemo(Self.option(for: fake), context: Self.context(observer))
         await mountServiceExpect("the handshake to start") { fake.connectGate.isWaiting }
         let begun = helper.backgroundTasksBegun
         helper.simulateBackground()
