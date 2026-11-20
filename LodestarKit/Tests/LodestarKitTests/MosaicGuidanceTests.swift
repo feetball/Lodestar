@@ -254,6 +254,17 @@ final class MosaicGuidanceTests: XCTestCase {
         XCTAssertEqual(reached, plan.panelCount)
     }
 
+    /// Milliseconds allowed for the pointings of a whole plan. A release build needs far less; an unoptimised debug build is
+    /// slower and a shared runner slower still, so the debug bound is ten times larger and only catches a calculation that has
+    /// gone badly wrong.
+    private static let perCallLimitMilliseconds: Double = {
+        #if DEBUG
+        return 200
+        #else
+        return 20
+        #endif
+    }()
+
     func testPointingAWholePlanIsFast() throws {
         let plan = try MosaicPlanner.plan(
             region: .equatorial(center: EquatorialCoordinate(rightAscensionHours: 22.7, declination: 20), width: 100, height: 60),
@@ -263,6 +274,6 @@ final class MosaicGuidanceTests: XCTestCase {
         let start = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<100 { _ = MosaicGuidance.pointings(for: plan, frame: frame) }
         let perCallMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 100.0 / 1e6
-        XCTAssertLessThan(perCallMilliseconds, 20.0, "\(perCallMilliseconds) ms for \(plan.panelCount) panels")
+        XCTAssertLessThan(perCallMilliseconds, Self.perCallLimitMilliseconds, "\(perCallMilliseconds) ms for \(plan.panelCount) panels")
     }
 }

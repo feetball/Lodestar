@@ -27,6 +27,10 @@ struct AimCandidateRow: View {
                     if let separation = row.separation {
                         Text("\(AppFormat.separation(separation)) away")
                     }
+                    if let nearest = row.nearest {
+                        Text(AimAlignmentSpacing.nearestText(nearest))
+                            .foregroundStyle(AimAlignmentSpacing.isTooClose(nearest) ? palette.warning : palette.secondaryText)
+                    }
                 }
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(palette.secondaryText)
@@ -91,9 +95,12 @@ struct AimReferenceCard: View {
     }
 }
 
-/// What the alignment has found so far, its points and a way to start over.
+/// What the alignment has found so far, its points and a way to start over. `alignedAt` is when it was made and
+/// `gyroLock` whether the heading comes from gyro lock, which ages an alignment faster.
 struct AimAlignmentSummaryCard: View {
     let alignment: AlignmentModel
+    let alignedAt: Date?
+    let gyroLock: Bool
     let onRemove: (Int) -> Void
     let onReset: () -> Void
     @Environment(\.palette) private var palette
@@ -102,6 +109,9 @@ struct AimAlignmentSummaryCard: View {
         VStack(alignment: .leading, spacing: 8) {
             CardTitle(title: "Current alignment", systemImage: "checkmark.seal")
             if alignment.isAligned {
+                if let alignedAt {
+                    AimAlignmentAgeLine(alignedAt: alignedAt, gyroLock: gyroLock)
+                }
                 InfoRow(label: "Heading correction",
                         value: AngleFormatter.formatSignedDegrees(alignment.headingOffset, decimals: 1))
                 InfoRow(label: "Bracket correction",
@@ -151,6 +161,57 @@ struct AimAlignmentSummaryCard: View {
             .buttonStyle(.plain)
             .foregroundStyle(palette.accent)
             .accessibilityLabel("Remove \(name)")
+        }
+    }
+}
+
+/// "Aligned 12 min ago", counting on with the clock, and a note once the alignment is stale.
+private struct AimAlignmentAgeLine: View {
+    let alignedAt: Date
+    let gyroLock: Bool
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let isStale = AlignmentHygiene.isStale(alignedAt: alignedAt, now: context.date, gyroLock: gyroLock)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(AimAlignmentAge.cardText(seconds: context.date.timeIntervalSince(alignedAt)))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isStale ? palette.warning : palette.secondaryText)
+                if isStale {
+                    Text(AimAlignmentAge.staleAdvice)
+                        .font(.caption)
+                        .foregroundStyle(palette.warning)
+                }
+            }
+        }
+    }
+}
+
+/// Sync is waiting for the camera to be still: a line, a thin bar that fills while it is, and a way out.
+struct AimHoldStillFooter: View {
+    let progress: Double
+    let onCancel: () -> Void
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Label("Hold still\u{2026}", systemImage: "hand.raised")
+                .foregroundStyle(palette.guidance)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(palette.stroke)
+                    Capsule().fill(palette.guidance)
+                        .frame(width: proxy.size.width * min(max(progress, 0), 1))
+                }
+            }
+            .frame(height: 4)
+            .accessibilityElement()
+            .accessibilityLabel("Hold still")
+            .accessibilityValue(AppFormat.percent(progress))
+            Button("Cancel", action: onCancel)
+                .buttonStyle(.lodestarSecondary)
         }
     }
 }

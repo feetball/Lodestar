@@ -74,12 +74,12 @@ final class ReviewDriver {
             service.selectedOptionID = MountConnectionOption.skyWatcher.id
             service.settings.arrangement = equatorial ? .equatorial : .altAzimuth
         case .demo:
-            service.connectDemo(observer: observer)
+            service.connectDemo(context: app.observerContext)
             await waitForConnection(service)
             guard screen.slews, service.isConnected, let target = app.target, let observer else { return }
             await service.goTo(target, observer: observer)
         case .skyWatcher(let syncs):
-            service.connectDemo(.demoSkyWatcher, observer: observer)
+            service.connectDemo(.demoSkyWatcher, context: app.observerContext)
             await waitForConnection(service)
             guard service.isConnected, let observer, let catalog = app.catalog.catalog else { return }
             // Stars the way the set-up screen suggests them, for the real time: the simulated mount runs on it.

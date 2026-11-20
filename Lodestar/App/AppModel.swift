@@ -28,6 +28,14 @@ enum AppTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Why the World Magnetic Model's declination is not used as it stands at the observer; the Aim chips report it.
+enum MagneticReferenceLimit: Equatable {
+    /// The model's five years of validity (2025 to 2030) are over, so the field is extrapolated and less accurate.
+    case modelExpired
+    /// The Blackout Zone around a magnetic pole: the declination means nothing and a compass cannot be trusted.
+    case blackout
+}
+
 /// Root application state: owns the services, the current target and alignment, and derives the
 /// observing context and display mode. Views read it with `@Environment(AppModel.self)`.
 @MainActor
@@ -40,11 +48,15 @@ final class AppModel {
     let camera: CameraService
     let catalog: CatalogService
     let feedback: FeedbackService
+    /// Speaks the aiming guidance (Settings ▸ Feedback); silent unless switched on.
+    let spokenGuidance: SpokenGuidanceService
     let screen: ScreenController
     /// The optional downloads (satellites, comets, cloud forecast); everything in it is off until switched on.
     let online: OnlineDataService
     /// The satellite Aim follows or waits for, if one was chosen from a pass.
     let satelliteAim: SatelliteAimSession
+    /// What was shot on which night, kept on this device only.
+    let sessionLog: SessionLogStore
 
     /// The selected tab. Changing it starts/stops the sensors that tab needs.
     var selectedTab: AppTab = .aim {
@@ -54,8 +66,16 @@ final class AppModel {
     /// The object the Aim screen guides to.
     private(set) var target: CelestialObject?
 
+    /// Why the compass's magnetic reference is limited here, or `nil` when it is not. It is set whenever the reference is
+    /// worked out (while the motion sensors run).
+    private(set) var magneticReferenceLimit: MagneticReferenceLimit?
+
     /// Star-alignment corrections for the current mount and heading source.
     var alignment: AlignmentModel = .identity
+
+    /// When the current alignment was made: the time of its newest point, or `nil` without an alignment. It follows
+    /// the alignment, so a reset clears it, and removing a point never makes an old alignment look fresh.
+    var alignedAt: Date? { alignment.points.map(\.timestamp).max() }
 
     /// Keeps the motion sensors running outside the Aim and Sky tabs (e.g. Sensor Diagnostics).
     var keepsMotionRunning = false {
@@ -72,6 +92,12 @@ final class AppModel {
         didSet { if keepsScreenAwake != oldValue { syncServices() } }
     }
 
+    /// Whether the red torch covers the app (Settings, Siri, Shortcuts and Control Center show it). While it does, the
+    /// screen is at the torch's brightness and stays awake, and the camera is off.
+    var isTorchShown = false {
+        didSet { if isTorchShown != oldValue { syncServices() } }
+    }
+
     /// Whether the Sun is below −6° at the observer (drives automatic night mode).
     private(set) var isSunBelowCivilTwilight = false
 
@@ -83,6 +109,8 @@ final class AppModel {
 
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
     @ObservationIgnored private var timeZoneUpgradeTask: Task<Void, Never>?
+    /// The site whose time zone was looked up last, so the next foreground goes on with the sites after it.
+    @ObservationIgnored private var lastTimeZoneUpgradeSiteID: UUID?
     @ObservationIgnored private var hasRequestedLocationThisLaunch = false
     @ObservationIgnored private var lastAlignmentContext: AlignmentContext?
     @ObservationIgnored private var lastSunEvaluation: (date: Date, observer: Observer)?
@@ -97,10 +125,13 @@ final class AppModel {
         camera = CameraService()
         catalog = CatalogService()
         feedback = FeedbackService()
+        spokenGuidance = SpokenGuidanceService()
         screen = ScreenController()
         online = OnlineDataService(catalog: catalog)
         satelliteAim = SatelliteAimSession()
+        sessionLog = SessionLogStore()
         online.locationProvider = { [weak self] in self?.observerContext?.location }
+        satelliteAim.isNightProvider = { [weak self] in self?.isNightModeActive ?? false }
         #if DEBUG
         if let demo = ScreenshotMode.current { applyScreenshotMode(demo) }
         #endif
@@ -158,9 +189,11 @@ final class AppModel {
                                    timeZone: .autoupdatingCurrent, name: "Current Location", source: .device)
         case .site(let id):
             guard let site = settings.savedSites.first(where: { $0.id == id }) else { return nil }
+            // The recorded skyline and the terrain horizon, as they apply together (see SiteHorizon).
+            let skyline = SiteHorizon.resolve(site)
             return ObserverContext(observer: Observer(location: site.location, atmosphere: atmosphere),
                                    timeZone: site.timeZone ?? .autoupdatingCurrent, name: site.name, source: .site(id),
-                                   horizon: site.horizon)
+                                   horizon: skyline.profile, horizonSource: skyline.source)
         }
     }
 
@@ -169,17 +202,8 @@ final class AppModel {
         MountProfile.presets.first { $0.id == settings.mountPresetID } ?? .backCameraPortrait
     }
 
-    /// The camera body + lens used for the framing rectangle and exposure tools.
-    var lensSetup: LensSetup {
-        let sensor: SensorFormat
-        if let preset = SensorFormat.presets.first(where: { $0.id == settings.sensorID }) {
-            sensor = preset
-        } else {
-            sensor = SensorFormat.custom(width: settings.customSensorWidth, height: settings.customSensorHeight)
-        }
-        return LensSetup(sensor: sensor, focalLengthMillimeters: settings.focalLength,
-                         aperture: settings.aperture, pixelPitchMicrometers: settings.pixelPitch)
-    }
+    /// The camera body + lens used for the framing rectangle and exposure tools: the active camera profile.
+    var lensSetup: LensSetup { settings.activeCameraProfile.lensSetup }
 
     // MARK: Lifecycle
 
@@ -211,8 +235,10 @@ final class AppModel {
             startMaintenance()
             online.onForeground()
             upgradeEstimatedTimeZones()
+            satelliteAim.refreshLiveActivity()
         case .background:
             settingsStore.saveNow()
+            sessionLog.saveNow()
             clock.stop()
             maintenanceTask?.cancel()
             maintenanceTask = nil
@@ -252,6 +278,31 @@ final class AppModel {
     func clearTarget() {
         pendingTargetID = nil
         target = nil
+    }
+
+    /// Makes the object with this catalog identifier the target and shows the Aim tab, once the catalog is loaded. An
+    /// identifier the catalog does not know changes nothing.
+    func aim(objectID: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            await catalog.load()
+            if let object = catalog.object(id: objectID) { aim(at: object) }
+        }
+    }
+
+    /// Carries out what an intent, a Control Center control or a shortcut asked for.
+    func perform(_ command: LodestarCommand) {
+        switch command {
+        case .showAim:
+            selectedTab = .aim
+        case .showTorch:
+            isTorchShown = true
+        case .nightMode(let change):
+            let isOn = change.resultingIsOn(currentlyOn: settings.nightMode == .on)
+            settingsStore.settings.nightMode = isOn ? .on : .off
+        case .aim(let objectID):
+            aim(objectID: objectID)
+        }
     }
 
     /// Downloaded comets and asteroids replaced the catalog's small bodies: a target that is one of them follows its
@@ -314,21 +365,28 @@ final class AppModel {
         let wantsPreview = settings.cameraPreviewEnabled && backCameraAlongLens
             && (!isNightModeActive || settings.cameraPreviewAtNight)
         let aimWantsCamera = selectedTab == .aim && wantsPreview && observerContext != nil
-        if active && onboarded && (aimWantsCamera || keepsCameraRunning) {
+        if active && onboarded && !isTorchShown && (aimWantsCamera || keepsCameraRunning) {
             camera.start(nightFilter: isNightModeActive ? settings.nightIntensity : nil)
         } else {
             camera.stop()
         }
 
-        // Screen: dim at night, keep awake while aiming.
+        // Screen: dim at night, keep awake while aiming and while a mount is connected (a locked screen sends the app
+        // to the background, which ends the mount's session); the torch has its own brightness and keeps it awake.
         if active {
-            screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
-            screen.setIdleTimerDisabled((selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
+            if isTorchShown {
+                screen.setBrightnessOverride(settings.torchBrightness)
+            } else {
+                screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
+            }
+            let awakeBySetting = settings.keepScreenAwake && (selectedTab == .aim || MountService.shared.isConnected)
+            screen.setIdleTimerDisabled(isTorchShown || awakeBySetting || keepsScreenAwake)
         } else {
             screen.restore()
         }
 
         feedback.configure(haptics: settings.hapticsEnabled, audio: settings.audioCuesEnabled)
+        spokenGuidance.configure(isEnabled: settings.spokenGuidance, rate: settings.spokenGuidanceRate)
         invalidateAlignmentIfNeeded()
     }
 
@@ -353,27 +411,50 @@ final class AppModel {
 
     /// Magnetic declination and expected field strength at the observer from WMM2025, used when
     /// CoreMotion's true-north frame is unavailable and to detect magnetic interference.
+    ///
+    /// In the model's Blackout Zone the declination is meaningless, so there is no reference at all (CoreMotion's own
+    /// true-north frame, when it has one, still applies) and `magneticReferenceLimit` says so. After the model's
+    /// validity ends the extrapolated field is still the best estimate and is used, flagged the same way.
     private func magneticReference() -> MagneticReference? {
-        guard let context = observerContext else { return nil }
+        guard let context = observerContext else {
+            setMagneticReferenceLimit(nil)
+            return nil
+        }
         let location = context.location
         let model = WorldMagneticModel.wmm2025
+        let year = WorldMagneticModel.decimalYear(from: clock.now)
         let field = model.field(latitude: location.latitude, longitude: location.longitude,
-                                altitudeMeters: location.elevation,
-                                decimalYear: WorldMagneticModel.decimalYear(from: clock.now))
+                                altitudeMeters: location.elevation, decimalYear: year)
+        guard field.compassReliability != .blackout else {
+            setMagneticReferenceLimit(.blackout)
+            return nil
+        }
+        setMagneticReferenceLimit(model.isWithinValidity(decimalYear: year) ? nil : .modelExpired)
         return MagneticReference(declination: field.declination,
                                  expectedFieldMicrotesla: field.totalIntensity / 1000)
     }
 
+    /// Stores the limit only when it changes, so that the views that read it are not refreshed on every sync.
+    private func setMagneticReferenceLimit(_ limit: MagneticReferenceLimit?) {
+        if magneticReferenceLimit != limit { magneticReferenceLimit = limit }
+    }
+
     /// Looks up the real time zone of saved sites that only have the one estimated from their longitude (they were saved
     /// without a network). That estimate has no daylight saving time, so their times are an hour off for half the year.
-    /// The lookups run one after the other off the main thread, a few per foreground, and a site that cannot be resolved
-    /// now is simply tried again at the next foreground.
+    /// The lookups run one after the other off the main thread, a few per foreground, starting after the site tried
+    /// last so that sites the geocoder cannot resolve do not keep the ones behind them from a turn. A site that cannot
+    /// be resolved now is tried again once the others had theirs.
     private func upgradeEstimatedTimeZones() {
         guard timeZoneUpgradeTask == nil else { return }
-        let pending = settings.savedSites.filter { $0.timeZone.map(SettingsFormat.isNominal) ?? true }
-        guard !pending.isEmpty else { return }
+        let sites = settings.savedSites
+        let pendingIndices = sites.indices.filter { sites[$0].timeZone.map(SettingsFormat.isNominal) ?? true }
+        guard !pendingIndices.isEmpty else { return }
+        let resumeIndex = lastTimeZoneUpgradeSiteID.flatMap { id in sites.firstIndex(where: { $0.id == id }) } ?? -1
+        let pending = (pendingIndices.filter { $0 > resumeIndex } + pendingIndices.filter { $0 <= resumeIndex })
+            .map { sites[$0] }
         timeZoneUpgradeTask = Task { [weak self] in
             for site in pending.prefix(Self.timeZoneUpgradesPerForeground) {
+                self?.lastTimeZoneUpgradeSiteID = site.id
                 guard let zone = await TimeZoneResolver.timeZone(for: site.location), !SettingsFormat.isNominal(zone) else {
                     continue
                 }

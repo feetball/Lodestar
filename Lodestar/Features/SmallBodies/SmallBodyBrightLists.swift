@@ -81,6 +81,8 @@ struct SmallBodyListEntry: Sendable, Identifiable, Equatable {
     let bright: BrightSmallBody
     /// The state at the moment of the peak: for `SmallBodyListPeriod.now` that is now.
     let info: SmallBodyInfo
+    /// How the body stands in the dark hours of one night, for the Tonight card; `nil` in the lists.
+    var night: SmallBodyNightSight?
 
     init(object: CelestialObject, bright: BrightSmallBody) {
         self.object = object

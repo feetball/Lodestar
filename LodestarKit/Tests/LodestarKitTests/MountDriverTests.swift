@@ -32,12 +32,12 @@ final class MountDriverTests: XCTestCase {
     }
 
     private func nexStar(_ flavor: NexStarFlavor = .synscan, _ major: Int = 4, _ minor: Int = 38, _ patch: Int = 6,
-                         trackingMode: Int = 1) -> Fixture<NexStarSimulator> {
+                         trackingMode: Int = 1, model: Int = 128) -> Fixture<NexStarSimulator> {
         let clock = ManualMountClock(start: Support.start)
         let mount = MountSimulatorModel(clock: clock, start: Support.parkPosition)
         return Fixture(clock: clock, mount: mount,
                        simulator: NexStarSimulator(clock: clock, mount: mount, flavor: flavor, major: major, minor: minor, patch: patch,
-                                                   trackingMode: trackingMode))
+                                                   model: model, trackingMode: trackingMode))
     }
 
     // MARK: LX200
@@ -88,14 +88,85 @@ final class MountDriverTests: XCTestCase {
     }
 
     func testIdentificationIsOptional() throws {
-        let f = lx200(.meade) { $0.inject("GVP", .silence) }
+        let f = lx200(.meade) { $0.inject("GVP", .silence, times: 2) }
         let driver = LX200Driver(transport: f.simulator, clock: f.clock)
         let begin = f.clock.secondsSince1970
         let capabilities = try driver.connect()
         XCTAssertEqual(capabilities.name, "LX200-compatible mount")
         XCTAssertNil(capabilities.firmware)
         XCTAssertEqual(driver.dialect, .meade)
-        // Only the short identification timeout was spent waiting.
+        XCTAssertEqual(driver.dialectSource, .assumedMeade)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 2)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GU" }.count, 1)
+        // Two product name timeouts and one status timeout were spent waiting, one second each, and nothing more.
+        let waited = f.clock.secondsSince1970 - begin
+        XCTAssertGreaterThanOrEqual(waited, 2.9)
+        XCTAssertLessThan(waited, 3.5)
+    }
+
+    func testAnOnStepThatAnswersTheProductNameLateIsStillDrivenAsOnStep() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .productNameAfterRetry)
+        XCTAssertEqual(capabilities.name, "On-Step")
+        XCTAssertEqual(capabilities.firmware, "4.24")
+        XCTAssertTrue(capabilities.canSetTracking)
+        XCTAssertEqual(capabilities.isAligned, true)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 2)
+        XCTAssertEqual(try driver.readTracking(), true)
+    }
+
+    func testAnOnStepThatAnswersTheProductNameAtOnceIsNotAskedTwice() throws {
+        let f = lx200(.onstep)
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        _ = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .productName)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 1)
+    }
+
+    func testAnOnStepThatNeverIdentifiesItselfIsFoundByItsStatusAnswer() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence, times: 2) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let begin = f.clock.secondsSince1970
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .onstep)
+        XCTAssertEqual(driver.dialectSource, .statusProbe)
+        XCTAssertEqual(capabilities.name, "OnStep-compatible mount")
+        XCTAssertNil(capabilities.firmware)
+        XCTAssertTrue(capabilities.canSetTracking)
+        XCTAssertEqual(capabilities.isAligned, true)
+        XCTAssertEqual(try driver.readTracking(), true)
+        // Two product name timeouts, then the status answer: the budget stays at about two seconds of waiting.
+        XCTAssertLessThan(f.clock.secondsSince1970 - begin, 2.5)
+    }
+
+    func testAMountThatAnswersTheStatusProbeWithSomethingElseStaysMeade() throws {
+        let f = lx200(.onstep) {
+            $0.inject("GVP", .silence, times: 2)
+            $0.inject("GU", .replace(text: "0#"))
+        }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock)
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .meade)
+        XCTAssertEqual(driver.dialectSource, .assumedMeade)
+        XCTAssertEqual(capabilities.name, "LX200-compatible mount")
+        XCTAssertFalse(capabilities.canSetTracking)
+        XCTAssertNil(try driver.readTracking())
+    }
+
+    func testAConfiguredDialectIsNeitherRetriedNorProbed() throws {
+        let f = lx200(.onstep) { $0.inject("GVP", .silence) }
+        let driver = LX200Driver(transport: f.simulator, clock: f.clock, configuration: LX200Configuration(dialect: .meade))
+        let begin = f.clock.secondsSince1970
+        let capabilities = try driver.connect()
+        XCTAssertEqual(driver.dialect, .meade)
+        XCTAssertEqual(driver.dialectSource, .configured)
+        XCTAssertFalse(capabilities.canSetTracking)
+        XCTAssertEqual(f.simulator.commandLog.filter { $0 == "GVP" }.count, 1)
+        XCTAssertFalse(f.simulator.commandLog.contains("GU"))
         XCTAssertLessThan(f.clock.secondsSince1970 - begin, 2.0)
     }
 
@@ -242,6 +313,53 @@ final class MountDriverTests: XCTestCase {
         XCTAssertEqual(override.epoch, .j2000)
     }
 
+    func testSynScanFirmwareBelowTheJ2000ReleasesIsSentTheCurrentEpoch() throws {
+        let cases: [((Int, Int, Int), MountEpoch)] = [
+            ((4, 38, 6), .j2000), ((4, 37, 3), .j2000), ((4, 37, 2), .meanOfDate), ((4, 36, 0), .meanOfDate),
+            ((3, 37, 0), .j2000), ((3, 36, 0), .meanOfDate), ((3, 2, 0), .meanOfDate),
+        ]
+        for (version, expected) in cases {
+            let f = nexStar(.synscan, version.0, version.1, version.2)
+            let driver = NexStarDriver(transport: f.simulator, clock: f.clock)
+            XCTAssertEqual(driver.epoch, .meanOfDate, "\(version) before connect")
+            _ = try driver.connect()
+            XCTAssertEqual(driver.epoch, expected, "\(version)")
+        }
+    }
+
+    func testAnExplicitEpochWinsOverTheFirmwareGate() throws {
+        let old = nexStar(.synscan, 4, 36, 0)
+        let forcedJ2000 = NexStarDriver(transport: old.simulator, clock: old.clock,
+                                        configuration: NexStarConfiguration(epoch: .j2000))
+        _ = try forcedJ2000.connect()
+        XCTAssertEqual(forcedJ2000.epoch, .j2000)
+        let recent = nexStar(.synscan, 4, 38, 6)
+        let forcedCurrent = NexStarDriver(transport: recent.simulator, clock: recent.clock,
+                                          configuration: NexStarConfiguration(epoch: .meanOfDate))
+        _ = try forcedCurrent.connect()
+        XCTAssertEqual(forcedCurrent.epoch, .meanOfDate)
+    }
+
+    func testAVersionThatCannotBeReadFailsTheConnectionAndLeavesTheCurrentEpoch() throws {
+        /// Answers the version command with six characters that are not all hexadecimal digits.
+        final class GarbledVersion: MountTransport {
+            private var pending: [UInt8] = []
+            func send(_ bytes: [UInt8]) throws { pending = Array("04250G#".utf8) }
+            func receive(maxCount: Int, timeoutSeconds: Double) throws -> [UInt8] {
+                if pending.isEmpty { throw MountError.timeout(operation: "receive") }
+                let chunk = Array(pending.prefix(maxCount))
+                pending.removeFirst(chunk.count)
+                return chunk
+            }
+            func discardPendingInput() throws { pending = [] }
+        }
+        let clock = ManualMountClock(start: Support.start)
+        let driver = NexStarDriver(transport: GarbledVersion(), clock: clock)
+        XCTAssertEqual(mountError { _ = try driver.connect() }, .malformedReply(detail: "version"))
+        XCTAssertNil(driver.version)
+        XCTAssertEqual(driver.epoch, .meanOfDate)
+    }
+
     func testTrackingIsSwitchedBackOnInTheModeThatWasRunning() throws {
         let equatorial = nexStar(trackingMode: 2)
         let driver = NexStarDriver(transport: equatorial.simulator, clock: equatorial.clock)
@@ -260,6 +378,108 @@ final class MountDriverTests: XCTestCase {
         try preferred.setTracking(true)
         XCTAssertEqual(stopped.simulator.trackingMode, 2)
         XCTAssertTrue(stopped.mount.isTracking)
+    }
+
+    /// The simulator starts in alt-azimuth mode (1) here, so a 2 or 3 afterwards can only come from the driver's `T`.
+    func testAnEquatorialMountThatWasNotTrackingGetsEquatorialTrackingWhenSwitchedOn() throws {
+        // CGEM DX (14), with no site sent: the hemisphere is not known, so north.
+        let celestron = nexStar(.celestron, 5, 28, 0, trackingMode: 1, model: 14)
+        celestron.mount.isTracking = false
+        let driver = NexStarDriver(transport: celestron.simulator, clock: celestron.clock)
+        _ = try driver.connect()
+        XCTAssertEqual(try driver.readTracking(), false)
+        try driver.setTracking(true)
+        XCTAssertEqual(celestron.simulator.trackingMode, 2)
+        XCTAssertTrue(celestron.mount.isTracking)
+
+        // HEQ5 (1) on SynScan.
+        let synScan = nexStar(.synscan, trackingMode: 1, model: 1)
+        synScan.mount.isTracking = false
+        let synScanDriver = NexStarDriver(transport: synScan.simulator, clock: synScan.clock)
+        _ = try synScanDriver.connect()
+        try synScanDriver.setTracking(true)
+        XCTAssertEqual(synScan.simulator.trackingMode, 2)
+    }
+
+    func testACelestronEquatorialMountTracksSouthWhenTheSiteSentIsSouth() throws {
+        let sites: [(Double, Int)] = [(40.0, 2), (0.0, 2), (-33.9, 3)]
+        for (latitude, expected) in sites {
+            let f = nexStar(.celestron, 5, 28, 0, trackingMode: 1, model: 20)
+            f.mount.isTracking = false
+            let driver = NexStarDriver(transport: f.simulator, clock: f.clock)
+            _ = try driver.connect()
+            try driver.setSiteAndTime(location: GeographicLocation(latitude: latitude, longitude: 18.4, elevation: 0), date: Support.start)
+            try driver.setTracking(true)
+            XCTAssertEqual(f.simulator.trackingMode, expected, "latitude \(latitude)")
+        }
+    }
+
+    func testASynScanEquatorialMountUsesItsOneEquatorialModeInTheSouthToo() throws {
+        let f = nexStar(.synscan, trackingMode: 1, model: 0)
+        f.mount.isTracking = false
+        let driver = NexStarDriver(transport: f.simulator, clock: f.clock)
+        _ = try driver.connect()
+        try driver.setSiteAndTime(location: GeographicLocation(latitude: -33.9, longitude: 18.4, elevation: 0), date: Support.start)
+        try driver.setTracking(true)
+        // Code 3 is sidereal with PEC on SynScan, not equatorial south.
+        XCTAssertEqual(f.simulator.trackingMode, 2)
+    }
+
+    func testAnAltAzimuthOrUnknownModelStillGetsAltAzimuthTracking() throws {
+        let celestron: [Int] = [12, 9, 26, 99]
+        let synScan: [Int] = [128, 160, 5, 77]
+        for (flavor, models) in [(NexStarFlavor.celestron, celestron), (NexStarFlavor.synscan, synScan)] {
+            for model in models {
+                // The simulator last ran in equatorial mode (2), so a 1 afterwards can only come from the driver's `T`.
+                let f = flavor == .celestron ? nexStar(.celestron, 5, 28, 0, trackingMode: 2, model: model)
+                    : nexStar(.synscan, trackingMode: 2, model: model)
+                f.mount.isTracking = false
+                let driver = NexStarDriver(transport: f.simulator, clock: f.clock)
+                _ = try driver.connect()
+                // A southern site must not matter for a mount that is not equatorial.
+                try driver.setSiteAndTime(location: GeographicLocation(latitude: -33.9, longitude: 18.4, elevation: 0),
+                                          date: Support.start)
+                try driver.setTracking(true)
+                XCTAssertEqual(f.simulator.trackingMode, 1, "\(flavor) model \(model)")
+                XCTAssertTrue(f.mount.isTracking)
+            }
+        }
+    }
+
+    func testAMountThatWasTrackingKeepsTheModeItReports() throws {
+        // An equatorial model that reports alt-azimuth tracking (for example a mount that was set up that way).
+        let altAz = nexStar(.celestron, 5, 28, 0, trackingMode: 1, model: 14)
+        let altAzDriver = NexStarDriver(transport: altAz.simulator, clock: altAz.clock)
+        _ = try altAzDriver.connect()
+        try altAzDriver.setTracking(false)
+        try altAzDriver.setTracking(true)
+        XCTAssertEqual(altAz.simulator.trackingMode, 1)
+
+        // An alt-azimuth model that reports equatorial tracking (a fork mount on a wedge).
+        let wedge = nexStar(.celestron, 5, 28, 0, trackingMode: 3, model: 12)
+        let wedgeDriver = NexStarDriver(transport: wedge.simulator, clock: wedge.clock)
+        _ = try wedgeDriver.connect()
+        try wedgeDriver.setTracking(false)
+        try wedgeDriver.setTracking(true)
+        XCTAssertEqual(wedge.simulator.trackingMode, 3)
+    }
+
+    func testTheConfiguredTrackingModeWinsOverTheModel() throws {
+        let equatorial = nexStar(.celestron, 5, 28, 0, trackingMode: 2, model: 14)
+        equatorial.mount.isTracking = false
+        let altAzDriver = NexStarDriver(transport: equatorial.simulator, clock: equatorial.clock,
+                                        configuration: NexStarConfiguration(preferredTrackingMode: .altAz))
+        _ = try altAzDriver.connect()
+        try altAzDriver.setTracking(true)
+        XCTAssertEqual(equatorial.simulator.trackingMode, 1)
+
+        let fork = nexStar(.celestron, 5, 28, 0, trackingMode: 1, model: 12)
+        fork.mount.isTracking = false
+        let wedgeDriver = NexStarDriver(transport: fork.simulator, clock: fork.clock,
+                                        configuration: NexStarConfiguration(preferredTrackingMode: .eqSouth))
+        _ = try wedgeDriver.connect()
+        try wedgeDriver.setTracking(true)
+        XCTAssertEqual(fork.simulator.trackingMode, 3)
     }
 
     func testAMotorControllerThatDoesNotAnswerIsReported() throws {

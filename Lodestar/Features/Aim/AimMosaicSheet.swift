@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import LodestarKit
 
 /// Plans a mosaic and starts it: the area to cover (the target, the Milky Way arch or a custom rectangle), the overlap,
@@ -25,10 +26,11 @@ struct AimMosaicSheet: View {
     @State private var customHeight = 20.0
     /// Where the camera pointed when the sheet opened (or was told to take it again): the centre of a custom area.
     @State private var customCenter: HorizontalCoordinate?
-    /// The instant the Milky Way arch is worked out for.
+    /// The instant the Milky Way arch is worked out for: the previewed moment while the sky is previewed.
     @State private var snapshotDate = Date()
     @State private var result: Result<AimMosaicPlanResult, AimMosaicProblem>?
     @State private var isPlanning = false
+    @State private var export = InterchangeExport()
 
     /// Pause before planning after an input changes, so dragging a slider does not plan for every step.
     private static let planningDelay: Duration = .milliseconds(150)
@@ -53,12 +55,13 @@ struct AimMosaicSheet: View {
         .tint(palette.accent)
         .presentationBackground(palette.background)
         .onAppear {
-            snapshotDate = app.clock.now
+            snapshotDate = model.date
             takeCurrentPointing()
         }
         .task(id: request) {
             await plan()
         }
+        .interchangeExporter($export)
     }
 
     // MARK: Header and footer
@@ -313,6 +316,27 @@ struct AimMosaicSheet: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(palette.warning)
         }
+        exportRow(planned)
+    }
+
+    /// The button that saves the panels as a table or a list for a planetarium or an ASIAIR; a plan in azimuth and altitude
+    /// has no right ascension and declination to save.
+    @ViewBuilder
+    private func exportRow(_ planned: AimMosaicPlanResult) -> some View {
+        if planned.plan.kind == .equatorial {
+            Menu {
+                Button("CSV Table\u{2026}") { exportPanels(planned, asText: false) }
+                Button("Text List\u{2026}") { exportPanels(planned, asText: true) }
+            } label: {
+                Label("Export Panels\u{2026}", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.lodestarSecondary)
+        } else {
+            Text("A plan in azimuth and altitude has no right ascension and declination to export.")
+                .font(.footnote)
+                .foregroundStyle(palette.secondaryText)
+        }
     }
 
     /// "2 \u{00D7} 3", or "3 \u{00D7} up to 4" when the rows differ in length.
@@ -374,7 +398,9 @@ struct AimMosaicSheet: View {
             planSource = .custom(width: customWidth, height: customHeight, center: customCenter)
         }
         return AimMosaicRequest(source: planSource, overlap: overlapPercent / 100, orientation: chosenOrientation,
-                                frame: app.lensSetup.fieldOfView, observer: context.observer, date: snapshotDate)
+                                frame: app.lensSetup.fieldOfView,
+                                lensIsRectilinear: app.lensSetup.projection == .rectilinear,
+                                observer: context.observer, date: snapshotDate)
     }
 
     // MARK: Actions
@@ -402,10 +428,23 @@ struct AimMosaicSheet: View {
         if let frame = model.engine.frame() {
             customCenter = frame.pointing.boresight
             // The centre is an altitude and azimuth of this instant, and the planner turns it into sky coordinates
-            // with `snapshotDate`: it has to be the same instant, or the centre is off by the sky's turn since.
-            snapshotDate = app.clock.now
+            // with `snapshotDate`: it has to be taken at the same instant (the previewed moment while the sky is
+            // previewed, as when the sheet opens), or the centre is off by the sky's turn since the sheet opened.
+            snapshotDate = model.date
         } else if customCenter == nil, let target = model.skyContent?.snapshot.target {
             customCenter = target.horizontal
+        }
+    }
+
+    private func exportPanels(_ planned: AimMosaicPlanResult, asText: Bool) {
+        guard let records = try? MosaicPanelCodec.records(of: planned.plan) else { return }
+        let name = planned.title.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        let filename = (name.isEmpty ? "Mosaic" : name) + " Panels"
+        if asText {
+            export.present(text: MosaicPanelCodec.text(records, targetName: planned.title), contentType: .plainText,
+                           filename: filename)
+        } else {
+            export.present(text: MosaicPanelCodec.csv(records), contentType: .commaSeparatedText, filename: filename)
         }
     }
 

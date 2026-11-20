@@ -2,12 +2,14 @@ import Foundation
 import LodestarKit
 
 /// The words for the state without a place, which has no night to describe. Where the user has not been asked yet the
-/// app can ask; where they said no, only Settings can help, so opening the app would be no use.
+/// app can ask; where they said no, only Settings can help, so opening the app would be no use; where they said yes,
+/// there is nothing to do but wait for the first fix.
 enum TonightNeedsLocationText {
     static func full(_ issue: TonightLocationIssue) -> String {
         switch issue {
         case .notAsked: return "Open Lodestar to allow location"
         case .deniedOrRestricted: return "Allow location for Lodestar in Settings"
+        case .waitingForFix: return "Waiting for a location fix"
         }
     }
 
@@ -16,6 +18,7 @@ enum TonightNeedsLocationText {
         switch issue {
         case .notAsked: return "Open Lodestar for location"
         case .deniedOrRestricted: return "Allow location in Settings"
+        case .waitingForFix: return "Waiting for location"
         }
     }
 
@@ -24,6 +27,7 @@ enum TonightNeedsLocationText {
         switch issue {
         case .notAsked: return "Set location"
         case .deniedOrRestricted: return "Location off"
+        case .waitingForFix: return "No fix yet"
         }
     }
 
@@ -31,6 +35,16 @@ enum TonightNeedsLocationText {
         switch issue {
         case .notAsked: return "Lodestar. Open the app to allow location."
         case .deniedOrRestricted: return "Lodestar. Allow location for Lodestar in Settings."
+        case .waitingForFix: return "Lodestar. Waiting for a location fix."
+        }
+    }
+
+    /// The SF Symbol that goes with the words: a crossed-out arrow where location is off or not allowed yet, a plain
+    /// one where it is allowed and the fix is on its way.
+    static func symbol(_ issue: TonightLocationIssue) -> String {
+        switch issue {
+        case .notAsked, .deniedOrRestricted: return "location.slash"
+        case .waitingForFix: return "location"
         }
     }
 }

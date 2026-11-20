@@ -25,7 +25,12 @@ final class TonightPlaceTests: XCTestCase {
         let place = TonightPlace.preview()
         XCTAssertEqual(place.latitude, 40)
         XCTAssertEqual(place.timeZoneIdentifier, TimeZone.current.identifier)
-        XCTAssertEqual(place.longitude, Double(TimeZone.current.secondsFromGMT()) / 240, accuracy: 1e-9)
+        // Fifteen degrees to the hour, wrapped into (-180, 180] as a place wraps it: UTC+13 and UTC+14 would be 195° and
+        // 210° east, which is 165° and 150° west.
+        var longitude = Double(TimeZone.current.secondsFromGMT()) / 240
+        if longitude > 180 { longitude -= 360 }
+        if longitude <= -180 { longitude += 360 }
+        XCTAssertEqual(place.longitude, longitude, accuracy: 1e-9)
     }
 
     func testAPlaceSurvivesJSONAndTheStore() throws {
@@ -55,5 +60,69 @@ final class TonightPlaceTests: XCTestCase {
         XCTAssertNil(TonightPhoneContext.place(from: ["lat": 40.0]))
         XCTAssertNil(TonightPhoneContext.place(from: ["lat": "40", "lon": "-105"]))
         XCTAssertNil(TonightPhoneContext.place(from: ["lat": 140.0, "lon": 0.0]))
+    }
+
+    // MARK: The iPhone's place
+
+    private let sent = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func testAPlaceTheIPhoneSendsKeepsItsKindAndSendTime() throws {
+        for kind in [TonightPhonePlace.Kind.device, .savedSite] {
+            let phonePlace = TonightPhonePlace(place: TonightTestSupport.boulder, kind: kind, sentAt: sent)
+            let context = TonightPhoneContext.context(for: phonePlace)
+            XCTAssertEqual(context[TonightPhoneContext.latitudeKey] as? Double, 40)
+            XCTAssertEqual(context[TonightPhoneContext.kindKey] as? String, kind.rawValue)
+            XCTAssertEqual(context[TonightPhoneContext.sentAtKey] as? Double, 1_800_000_000)
+            XCTAssertEqual(TonightPhoneContext.phonePlace(from: context), phonePlace)
+        }
+    }
+
+    func testAContextFromAnOlderIPhoneAppIsTheDevicesPlaceOfUnknownAge() throws {
+        let old: [String: Any] = ["lat": 40.0, "lon": -105.27, "elevation": 1650.0, "timeZone": "America/Denver"]
+        let phonePlace = try XCTUnwrap(TonightPhoneContext.phonePlace(from: old))
+        XCTAssertEqual(phonePlace.place, TonightTestSupport.boulder)
+        XCTAssertEqual(phonePlace.kind, .device)
+        XCTAssertNil(phonePlace.sentAt)
+        XCTAssertFalse(phonePlace.isFresh(at: sent))
+    }
+
+    func testAContextWithoutAValidPlaceOrWithOddExtrasIsHandledSafely() throws {
+        XCTAssertNil(TonightPhoneContext.phonePlace(from: ["kind": "device", "sentAt": 1_800_000_000.0]))
+        XCTAssertNil(TonightPhoneContext.phonePlace(from: ["lat": 140.0, "lon": 0.0, "sentAt": 1_800_000_000.0]))
+        let odd = try XCTUnwrap(TonightPhoneContext.phonePlace(
+            from: ["lat": 10.0, "lon": 20.0, "kind": "orbit", "sentAt": Double.nan]))
+        XCTAssertEqual(odd.kind, .device)
+        XCTAssertNil(odd.sentAt)
+        let text = try XCTUnwrap(TonightPhoneContext.phonePlace(from: ["lat": 10.0, "lon": 20.0, "sentAt": "now"]))
+        XCTAssertNil(text.sentAt)
+    }
+
+    func testTheIPhonesOwnLocationIsTrustedForAWhileAndThenNot() {
+        let phonePlace = TonightPhonePlace(place: TonightTestSupport.boulder, kind: .device, sentAt: sent)
+        let limit = TonightPhonePlace.deviceFreshness
+        XCTAssertTrue(phonePlace.isFresh(at: sent))
+        XCTAssertTrue(phonePlace.isFresh(at: sent.addingTimeInterval(limit)))
+        XCTAssertFalse(phonePlace.isFresh(at: sent.addingTimeInterval(limit + 1)))
+        XCTAssertFalse(phonePlace.isFresh(at: sent.addingTimeInterval(24 * 3_600)))
+    }
+
+    func testASendTimeFarAheadOfTheClockIsNotBelieved() {
+        let phonePlace = TonightPhonePlace(place: TonightTestSupport.boulder, kind: .device, sentAt: sent)
+        let slack = TonightPhonePlace.clockTolerance
+        XCTAssertTrue(phonePlace.isFresh(at: sent.addingTimeInterval(-slack)))
+        XCTAssertFalse(phonePlace.isFresh(at: sent.addingTimeInterval(-slack - 1)))
+    }
+
+    func testASiteTheUserChoseHoldsUntilTheUserChoosesAnother() {
+        let site = TonightPhonePlace(place: TonightTestSupport.sydney, kind: .savedSite, sentAt: sent)
+        XCTAssertTrue(site.isFresh(at: sent.addingTimeInterval(30 * 24 * 3_600)))
+        let unstamped = TonightPhonePlace(place: TonightTestSupport.sydney, kind: .savedSite, sentAt: nil)
+        XCTAssertTrue(unstamped.isFresh(at: sent))
+    }
+
+    func testTheIPhonesPlaceSurvivesTheStore() throws {
+        let phonePlace = TonightPhonePlace(place: TonightTestSupport.sydney, kind: .savedSite, sentAt: sent)
+        TonightPlaceStore.savePhonePlace(phonePlace)
+        XCTAssertEqual(TonightPlaceStore.loadPhonePlace(), phonePlace)
     }
 }

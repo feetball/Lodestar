@@ -26,6 +26,10 @@ final class TonightLocator {
         }
     }
 
+    /// Called when the user answers the permission prompt or changes the answer in Settings, so that the watch app can
+    /// work out the night at once instead of at its next refresh. Not called while the user has not been asked.
+    var onAuthorizationChange: (() -> Void)?
+
     private let manager = CLLocationManager()
     private var delegate: Delegate?
     private var waiter: CheckedContinuation<Fix?, Never>?
@@ -34,7 +38,8 @@ final class TonightLocator {
     init() {
         let delegate = Delegate(
             onFix: { [weak self] fix in Task { @MainActor [weak self] in self?.finish(fix) } },
-            onFailure: { [weak self] in Task { @MainActor [weak self] in self?.finish(nil) } })
+            onFailure: { [weak self] in Task { @MainActor [weak self] in self?.finish(nil) } },
+            onAuthorizationChange: { [weak self] in Task { @MainActor [weak self] in self?.authorizationDidChange() } })
         self.delegate = delegate
         manager.delegate = delegate
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
@@ -55,8 +60,9 @@ final class TonightLocator {
     }
 
     /// What to tell the user when there is no place: to allow location where they have not been asked yet, to change it
-    /// in Settings where they said no (or location is restricted).
+    /// in Settings where they said no (or location is restricted), to wait where they said yes and no fix has come.
     var locationIssue: TonightLocationIssue {
+        if isAuthorized { return .waitingForFix }
         switch manager.authorizationStatus {
         case .denied, .restricted:
             return .deniedOrRestricted
@@ -99,6 +105,12 @@ final class TonightLocator {
         }
     }
 
+    /// Core Location also reports the state it finds when the delegate is set, before the user has been asked.
+    private func authorizationDidChange() {
+        guard manager.authorizationStatus != .notDetermined else { return }
+        onAuthorizationChange?()
+    }
+
     private func finish(_ fix: Fix?) {
         guard let continuation = waiter else { return }
         waiter = nil
@@ -118,11 +130,18 @@ final class TonightLocator {
     private final class Delegate: NSObject, CLLocationManagerDelegate {
         private let onFix: @Sendable (Fix) -> Void
         private let onFailure: @Sendable () -> Void
+        private let onAuthorizationChange: @Sendable () -> Void
 
-        init(onFix: @escaping @Sendable (Fix) -> Void, onFailure: @escaping @Sendable () -> Void) {
+        init(onFix: @escaping @Sendable (Fix) -> Void, onFailure: @escaping @Sendable () -> Void,
+             onAuthorizationChange: @escaping @Sendable () -> Void) {
             self.onFix = onFix
             self.onFailure = onFailure
+            self.onAuthorizationChange = onAuthorizationChange
             super.init()
+        }
+
+        func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+            onAuthorizationChange()
         }
 
         func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {

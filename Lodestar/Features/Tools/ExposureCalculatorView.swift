@@ -26,6 +26,10 @@ private struct ExposureCalculatorForm: View {
     @State private var declination = 0.0
     @State private var targetDeclination: Double?
     @State private var testSeconds = 20.0
+    @State private var sky: ExposureSky?
+    /// The place of the alt-azimuth mount's target that is set by hand when there is no target.
+    @State private var altAzAltitude = 45.0
+    @State private var altAzAzimuth = 180.0
 
     init(myCamera: LensSetup) {
         self.myCamera = myCamera
@@ -45,6 +49,11 @@ private struct ExposureCalculatorForm: View {
             resultSection(estimate: estimate, setup: setup)
             comparisonSection(setup: setup)
             trailSection(setup: setup)
+            ExposureTrackedSection(setup: setup)
+            ExposureAltAzSection(setup: setup, target: app.target, sky: sky,
+                                 latitude: app.observerContext?.observer.location.latitude,
+                                 altitude: $altAzAltitude, azimuth: $altAzAzimuth)
+            ExposureMoonSection(setup: setup, sky: sky)
         }
         .themedList(palette)
         .scrollDismissesKeyboard(.interactively)
@@ -53,13 +62,18 @@ private struct ExposureCalculatorForm: View {
         .task(id: app.target?.id) {
             targetDeclination = app.target.map(apparentDeclination(of:))
         }
+        .task(id: ExposureSkyKey(context: app.observerContext, targetID: app.target?.id)) {
+            await keepSkyFresh()
+        }
     }
 
     // MARK: Inputs
 
+    /// The lens type and image circle cannot be changed here, so they stay what the camera in Settings has.
     private var currentSetup: LensSetup {
         LensSetup(sensor: sensor, focalLengthMillimeters: focalLength, aperture: aperture,
-                  pixelPitchMicrometers: pixelPitch)
+                  pixelPitchMicrometers: pixelPitch, projection: myCamera.projection,
+                  imageCircleDiameterMillimeters: myCamera.imageCircleDiameterMillimeters)
     }
 
     /// The presets, plus the user's own sensor when it is a custom size.
@@ -187,6 +201,25 @@ private struct ExposureCalculatorForm: View {
     }
 
     // MARK: Helpers
+
+    /// How often the target's and the Moon's place are worked out again while the calculator is open.
+    private static let skyRefreshInterval: Duration = .seconds(30)
+
+    /// Works out the sky right away and then every `skyRefreshInterval` until the task is cancelled. It uses the live
+    /// time, not the sky chart's time-travel date, because the Alt-Az Mount and Moon sections show the sky now.
+    private func keepSkyFresh() async {
+        let observer = app.observerContext?.observer
+        let target = app.target
+        while !Task.isCancelled {
+            let date = app.clock.now
+            let computed = await Task.detached(priority: .userInitiated) {
+                ExposureSkyCalculator.compute(observer: observer, target: target, date: date)
+            }.value
+            guard !Task.isCancelled else { return }
+            sky = computed
+            try? await Task.sleep(for: Self.skyRefreshInterval)
+        }
+    }
 
     /// The pixel pitch assumed when none is set, e.g. "4.0".
     private static var defaultPitchText: String {

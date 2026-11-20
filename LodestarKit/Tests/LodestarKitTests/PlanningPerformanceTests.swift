@@ -25,9 +25,9 @@ final class PlanningPerformanceTests: XCTestCase {
         }
     }
 
-    private func seconds(_ work: () -> Void) -> Double {
+    private func seconds(_ work: () throws -> Void) rethrows -> Double {
         let clock = ContinuousClock()
-        let elapsed = clock.measure(work)
+        let elapsed = try clock.measure(work)
         return Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
     }
 
@@ -67,7 +67,7 @@ final class PlanningPerformanceTests: XCTestCase {
     }
 
     func testANightSummaryTakesWellUnderASecond() throws {
-        let elapsed = seconds { _ = try? Support.summary(Support.boulder, 2026, 12, 21) }
+        let elapsed = try seconds { _ = try Support.summary(Support.boulder, 2026, 12, 21) }
         XCTAssertLessThan(elapsed, 2, "took \(elapsed) s")
     }
 

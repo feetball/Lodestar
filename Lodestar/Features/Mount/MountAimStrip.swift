@@ -15,8 +15,8 @@ struct MountAimStrip: View {
 
     var body: some View {
         content
-            .onChange(of: app.observerContext?.observer, initial: true) { _, observer in
-                service.updateObserver(observer)
+            .onChange(of: app.observerContext, initial: true) { _, context in
+                service.updateObserver(context)
             }
             .sheet(item: $confirmation) { confirmation in
                 MountConfirmationSheet(confirmation: confirmation)
@@ -69,7 +69,7 @@ struct MountAimStrip: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button {
-                    service.reconnect(observer: app.observerContext?.observer)
+                    service.reconnect(context: app.observerContext)
                 } label: {
                     Label("Reconnect", systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
@@ -97,6 +97,8 @@ struct MountAimStrip: View {
             }
             progress(status, target: target)
             skyWatcherLines
+            MountMeridianChip()
+            MountSiteChangeRow()
             messageLine
             actions(target: target)
         }

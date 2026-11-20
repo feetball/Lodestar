@@ -165,11 +165,24 @@ def sha256(path: Path) -> str:
 
 
 def download(url: str, destination: Path, expected: str | None) -> None:
+    """Download ``url`` to ``destination``, which only ever holds a file whose SHA-256 was checked.
+
+    The bytes go to a ``.part`` file first; a transfer that fails, is interrupted or does not match ``expected`` leaves
+    nothing behind at the final name, so a later run cannot mistake it for the real file.
+    """
+    partial = destination.with_name(destination.name + ".part")
     request = urllib.request.Request(url, headers={"User-Agent": "lodestar-fixtures"})
-    with urllib.request.urlopen(request, timeout=300) as response, open(destination, "wb") as stream:
-        shutil.copyfileobj(response, stream)
-    if expected is not None and sha256(destination) != expected:
-        raise SystemExit(f"{url}: unexpected SHA-256 {sha256(destination)}")
+    try:
+        with urllib.request.urlopen(request, timeout=300) as response, open(partial, "wb") as stream:
+            shutil.copyfileobj(response, stream)
+        if expected is not None:
+            actual = sha256(partial)
+            if actual != expected:
+                raise SystemExit(f"{url}: unexpected SHA-256 {actual}")
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    os.replace(partial, destination)
 
 
 # ---------------------------------------------------------------------------------------
@@ -309,7 +322,8 @@ def make_passes(out: Path, python_path: str | None, cache: Path) -> None:
 
     cache.mkdir(parents=True, exist_ok=True)
     bsp = cache / "de421.bsp"
-    if not bsp.exists():
+    # A cached kernel is used only when its digest matches; anything else is downloaded again.
+    if not bsp.is_file() or sha256(bsp) != DE421_SHA256:
         download(DE421_URL, bsp, DE421_SHA256)
     loader = Loader(str(cache))
     eph = loader("de421.bsp")
@@ -555,7 +569,8 @@ def make_streaks(out: Path, python_path: str | None, cache: Path) -> None:
 
     cache.mkdir(parents=True, exist_ok=True)
     bsp = cache / "de421.bsp"
-    if not bsp.exists():
+    # A cached kernel is used only when its digest matches; anything else is downloaded again.
+    if not bsp.is_file() or sha256(bsp) != DE421_SHA256:
         download(DE421_URL, bsp, DE421_SHA256)
     loader = Loader(str(cache))
     eph = loader("de421.bsp")

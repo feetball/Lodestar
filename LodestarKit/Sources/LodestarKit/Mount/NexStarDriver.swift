@@ -4,31 +4,35 @@ import Foundation
 ///
 /// Values are clamped to their ranges when the configuration is created.
 public struct NexStarConfiguration: Hashable, Sendable {
-    /// The frame of the coordinates on the wire. Nil (the default) picks it from the controller family at connect time:
-    /// Sky-Watcher SynScan firmware 3.37 / 4.37.03 or later documents J2000 for GOTO, sync and position replies
-    /// ("SynScan Serial Communication Protocol" 3.3), Celestron hand controls take the current epoch ("JNow", mean of
-    /// date). Set it to override, for example `MountEpoch.meanOfDate` for a SynScan hand control with old firmware.
+    /// The frame of the coordinates on the wire. Nil (the default) picks it from the controller family and the firmware
+    /// version at connect time: Sky-Watcher SynScan firmware 3.37 / 4.37.03 or later documents J2000 for GOTO, sync
+    /// and position replies ("SynScan Serial Communication Protocol" 3.3); older SynScan firmware and Celestron hand
+    /// controls take the current epoch ("JNow", mean of date). Until `connect` has read the version the driver reports
+    /// JNow, and a version it cannot read fails the connection, so the frame is never guessed. Set it to override, for
+    /// example `MountEpoch.j2000` for a SynScan hand control that takes J2000 below those versions.
     public let epoch: MountEpoch?
     /// How long one command may take (1 to 30 s). Celestron documents up to 3.5 s, SynScan up to 5 s, in the worst case.
     public let exchangeTimeoutSeconds: Double
     /// Use the 32-bit position commands; nil decides from the firmware version (Celestron 1.6 and later, always for SynScan).
     public let usesPrecisePositions: Bool?
-    /// The mode `T` sets when tracking is switched on and the mount has not reported a running mode (alt-az for the AZ-GTi
-    /// family, equatorial for EQ mounts).
-    public let preferredTrackingMode: NexStarTrackingMode
+    /// The mode `T` sets when tracking is switched on and the mount has not reported a running mode. Nil (the default)
+    /// picks it from the model number the mount reports (`NexStarCodec.isEquatorialModel`): equatorial for the mounts known
+    /// to be German equatorial, alt-azimuth for every other model, including those the list does not know. Set it to
+    /// override, for example `.eqNorth` for a fork mount on a wedge. `.off` is not a mode to switch on and counts as `.altAz`.
+    public let preferredTrackingMode: NexStarTrackingMode?
     /// Swap the sense of east and west nudges (the sign of the right ascension / azimuth axis is not documented per mount).
     public let invertsEastWest: Bool
 
-    /// Automatic epoch, 5.5 s timeout, alt-azimuth tracking when switched on, INDI's axis signs.
+    /// Automatic epoch, 5.5 s timeout, tracking mode from the mount's model, INDI's axis signs.
     public static let standard = NexStarConfiguration()
 
     /// Creates a configuration; out-of-range values are clamped.
     public init(epoch: MountEpoch? = nil, exchangeTimeoutSeconds: Double = 5.5, usesPrecisePositions: Bool? = nil,
-                preferredTrackingMode: NexStarTrackingMode = .altAz, invertsEastWest: Bool = false) {
+                preferredTrackingMode: NexStarTrackingMode? = nil, invertsEastWest: Bool = false) {
         self.epoch = epoch
         self.exchangeTimeoutSeconds = exchangeTimeoutSeconds.isNaN ? 5.5 : min(max(exchangeTimeoutSeconds, 1.0), 30.0)
         self.usesPrecisePositions = usesPrecisePositions
-        self.preferredTrackingMode = preferredTrackingMode == .off ? .altAz : preferredTrackingMode
+        self.preferredTrackingMode = preferredTrackingMode.map { $0 == .off ? .altAz : $0 }
         self.invertsEastWest = invertsEastWest
     }
 }
@@ -47,7 +51,12 @@ public final class NexStarDriver: MountDriver {
 
     private var resolvedEpoch: MountEpoch
     private var precise: Bool
-    private var rememberedTrackingMode: NexStarTrackingMode
+    /// The last mode the mount reported while it was tracking; nil until it has reported one.
+    private var rememberedTrackingMode: NexStarTrackingMode?
+    /// True if the model number read by `connect` is that of a German equatorial mount.
+    private var isEquatorialModel = false
+    /// The latitude last sent to the mount by `setSiteAndTime`; nil until then.
+    private var siteLatitude: Double?
     private var trackingToRestore: NexStarTrackingMode?
     private var activeNudges: [MountNudgeDirection] = []
     private var canReadTracking = true
@@ -65,22 +74,23 @@ public final class NexStarDriver: MountDriver {
         self.configuration = configuration
         resolvedEpoch = configuration.epoch ?? .meanOfDate
         precise = configuration.usesPrecisePositions ?? true
-        rememberedTrackingMode = configuration.preferredTrackingMode
     }
 
     public func connect() throws -> MountCapabilities {
         let found = try readVersion()
         version = found
-        resolvedEpoch = configuration.epoch ?? (found.flavor == .synscan ? .j2000 : .meanOfDate)
+        resolvedEpoch = configuration.epoch ?? (found.expectsJ2000Coordinates ? .j2000 : .meanOfDate)
         let isSynScan = found.flavor == .synscan
         precise = configuration.usesPrecisePositions ?? (isSynScan || found.isAtLeast(1, 6))
         canReadTracking = isSynScan || found.isAtLeast(2, 3)
         canSetTime = isSynScan || found.isAtLeast(2, 3)
 
         var name = isSynScan ? "Sky-Watcher SynScan" : "Celestron NexStar"
+        isEquatorialModel = false
         do {
             let model = try transact(NexStarCodec.getModel, payloadLength: 1, operation: "read model")
             name = NexStarCodec.modelName(Int(model[0]), flavor: found.flavor)
+            isEquatorialModel = NexStarCodec.isEquatorialModel(Int(model[0]), flavor: found.flavor)
         } catch MountError.timeout {
             // The model command is optional on old firmware.
         } catch MountError.malformedReply {
@@ -165,7 +175,7 @@ public final class NexStarDriver: MountDriver {
     }
 
     public func setTracking(_ enabled: Bool) throws {
-        let mode = enabled ? rememberedTrackingMode : NexStarTrackingMode.off
+        let mode = enabled ? trackingModeToSwitchOn() : NexStarTrackingMode.off
         try expectAcknowledge(NexStarCodec.setTrackingMode(mode), operation: "set tracking")
         if enabled { trackingToRestore = nil }
     }
@@ -200,10 +210,26 @@ public final class NexStarDriver: MountDriver {
             throw MountError.invalidInput(detail: "the date is outside 1970 to 9999")
         }
         try expectAcknowledge(NexStarCodec.setLocation(location), operation: "set location")
+        siteLatitude = location.latitude
         try expectAcknowledge(NexStarCodec.setTime(fields, zoneOffsetHours: 0, daylightSaving: false), operation: "set time")
     }
 
     // MARK: Exchanges
+
+    /// The mode `T` sets when tracking is switched on. In order: the mode the mount was seen tracking in, the configured
+    /// mode, then the mode that fits the mount's model. A German equatorial mount gets the equatorial mode and every other
+    /// mount, or one whose model is unknown, gets alt-azimuth tracking.
+    ///
+    /// SynScan has one equatorial mode (`T` 2; 3 is sidereal with PEC), so it is used in both hemispheres. A Celestron
+    /// mount has an equatorial mode for each hemisphere: south when the latitude sent by `setSiteAndTime` is negative. Until
+    /// a site has been sent the hemisphere is not known and north is assumed.
+    private func trackingModeToSwitchOn() -> NexStarTrackingMode {
+        if let remembered = rememberedTrackingMode { return remembered }
+        if let configured = configuration.preferredTrackingMode { return configured }
+        guard isEquatorialModel else { return .altAz }
+        if version?.flavor == .synscan { return .eqNorth }
+        return (siteLatitude ?? 0.0) < 0.0 ? .eqSouth : .eqNorth
+    }
 
     private func requireFinite(_ target: EquatorialCoordinate) throws {
         if !target.rightAscension.isFinite || !target.declination.isFinite {

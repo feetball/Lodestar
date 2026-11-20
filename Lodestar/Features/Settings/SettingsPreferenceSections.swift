@@ -1,7 +1,8 @@
 import SwiftUI
 import LodestarKit
 
-/// Settings ▸ Feedback: haptics, audio cues and keeping the screen awake while aiming.
+/// Settings ▸ Feedback: haptics, audio cues, spoken guidance, the watch and keeping the screen awake while aiming
+/// or while a mount is connected.
 struct SettingsFeedbackSection: View {
     @Environment(AppModel.self) private var app
 
@@ -18,8 +19,30 @@ struct SettingsFeedbackSection: View {
                     + "The Silent switch mutes them.",
                 isOn: $store.settings.audioCuesEnabled)
             SettingsToggleRow(
+                title: "Spoken guidance",
+                caption: "Says the pan and tilt to make, such as \u{201C}Pan right 12, tilt up 3\u{201D}, and when you are "
+                    + "on target. The Silent switch mutes it.",
+                isOn: $store.settings.spokenGuidance)
+            if store.settings.spokenGuidance {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Speech rate")
+                        .accessibilityHidden(true)
+                    Picker("Speech rate", selection: $store.settings.spokenGuidanceRate) {
+                        ForEach(SpokenGuidanceRate.allCases) { rate in
+                            Text(rate.title).tag(rate)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+            SettingsToggleRow(
+                title: "Show aiming on the watch",
+                caption: "Mirrors the arrow, pan and tilt on your Apple Watch while the Aim screen is open and Lodestar "
+                    + "is open on the watch.",
+                isOn: $store.settings.aimOnWatch)
+            SettingsToggleRow(
                 title: "Keep screen awake",
-                caption: "Stops the iPhone from locking while the Aim screen is open.",
+                caption: "Stops the iPhone from locking while the Aim screen is open and while a mount is connected.",
                 isOn: $store.settings.keepScreenAwake)
         }
     }
@@ -39,6 +62,11 @@ struct SettingsSkyDisplaySection: View {
                 SettingsDeepSkyDetailRow(level: $store.settings.deepSkyProminence)
             }
             Toggle("Milky Way", isOn: $store.settings.showMilkyWay)
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle("Horizon glow", isOn: $store.settings.showHorizonGlow)
+                SettingsCaption("A thin ring along the sky chart's horizon that is brighter toward the artificial "
+                                + "light around you.")
+            }
             VStack(alignment: .leading, spacing: 4) {
                 SettingsSliderRow(title: "Faintest stars",
                                   valueText: AppFormat.magnitude(store.settings.starMagnitudeLimit),
@@ -103,9 +131,11 @@ struct SettingsAtmosphereSection: View {
     }
 }
 
-/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner and the polar alignment
-/// helper.
+/// Settings ▸ Tools: links to the exposure calculator, the star-trail and time-lapse planner, the polar alignment
+/// helper, the alignment finder and the red torch.
 struct SettingsToolsSection: View {
+    @Environment(AppModel.self) private var app
+
     var body: some View {
         SettingsSection(title: "Tools") {
             NavigationLink {
@@ -122,6 +152,16 @@ struct SettingsToolsSection: View {
                 PolarAlignmentView()
             } label: {
                 Label("Polar Alignment", systemImage: "sparkle")
+            }
+            NavigationLink {
+                AlignmentFinderView()
+            } label: {
+                Label("Alignment Finder", systemImage: "mountain.2")
+            }
+            Button {
+                app.isTorchShown = true
+            } label: {
+                Label("Red Torch", systemImage: "flashlight.on.fill")
             }
         }
     }

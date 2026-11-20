@@ -85,6 +85,7 @@ struct PlanisphereRenderer {
         occupied += drawTarget(&sky)
         drawSelection(&sky)
 
+        drawHorizonGlow(&context)
         context.stroke(disc, with: .color(palette.horizonLine), lineWidth: 1.5)
         drawTargetRimIndicator(&context)
         drawAltitudeLabels(&context)
@@ -182,6 +183,27 @@ struct PlanisphereRenderer {
         context.stroke(clusters, with: .color(palette.deepSkyMarker), style: style)
         context.stroke(darkNebulae, with: .color(palette.deepSkyMarker.opacity(0.6)),
                        style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+    }
+
+    // MARK: Horizon glow
+
+    /// The thickness (points) of the horizon glow ring and the opacity it has where the glow is faint and where it is full.
+    private static let glowWidth: CGFloat = 3
+    private static let glowMinimumOpacity = 0.1
+    private static let glowOpacityRange = 0.75
+
+    /// The thin ring of artificial light just inside the horizon circle: one short stroke per segment of the ring, stronger
+    /// toward the azimuths where the lights are. Nothing without a ring.
+    private func drawHorizonGlow(_ context: inout GraphicsContext) {
+        guard let ring = layers.horizonGlow else { return }
+        let step = 360.0 / Double(HorizonGlowRing.segments)
+        for (index, glow) in ring.glow.enumerated() where glow > 0 {
+            var segment = Path()
+            segment.move(to: viewport.rimPoint(azimuth: Double(index) * step - step * 0.55, outside: -Self.glowWidth / 2))
+            segment.addLine(to: viewport.rimPoint(azimuth: Double(index) * step + step * 0.55, outside: -Self.glowWidth / 2))
+            context.stroke(segment, with: .color(palette.warning.opacity(Self.glowMinimumOpacity + Self.glowOpacityRange * glow)),
+                           style: StrokeStyle(lineWidth: Self.glowWidth, lineCap: .butt))
+        }
     }
 
     // MARK: Skyline and mosaic

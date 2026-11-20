@@ -6,7 +6,6 @@ import SwiftUI
 struct MountAlignmentSyncRow: View {
     @Binding var isOn: Bool
     let objectName: String
-    @Environment(\.palette) private var palette
     private var service: MountService { MountService.shared }
 
     var body: some View {
@@ -15,20 +14,31 @@ struct MountAlignmentSyncRow: View {
                 Toggle("Also sync the mount to \(objectName)", isOn: $isOn)
                     .font(.subheadline)
                     .disabled(service.status.phase != .idle)
-                if let text = service.errorText {
-                    Label(text, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(palette.warning)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else if let text = service.noticeText {
-                    Label(text, systemImage: "checkmark.circle.fill")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(palette.positive)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                MountAlignmentSyncOutcome()
             }
+        }
+    }
+}
+
+/// How the mount's last command went, the sync after a star alignment in particular: the error, else the notice. The
+/// alignment sheet shows it on its own once the star is dropped and the row with the toggle is gone.
+struct MountAlignmentSyncOutcome: View {
+    @Environment(\.palette) private var palette
+    private var service: MountService { MountService.shared }
+
+    var body: some View {
+        if let text = service.errorText {
+            Label(text, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(palette.warning)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let text = service.noticeText {
+            Label(text, systemImage: "checkmark.circle.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(palette.positive)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

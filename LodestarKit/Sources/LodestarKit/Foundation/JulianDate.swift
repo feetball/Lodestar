@@ -62,7 +62,11 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
         JulianDate(ut: ut + days)
     }
 
-    public static func < (lhs: JulianDate, rhs: JulianDate) -> Bool { lhs.ut < rhs.ut }
+    /// Orders by UT, then by ΔT, so that the order agrees with `==` and the hash, which compare both.
+    public static func < (lhs: JulianDate, rhs: JulianDate) -> Bool {
+        if lhs.ut != rhs.ut { return lhs.ut < rhs.ut }
+        return lhs.deltaT < rhs.deltaT
+    }
 
     /// The decimal year corresponding to a Julian Day number (Julian-year approximation).
     public static func decimalYear(julianDay: Double) -> Double {
@@ -91,7 +95,12 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
     /// Uses the Espenak & Meeus (2006) polynomials up to 2005, measured annual values from
     /// 2005 to 2026, a linear blend towards the Espenak & Meeus long-term expression between 2026
     /// and 2050, and that expression afterwards. Errors are well below a few seconds for the
-    /// 20th and 21st centuries, which is negligible for pointing purposes.
+    /// 20th century and up to 2026, which is negligible for pointing purposes.
+    ///
+    /// After 2026 the blend rises by about 1 s a year, while Skyfield's extrapolation stays at 69–71 s through 2049.
+    /// Measured against that, the estimate is about 5 s high in 2031 and 13 s high in 2040: 3 to 7 arcseconds for the
+    /// Moon (0.55 arcseconds a second; the Sun only 0.04). Adding each new measured year to `measuredDeltaT` keeps the
+    /// error small.
     public static func deltaT(decimalYear y: Double) -> Double {
         guard y.isFinite else { return 69.2 }
         if y >= measuredDeltaTStart && y <= measuredDeltaTEnd {

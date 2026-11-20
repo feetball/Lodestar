@@ -75,6 +75,7 @@ final class MountSupportTests: XCTestCase {
         XCTAssertEqual(LX200Configuration(busyRetries: -3).busyRetries, 0)
         XCTAssertEqual(LX200Configuration.standard.epoch, .meanOfDate)
         XCTAssertNil(NexStarConfiguration.standard.epoch)
+        XCTAssertNil(NexStarConfiguration.standard.preferredTrackingMode)
         XCTAssertEqual(NexStarConfiguration.standard.exchangeTimeoutSeconds, 5.5, accuracy: 0.0)
         XCTAssertEqual(NexStarConfiguration(preferredTrackingMode: .off).preferredTrackingMode, .altAz)
         XCTAssertEqual(NexStarConfiguration(exchangeTimeoutSeconds: 0.0).exchangeTimeoutSeconds, 1.0, accuracy: 0.0)

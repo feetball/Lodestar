@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import LodestarKit
 
-/// The row of status chips at the top: sensors, compass, alignment, location and camera.
+/// The row of status chips at the top: the time preview, sensors, compass, alignment, location and camera.
 struct AimStatusChips: View {
     let model: AimViewModel
     /// The screen's sheet, where the help page is presented from: this view is rebuilt when the display turns.
@@ -10,6 +10,8 @@ struct AimStatusChips: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openURL) private var openURL
     @Environment(\.palette) private var palette
+    /// The time the age of the alignment is counted to, refreshed every half minute.
+    @State private var now = Date()
 
     /// Fractional deviation of the measured magnetic field from the expected one above which the compass is suspect.
     private static let interferenceThreshold = 0.25
@@ -21,10 +23,16 @@ struct AimStatusChips: View {
         let text: String
         var tone: ChipTone = .neutral
         var opensSettings = false
+        /// The chip of an alignment that is too old opens the alignment sheet.
+        var opensAlignment = false
     }
 
     var body: some View {
         AimFlowLayout {
+            // The preview comes first: it is what the rest of the screen is showing.
+            if let moment = model.previewMoment {
+                AimPreviewChip(model: model, moment: moment)
+            }
             ForEach(items) { item in
                 if item.opensSettings {
                     Button {
@@ -38,6 +46,20 @@ struct AimStatusChips: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Opens the iOS settings to allow camera access. The virtual sky still works.")
+                } else if item.opensAlignment {
+                    Button {
+                        // Aligning compares the sky with the phone's sensors now: align on the live sky.
+                        model.endPreview()
+                        sheet = .alignment
+                    } label: {
+                        // Padded to the minimum touch target.
+                        StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
+                            .aimChipBacking(palette)
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens star alignment so you can align again.")
                 } else {
                     StatusChip(systemImage: item.systemImage, text: item.text, tone: item.tone)
                         .aimChipBacking(palette)
@@ -59,6 +81,17 @@ struct AimStatusChips: View {
         // A chip wider than the row (the Starlink warning, with large text) shrinks its text to fit.
         .minimumScaleFactor(0.7)
         .frame(maxWidth: .infinity)
+        .task {
+            await keepClockCurrent()
+        }
+    }
+
+    /// Refreshes `now` every half minute, which is how the age of the alignment counts on.
+    private func keepClockCurrent() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(30))
+            now = Date()
+        }
     }
 
     private var items: [Item] {
@@ -90,6 +123,15 @@ struct AimStatusChips: View {
         } else {
             items.append(compassItem(quality: motion.compassQuality))
         }
+        switch app.magneticReferenceLimit {
+        case .blackout:
+            items.append(Item(id: "magnetic-model", systemImage: "safari", text: "Compass unreliable here", tone: .warning))
+        case .modelExpired:
+            items.append(Item(id: "magnetic-model", systemImage: "safari", text: "Magnetic model out of date",
+                              tone: .warning))
+        case nil:
+            break
+        }
         if let disturbance = motion.magneticDisturbance, disturbance > Self.interferenceThreshold {
             items.append(Item(id: "interference", systemImage: "bolt.horizontal.fill", text: "Magnetic interference",
                               tone: .warning))
@@ -111,6 +153,13 @@ struct AimStatusChips: View {
     private var alignmentItem: Item {
         let alignment = app.alignment
         guard alignment.isAligned else { return Item(id: "alignment", systemImage: "scope", text: "Not aligned") }
+        // An old alignment is worth less than its numbers say: the chip then asks for a new one instead of quoting them.
+        if let alignedAt = app.alignedAt,
+           AlignmentHygiene.isStale(alignedAt: alignedAt, now: now, gyroLock: app.motion.headingSource == .gyroLock) {
+            return Item(id: "alignment", systemImage: "exclamationmark.triangle.fill",
+                        text: AimAlignmentAge.chipText(seconds: now.timeIntervalSince(alignedAt)), tone: .warning,
+                        opensAlignment: true)
+        }
         let error = alignment.pointingUncertainty ?? alignment.rmsResidual
         let count = alignment.points.count
         let accuracy = AngleFormatter.formatDegrees(error, decimals: error < 10 ? 1 : 0)

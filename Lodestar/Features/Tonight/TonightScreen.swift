@@ -5,12 +5,17 @@ import LodestarKit
 private struct TonightTaskKey: Equatable {
     let night: TonightNightKey
     let catalogID: ObjectIdentifier?
+    /// Another filter ranks the targets afresh.
+    let imagingFilter: ImagingFilter
 }
 
 /// The Tonight tab's content once an observing place is known: the night selector and the cards for the chosen night.
 struct TonightScreen: View {
     /// The most nights from tonight the selector reaches in either direction.
     private static let reachInDays = 366
+    /// How long the night and the filter must hold still before the report is worked out. Stepping through the nights
+    /// quickly then computes the night it stops on, not every night it passes.
+    private static let settleDelay: Duration = .milliseconds(400)
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
@@ -23,7 +28,8 @@ struct TonightScreen: View {
 
     var body: some View {
         let taskKey = TonightTaskKey(night: TonightNightKey(context: context, choice: choice),
-                                     catalogID: app.catalog.catalog.map(ObjectIdentifier.init))
+                                     catalogID: app.catalog.catalog.map(ObjectIdentifier.init),
+                                     imagingFilter: app.settings.imagingFilter)
         ScrollView {
             VStack(spacing: 16) {
                 dateBar
@@ -156,8 +162,13 @@ struct TonightScreen: View {
     /// Works the night out off the main thread and keeps going: once the night under way is over the next one becomes
     /// tonight, which moves "tonight" itself and the label of any other chosen night ("Tomorrow night") with it.
     private func keepReportFresh(for key: TonightTaskKey) async {
+        // A new key cancels this task, so only the last of a quick run of taps gets past the pause. The computation
+        // cannot be stopped once it has started, which is why it must not start for every tap.
+        try? await Task.sleep(for: Self.settleDelay)
+        guard !Task.isCancelled else { return }
         repeat {
-            let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog)
+            let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog,
+                                     imagingFilter: key.imagingFilter)
             let computed = await Task.detached(priority: .userInitiated) {
                 TonightCalculator.report(for: input)
             }.value

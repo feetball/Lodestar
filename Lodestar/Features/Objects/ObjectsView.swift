@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import LodestarKit
 
 /// The latest catalog search and the query it answers.
@@ -20,6 +21,9 @@ private struct ObjectsSearchKey: Equatable {
 private struct ObjectsTrackingKey: Equatable {
     let observer: Observer?
     let skyline: HorizonProfile?
+    let timeZone: TimeZone?
+    /// Whether the list needs tonight's hours (to order or filter by them).
+    let wantsTonight: Bool
     let catalogID: ObjectIdentifier?
     let catalogue: ObjectsCatalogueFilter
     let extraIDs: [String]
@@ -43,6 +47,8 @@ struct ObjectsView: View {
     @AppStorage("lodestar.objects.hideFaint") private var hidesFaintObjects = false
     @AppStorage("lodestar.objects.catalogue") private var catalogueFilter = ObjectsCatalogueFilter.all
     @AppStorage("lodestar.objects.popularOnly") private var showsOnlyPopular = false
+    @AppStorage("lodestar.objects.visibleTonightOnly") private var showsOnlyVisibleTonight = false
+    @AppStorage("lodestar.objects.imagedOnly") private var showsOnlyImaged = false
 
     @State private var query = ""
     @State private var searchOutcome = ObjectsSearchOutcome.empty
@@ -50,6 +56,11 @@ struct ObjectsView: View {
     @State private var isShowingCustomTarget = false
     @State private var catalogIndex: ObjectsCatalogIndex?
     @State private var positions = ObjectsPositionModel()
+    @State private var isImporting = false
+    @State private var importedList: ObjectsImportedList?
+    @State private var importProblem: String?
+    @State private var isShowingFavoritesFull = false
+    @State private var export = InterchangeExport()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -68,6 +79,26 @@ struct ObjectsView: View {
             CustomTargetSheet()
                 .environment(app)
                 .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
+        }
+        .sheet(item: $importedList) { imported in
+            ObjectsImportSheet(imported: imported)
+                .environment(app)
+                .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
+        }
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: ObjectsListFile.importTypes,
+                      allowsMultipleSelection: false) { result in
+            importFile(result)
+        }
+        .interchangeExporter($export)
+        .alert("Could Not Import the List", isPresented: isShowingImportProblem) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importProblem ?? "")
+        }
+        .alert("Favorites Are Full", isPresented: $isShowingFavoritesFull) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Favorites hold \(AppSettings.maximumFavorites) objects. Remove one to add another.")
         }
         .task {
             await app.catalog.load()
@@ -113,8 +144,11 @@ struct ObjectsView: View {
     private func list(catalog: Catalog, index: ObjectsCatalogIndex) -> some View {
         let sections = displayedSections(catalog: catalog, index: index)
         let favorites = Set(app.settings.favoriteObjectIDs)
+        let imaged = app.sessionLog.imagedTargetIDs
         let timeZone = app.observerContext?.timeZone ?? .autoupdatingCurrent
         let showsProminence = catalogueFilter != .all || sortOrder == .prominence || grouping == .prominence
+        // The rows say how many hours tonight only while the list is ordered or filtered by them.
+        let tonight = options.needsTonightHours ? positions.tonight : [:]
         return List {
             if !isShowingResults {
                 Section {
@@ -137,8 +171,9 @@ struct ObjectsView: View {
             ForEach(sections) { section in
                 Section {
                     ForEach(section.objects) { object in
-                        row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone,
-                            showsProminence: showsProminence)
+                        row(for: object, isFavorite: favorites.contains(object.id),
+                            isImaged: imaged.contains(object.id), timeZone: timeZone,
+                            showsProminence: showsProminence, tonight: tonight[object.id])
                     }
                     // Favorite comets and asteroids without a current orbit stay in the list.
                     ForEach(section.unavailable, id: \.self) { id in
@@ -161,14 +196,15 @@ struct ObjectsView: View {
         }
     }
 
-    private func row(for object: CelestialObject, isFavorite: Bool, timeZone: TimeZone,
-                      showsProminence: Bool) -> some View {
+    private func row(for object: CelestialObject, isFavorite: Bool, isImaged: Bool, timeZone: TimeZone,
+                      showsProminence: Bool, tonight: UnobstructedVisibility?) -> some View {
         Button {
             path.append(object)
         } label: {
             HStack(spacing: 8) {
-                ObjectRow(object: object, position: positions.position(for: object.id), isFavorite: isFavorite,
-                          timeZone: timeZone, showsProminence: showsProminence)
+                ObjectRow(object: object, position: positions.position(for: object.id), tonight: tonight,
+                          isFavorite: isFavorite, isImaged: isImaged, timeZone: timeZone,
+                          showsProminence: showsProminence)
                 // The system's disclosure indicator is grey, which is not night-safe.
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
@@ -194,7 +230,11 @@ struct ObjectsView: View {
 
     private func favoriteAction(for object: CelestialObject, isFavorite: Bool) -> some View {
         Button {
-            app.settingsStore.toggleFavorite(object.id)
+            if !isFavorite, app.settings.favoriteObjectIDs.count >= AppSettings.maximumFavorites {
+                isShowingFavoritesFull = true
+            } else {
+                app.settingsStore.toggleFavorite(object.id)
+            }
         } label: {
             ObjectsSwipeGlyph.image(systemName: isFavorite ? "star.slash.fill" : "star.fill", color: palette.accent)
         }
@@ -228,8 +268,10 @@ struct ObjectsView: View {
                            message: "No objects match the current filters.") {
                 Button("Reset Filters") {
                     showsOnlyAboveHorizon = false
+                    showsOnlyVisibleTonight = false
                     hidesFaintObjects = false
                     showsOnlyPopular = false
+                    showsOnlyImaged = false
                     catalogueFilter = .all
                 }
                 .buttonStyle(.lodestarSecondary)
@@ -246,8 +288,12 @@ struct ObjectsView: View {
                 Label("Custom Target", systemImage: "plus")
             }
             ObjectsOptionsMenu(grouping: $grouping, sortOrder: $sortOrder,
-                               showsOnlyAboveHorizon: $showsOnlyAboveHorizon, hidesFaintObjects: $hidesFaintObjects,
-                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized, hasLocation: app.observerContext != nil)
+                               showsOnlyAboveHorizon: $showsOnlyAboveHorizon,
+                               showsOnlyVisibleTonight: $showsOnlyVisibleTonight, hidesFaintObjects: $hidesFaintObjects,
+                               showsOnlyPopular: $showsOnlyPopular, showsOnlyImaged: $showsOnlyImaged,
+                               isCustomized: options.isCustomized, hasLocation: app.observerContext != nil,
+                               onImport: { isImporting = true }, onExport: exportFavorites,
+                               hasFavorites: !app.settings.favoriteObjectIDs.isEmpty)
                 .disabled(isSearching)
             HelpButton(topic: .objects)
         }
@@ -258,7 +304,12 @@ struct ObjectsView: View {
     private var options: ObjectsListOptions {
         ObjectsListOptions(grouping: grouping, sortOrder: sortOrder, showsOnlyAboveHorizon: showsOnlyAboveHorizon,
                            hidesFaintObjects: hidesFaintObjects, catalogue: catalogueFilter,
-                           showsOnlyPopular: showsOnlyPopular)
+                           showsOnlyPopular: showsOnlyPopular, showsOnlyVisibleTonight: showsOnlyVisibleTonight,
+                           showsOnlyImaged: showsOnlyImaged)
+    }
+
+    private var isShowingImportProblem: Binding<Bool> {
+        Binding(get: { importProblem != nil }, set: { if !$0 { importProblem = nil } })
     }
 
     /// The site's recorded skyline, when it has one.
@@ -291,7 +342,8 @@ struct ObjectsView: View {
         }
         return ObjectsListBuilder.sections(options: options, catalog: catalog, index: index,
                                            favoriteIDs: app.settings.favoriteObjectIDs,
-                                           recentIDs: app.settings.recentObjectIDs, positions: positions.positions)
+                                           recentIDs: app.settings.recentObjectIDs, positions: positions.positions,
+                                           tonight: positions.tonight, imagedIDs: app.sessionLog.imagedTargetIDs)
     }
 
     /// Favorites, recents and search results that the browse listing does not include, whose positions are
@@ -323,10 +375,45 @@ struct ObjectsView: View {
     private var trackingKey: ObjectsTrackingKey {
         ObjectsTrackingKey(observer: app.observerContext?.observer,
                            skyline: skyline,
+                           timeZone: app.observerContext?.timeZone,
+                           wantsTonight: options.needsTonightHours,
                            catalogID: catalogID,
                            catalogue: catalogueFilter,
                            extraIDs: offListObjects.map(\.id),
                            isTabSelected: app.selectedTab == .objects)
+    }
+
+    // MARK: Lists
+
+    /// Reads the list the person chose and shows it in the import sheet.
+    private func importFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importProblem = ObjectsListFile.message(for: error)
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            Task {
+                do {
+                    importedList = ObjectsImportedList(list: try await ObjectsListFile.read(url))
+                } catch {
+                    importProblem = ObjectsListFile.message(for: error)
+                }
+            }
+        }
+    }
+
+    /// Offers the favorites as a CSV table or a SkySafari observing list.
+    private func exportFavorites(_ format: ObservingListFormat) {
+        guard let catalog = app.catalog.catalog else { return }
+        let entries = ObjectsListFile.entries(forFavorites: app.settings.favoriteObjectIDs, in: catalog)
+        switch format {
+        case .skySafari:
+            export.present(text: ObservingListCodec.encodeSkySafari(entries), contentType: InterchangeFileType.skylist,
+                           filename: "Lodestar Favorites")
+        case .genericCSV, .telescopiusCSV:
+            export.present(text: ObservingListCodec.encodeCSV(entries), contentType: .commaSeparatedText,
+                           filename: "Lodestar Favorites")
+        }
     }
 
     // MARK: Tasks
@@ -357,11 +444,12 @@ struct ObjectsView: View {
     /// Keeps positions fresh while the Objects tab is showing; other tabs do not need them.
     private func trackPositions() async {
         guard app.selectedTab == .objects else { return }
-        guard let observer = app.observerContext?.observer else {
+        guard let context = app.observerContext else {
             positions.clear()
             return
         }
-        await positions.keepFresh(observer: observer, skyline: skyline, clock: app.clock) {
+        await positions.keepFresh(observer: context.observer, skyline: skyline, timeZone: context.timeZone,
+                                  clock: app.clock, wantsTonight: options.needsTonightHours) {
             (app.catalog.catalog?.listedObjects ?? []) + offListObjects + catalogueObjects
         }
     }

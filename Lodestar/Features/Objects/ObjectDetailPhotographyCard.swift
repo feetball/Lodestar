@@ -3,6 +3,7 @@ import LodestarKit
 
 /// How the object fits the user's lens, how long to expose, and what the Moon will do to the shot.
 struct ObjectDetailPhotographyCard: View {
+    @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
 
     let object: CelestialObject
@@ -21,6 +22,9 @@ struct ObjectDetailPhotographyCard: View {
             lensRows(for: photography)
             if let framing = photography.framing {
                 framingRow(framing, in: photography.frame)
+            }
+            if let bodySize = photography.bodySize {
+                bodySizeRow(bodySize)
             }
             exposureRows(for: photography)
             if let moon = snapshot?.moon {
@@ -70,6 +74,28 @@ struct ObjectDetailPhotographyCard: View {
         return "Larger than the frame: needs a mosaic of about \(panels) panels"
     }
 
+    /// "46″ across · about 11 px at 200 mm" for a disc of the Sun, the Moon or a planet.
+    private func bodySizeRow(_ size: ObjectDetailBodySize) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(bodySizeText(size))
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+            if size.assumedPixelPitch {
+                Text("Assumes \(trimmed(ExposureCalculator.defaultPixelPitchMicrometers)) \u{00B5}m pixels: yours are not set.")
+                    .font(.caption)
+                    .foregroundStyle(palette.tertiaryText)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func bodySizeText(_ size: ObjectDetailBodySize) -> String {
+        let pixels = size.pixels < 1 ? "under 1 px" : "about \(Int(size.pixels.rounded())) px"
+        let angle = AppFormat.separation(size.diameterDegrees)
+        return "\(angle) across \u{00B7} \(pixels) at \(trimmed(lens.focalLengthMillimeters)) mm"
+    }
+
     // MARK: Exposure
 
     @ViewBuilder
@@ -92,32 +118,36 @@ struct ObjectDetailPhotographyCard: View {
 
     @ViewBuilder
     private func moonRows(for moon: ObjectDetailMoonConditions) -> some View {
-        let advice = moonAdvice(for: moon.impact)
+        let filter = app.settings.imagingFilter
+        let assessment = moon.geometry.assess(filter: filter, kind: MoonImpact.assessmentKind(of: object))
+        let advice = moonAdvice(for: assessment, filter: filter)
         InfoRow(label: moon.isNow ? "Moon now" : "Moon at \(AppFormat.time(moon.date, in: timeZone))",
-                value: moonSummary(moon))
+                value: moonSummary(moon, assessment: assessment))
         Label(advice.text, systemImage: advice.symbol)
             .font(.footnote)
             .foregroundStyle(advice.color)
     }
 
-    private func moonSummary(_ moon: ObjectDetailMoonConditions) -> String {
-        guard moon.impact != .moonDown else { return "Below the horizon" }
+    private func moonSummary(_ moon: ObjectDetailMoonConditions, assessment: ObjectMoonAssessment) -> String {
+        guard assessment.level != .moonDown else { return "Below the horizon" }
         let separation = AppFormat.separation(moon.separation)
         return "\(separation) away \u{00B7} \(AppFormat.percent(moon.illuminatedFraction)) lit"
     }
 
-    private func moonAdvice(for impact: ObjectDetailMoonConditions.Impact)
+    /// The advice line: its symbol and colour follow the assessed level, and a level that the filter relaxed counts
+    /// as good news.
+    private func moonAdvice(for assessment: ObjectMoonAssessment, filter: ImagingFilter)
         -> (text: String, symbol: String, color: Color) {
-        switch impact {
+        let text = ObjectMoonText.advice(assessment, filter: filter)
+        switch assessment.level {
         case .moonDown:
-            return ("The Moon is down, so the sky stays dark.", "moon.zzz", palette.positive)
+            return (text, "moon.zzz", palette.positive)
         case .minor:
-            return ("The Moon has little effect on this target.", "moon", palette.secondaryText)
+            return (text, "moon", assessment.isRelaxed ? palette.positive : palette.secondaryText)
         case .moderate:
-            return ("Moonlight will brighten the sky around this target.", "moon.fill", palette.warning)
+            return (text, "moon.fill", palette.warning)
         case .severe:
-            return ("A bright Moon close by will wash out faint detail.", "exclamationmark.triangle",
-                    palette.critical)
+            return (text, "exclamationmark.triangle", palette.critical)
         }
     }
 }
