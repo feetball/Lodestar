@@ -6,7 +6,7 @@ extension HelpContent {
     private static let objects = HelpTopic(
         topic: .objects, category: .sky, title: "Finding objects", systemImage: "sparkles",
         summary: "Search, browse and favorite planets, nebulae and stars.",
-        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets", "hour angle", "meridian", "transit", "moon", "moonlight", "narrowband", "light pollution"],
+        keywords: ["search", "catalog", "messier", "ngc", "m31", "favorites", "custom target", "sort", "filter", "comets", "hour angle", "meridian", "transit", "moon", "moonlight", "narrowband", "light pollution", "jupiter moons", "io", "europa", "ganymede", "callisto"],
         blocks: [
             .paragraph("The **Objects** tab is the catalog of what Lodestar can aim at, from planets to faint nebulae. Find a target here, then send it to the Aim screen."),
             .bullets([
@@ -16,6 +16,7 @@ extension HelpContent {
                 "**Swipe** a row right to favorite it, or left to aim at it. Favorites and recents are listed first. The **+** button adds a custom target from a right ascension and declination, the sky\u{2019}s coordinates.",
                 "**Tap a row** for the object\u{2019}s page. It shows where the object is now, with its hour angle (negative east of the meridian, the line from north to south across the sky, and positive west of it) and when it crosses that line. It also shows when the object rises, reaches its highest point and sets, with an altitude chart. With a recorded skyline, **Above your skyline** gives the hours tonight it is clear of it. Then come how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
                 "**The Moon line** on the page says how much moonlight will matter for the object: its distance from the Moon and the Moon\u{2019}s lit part give **minor**, **moderate** or **severe**. If you choose a light-pollution or narrowband **Filter** in **Settings** \u{25B8} **Camera & Lens**, emission nebulae, planetary nebulae and supernova remnants are judged more leniently, and the line says so, for example **Moderate \u{00B7} fine with your narrowband filter**. Galaxies, reflection nebulae, clusters and stars shine in all colors, so a filter does not help them.",
+                "**Jupiter\u{2019}s page** has a **Moons tonight** card: a strip with the planet\u{2019}s disc and its four large moons, Io, Europa, Ganymede and Callisto (I, E, G and C), east on the left and west on the right as in the sky. Under it are the next Great Red Spot transit and the moon events you can see from your site tonight. Moon positions and times are good to about 5 minutes.",
             ]),
             .caution("The Sun is listed under Solar System. Never point a camera at it without a certified solar filter."),
         ],
@@ -61,12 +62,14 @@ extension HelpContent {
 
     private static let events = HelpTopic(
         topic: .events, category: .sky, title: "Events calendar", systemImage: "calendar",
-        summary: "Meteor showers, eclipses, conjunctions and more.",
-        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant", "meteor camera", "where to point", "meteors per hour", "iss transit", "transit", "centreline", "silhouette"],
+        summary: "Meteor showers, eclipses, conjunctions, Jupiter\u{2019}s moons and more.",
+        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant", "meteor camera", "where to point", "meteors per hour", "great red spot", "grs", "jupiter moons", "shadow transit", "station", "retrograde", "iss transit", "transit", "centreline", "silhouette"],
         blocks: [
             .paragraph("The events calendar lists what the sky has coming in the next twelve months, with times for your site, so you can plan ahead."),
             .bullets([
-                "It covers meteor showers, lunar and solar eclipses, conjunctions (two bodies close together), oppositions (a planet opposite the Sun), greatest elongations (Mercury or Venus farthest from the Sun), supermoons, equinoxes and solstices.",
+                "It covers meteor showers, lunar and solar eclipses, conjunctions (two bodies close together), oppositions (a planet opposite the Sun), greatest elongations (Mercury or Venus farthest from the Sun), stations (a planet standing still among the stars before it turns back or goes on), supermoons, equinoxes and solstices.",
+                "For planet imagers the **Jupiter** chip lists the Great Red Spot crossing the planet\u{2019}s central meridian, the best time to photograph it (well placed for 50 minutes either side), and the moons\u{2019} transits, shadow transits, occultations and eclipses. They come by the dozen, so they are listed for today and tomorrow only. Moon times are good to about 5 minutes.",
+                "The spot drifts by a few degrees a month, which moves its transit by a few minutes. **Settings** \u{25B8} **Great Red Spot** holds the longitude, Sky & Telescope\u{2019}s value for 2026 until you enter your own. **Reset to Default** brings it back.",
                 "A meteor shower shows its hourly rate (ZHR) and how high its radiant is, the point the meteors seem to come from. ZHR is for a perfectly dark sky with the radiant overhead, so real counts are lower.",
                 "A meteor shower also has a **Camera** card. It says where to point the camera, high in the dark sky about 40\u{00B0} from the radiant and away from the Moon, and about how many meteors to expect in the frame of your lens from **Settings** \u{25B8} **Camera & Lens**. It is worked out for the time of the night when the radiant is highest. **Aim camera there** makes that place a target and opens the Aim screen; **Aim at the radiant** stays in the actions at the top.",
             ]),

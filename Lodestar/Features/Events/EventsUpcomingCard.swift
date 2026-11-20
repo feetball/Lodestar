@@ -76,7 +76,7 @@ struct EventsUpcomingCard: View {
     private func keepFresh() async {
         while !Task.isCancelled {
             now = app.clock.now
-            model.refresh(context: context, now: now)
+            model.refresh(context: context, now: now, greatRedSpot: app.settings.greatRedSpotOrDefault)
             try? await Task.sleep(for: .seconds(60))
         }
     }
