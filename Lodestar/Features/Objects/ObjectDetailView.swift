@@ -46,6 +46,7 @@ private struct ObjectDetailContent: View {
                 SmallBodyTailCard(detail: snapshot?.current.smallBody)
                 ObjectDetailPhotographyCard(object: object, snapshot: snapshot, lens: app.lensSetup,
                                             timeZone: context?.timeZone ?? .autoupdatingCurrent)
+                SessionLogObjectCard(object: object)
                 if ObjectDetailAboutCard.hasContent(for: object) {
                     ObjectDetailAboutCard(object: object)
                 }

@@ -13,6 +13,7 @@ extension HelpContent {
                 "**Search** by name or number, such as M31, NGC 7000, Sh2-155 or HIP 32349. Greek letters work spelled out or not: alpha CMa or \u{03B1} CMa.",
                 "**Browse** by group: Solar System, Stars, Galaxies, Nebulae, Star Clusters and Special (the Milky Way core and the celestial poles). Asteroids, and comets if you switch them on in **Settings** \u{25B8} **Online Data**, are under Solar System.",
                 "**Chips** above the list limit it to one catalog, such as Messier. **The menu** at the top right sorts by name, brightness, altitude, rise time or **Hours Visible Tonight**, and filters with **Above Horizon Now**, **Visible \u{2265} 1 h Tonight**, **Hide Faint** and **Popular Only**. The hours count the dark time an object is above your recorded skyline (a flat horizon without one) and at least 20\u{00B0} high, and each row then ends with \u{201C}3.4 h tonight\u{201D} or, for an object your skyline hides all night, \u{201C}behind skyline\u{201D}.",
+                "**Imaged Only** in the menu keeps the objects you logged as imaged, and a check mark on a row shows them. **Import List\u{2026}** reads a CSV table, a Telescopius export or a SkySafari observing list, finds its objects in the catalog by name or number and adds them to your favorites. **Export Favorites\u{2026}** saves them as a table or a SkySafari list.",
                 "**Swipe** a row right to favorite it, or left to aim at it. Favorites and recents are listed first. The **+** button adds a custom target from a right ascension and declination, the sky\u{2019}s coordinates.",
                 "**Tap a row** for the object\u{2019}s page. It shows where the object is now, with its hour angle (negative east of the meridian, the line from north to south across the sky, and positive west of it) and when it crosses that line. It also shows when the object rises, reaches its highest point and sets, with an altitude chart. With a recorded skyline, **Above your skyline** gives the hours tonight it is clear of it. Then come how much of your camera frame the object fills and the longest exposure before stars trail. A comet shows which way its tail points. **Aim at \u{2026}** sends the object to the Aim screen. A row for an object below the horizon says when it rises.",
                 "**The Moon line** on the page says how much moonlight will matter for the object: its distance from the Moon and the Moon\u{2019}s lit part give **minor**, **moderate** or **severe**. If you choose a light-pollution or narrowband **Filter** in **Settings** \u{25B8} **Camera & Lens**, emission nebulae, planetary nebulae and supernova remnants are judged more leniently, and the line says so, for example **Moderate \u{00B7} fine with your narrowband filter**. Galaxies, reflection nebulae, clusters and stars shine in all colors, so a filter does not help them.",
@@ -118,6 +119,7 @@ extension HelpContent {
                 "Lodestar steers you to each panel in turn and tells you how far to rotate the camera. The screen shows progress, such as Panel 3 of 12. Take the shot, then tap **Shot taken \u{2192} Next**. The panels also appear on the sky chart.",
                 "Tap **Finish** to end the mosaic.",
             ]),
+            .tip("**Export Panels\u{2026}** on the Plan card saves the panel centers, with the camera angle, as a table or as a list of right ascension and declination for a planetarium or an ASIAIR. Plans in azimuth and altitude, such as the Milky Way arch, cannot be exported."),
             .tip("An object\u{2019}s page tells you when it needs a mosaic with your lens."),
             .caution("A mosaic cannot follow the Sun, Moon, planets, comets or asteroids, because they move against the stars."),
         ],
@@ -183,5 +185,26 @@ extension HelpContent {
         related: [.tonight, .skyline, .skyChart])
 
     /// The topics of "Sky and objects" and "Planning a picture".
-    static let sky: [HelpTopic] = [objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline, sites]
+    private static let sessionLog = HelpTopic(
+        topic: .sessionLog, category: .planning, title: "Session log", systemImage: "book.closed",
+        summary: "A private diary of what you shot, with CSV and OpenAstronomyLog export.",
+        keywords: ["diary", "notes", "imaged", "export", "csv", "openastronomylog", "oal", "frames", "iso", "exposure", "astrobin"],
+        blocks: [
+            .paragraph("The session log records what you shot or tried on each night. It stays on this iPhone, and Lodestar never sends it anywhere."),
+            .steps([
+                "Open an object in **Objects** and tap **Log a Session** on its page. The form starts with now, your site, the lens from Settings and the longest exposure before stars trail. Fill in the ISO, the number of frames, the filter and your notes, and turn on **Imaged** when you got the shot.",
+                "The object\u{2019}s earlier entries are listed under the button. Tap one to edit it, or the trash button to delete it.",
+                "Open **Settings** \u{25B8} **Session Log** to see every entry grouped by night, search them and swipe to delete.",
+                "Tap **Export** for a **CSV Table**, which opens in any spreadsheet, or an **OpenAstronomyLog** file (version 2.1), which logging programs read. Both go through the Files save sheet.",
+            ]),
+            .bullets([
+                "A night runs from noon to noon at your site, so frames shot after midnight belong to the evening before.",
+                "In **Objects**, a check mark shows the objects you imaged, and **Imaged Only** in the menu lists just those.",
+                "The log holds 5,000 entries.",
+            ]),
+            .tip("Export a copy now and then: the log lives only on this device and is lost if you delete the app."),
+        ],
+        related: [.objects, .trailsAndExposure])
+
+    static let sky: [HelpTopic] = [objects, skyChart, tonight, events, planFraming, mosaic, trailsAndExposure, skyline, sites, sessionLog]
 }

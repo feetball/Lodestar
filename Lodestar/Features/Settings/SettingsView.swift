@@ -21,6 +21,7 @@ struct SettingsView: View {
                 SettingsAtmosphereSection()
                 SettingsOnlineDataSection()
                 SettingsToolsSection()
+                SettingsSessionLogSection()
                 SettingsAboutSection()
             }
             .settingsLocationSheets($locationPresentation)

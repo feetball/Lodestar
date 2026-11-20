@@ -50,6 +50,10 @@ tilt the tripod head until it is in your frame.
   and where to look and a button to aim at it.
 - **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
   order, guided panel by panel in Aim), and star-trail and time-lapse planners.
+- **Session log and lists** — a private diary of what you shot (frames, exposure, ISO, filter, notes) with CSV
+  and OpenAstronomyLog 2.1 export, a check mark on the objects you imaged, observing lists imported from CSV,
+  Telescopius and SkySafari files into your favorites (favorites export as CSV or a SkySafari list), and mosaic
+  panels saved as a table or a text list for a planetarium or an ASIAIR.
 - **Exposure calculator** — the longest exposure before stars trail by the NPF, 500, 400 and 300 rules for your
   camera, lens and target; for a star tracker, the drift and the limit for a polar-alignment error of 0.1° to 5°;
   for an alt-azimuth mount, the field-rotation rate and the limit at the target's place; and a shutter time for the

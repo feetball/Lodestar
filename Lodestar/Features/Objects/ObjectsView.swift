@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import LodestarKit
 
 /// The latest catalog search and the query it answers.
@@ -47,6 +48,7 @@ struct ObjectsView: View {
     @AppStorage("lodestar.objects.catalogue") private var catalogueFilter = ObjectsCatalogueFilter.all
     @AppStorage("lodestar.objects.popularOnly") private var showsOnlyPopular = false
     @AppStorage("lodestar.objects.visibleTonightOnly") private var showsOnlyVisibleTonight = false
+    @AppStorage("lodestar.objects.imagedOnly") private var showsOnlyImaged = false
 
     @State private var query = ""
     @State private var searchOutcome = ObjectsSearchOutcome.empty
@@ -54,6 +56,10 @@ struct ObjectsView: View {
     @State private var isShowingCustomTarget = false
     @State private var catalogIndex: ObjectsCatalogIndex?
     @State private var positions = ObjectsPositionModel()
+    @State private var isImporting = false
+    @State private var importedList: ObjectsImportedList?
+    @State private var importProblem: String?
+    @State private var export = InterchangeExport()
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -72,6 +78,21 @@ struct ObjectsView: View {
             CustomTargetSheet()
                 .environment(app)
                 .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
+        }
+        .sheet(item: $importedList) { imported in
+            ObjectsImportSheet(imported: imported)
+                .environment(app)
+                .themedRoot(palette, redFilter: app.settings.redFilterOverlay)
+        }
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: ObjectsListFile.importTypes,
+                      allowsMultipleSelection: false) { result in
+            importFile(result)
+        }
+        .interchangeExporter($export)
+        .alert("Could Not Import the List", isPresented: isShowingImportProblem) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importProblem ?? "")
         }
         .task {
             await app.catalog.load()
@@ -117,6 +138,7 @@ struct ObjectsView: View {
     private func list(catalog: Catalog, index: ObjectsCatalogIndex) -> some View {
         let sections = displayedSections(catalog: catalog, index: index)
         let favorites = Set(app.settings.favoriteObjectIDs)
+        let imaged = app.sessionLog.imagedTargetIDs
         let timeZone = app.observerContext?.timeZone ?? .autoupdatingCurrent
         let showsProminence = catalogueFilter != .all || sortOrder == .prominence || grouping == .prominence
         // The rows say how many hours tonight only while the list is ordered or filtered by them.
@@ -143,7 +165,8 @@ struct ObjectsView: View {
             ForEach(sections) { section in
                 Section {
                     ForEach(section.objects) { object in
-                        row(for: object, isFavorite: favorites.contains(object.id), timeZone: timeZone,
+                        row(for: object, isFavorite: favorites.contains(object.id),
+                            isImaged: imaged.contains(object.id), timeZone: timeZone,
                             showsProminence: showsProminence, tonight: tonight[object.id])
                     }
                     // Favorite comets and asteroids without a current orbit stay in the list.
@@ -167,14 +190,15 @@ struct ObjectsView: View {
         }
     }
 
-    private func row(for object: CelestialObject, isFavorite: Bool, timeZone: TimeZone,
+    private func row(for object: CelestialObject, isFavorite: Bool, isImaged: Bool, timeZone: TimeZone,
                       showsProminence: Bool, tonight: UnobstructedVisibility?) -> some View {
         Button {
             path.append(object)
         } label: {
             HStack(spacing: 8) {
                 ObjectRow(object: object, position: positions.position(for: object.id), tonight: tonight,
-                          isFavorite: isFavorite, timeZone: timeZone, showsProminence: showsProminence)
+                          isFavorite: isFavorite, isImaged: isImaged, timeZone: timeZone,
+                          showsProminence: showsProminence)
                 // The system's disclosure indicator is grey, which is not night-safe.
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
@@ -237,6 +261,7 @@ struct ObjectsView: View {
                     showsOnlyVisibleTonight = false
                     hidesFaintObjects = false
                     showsOnlyPopular = false
+                    showsOnlyImaged = false
                     catalogueFilter = .all
                 }
                 .buttonStyle(.lodestarSecondary)
@@ -255,8 +280,10 @@ struct ObjectsView: View {
             ObjectsOptionsMenu(grouping: $grouping, sortOrder: $sortOrder,
                                showsOnlyAboveHorizon: $showsOnlyAboveHorizon,
                                showsOnlyVisibleTonight: $showsOnlyVisibleTonight, hidesFaintObjects: $hidesFaintObjects,
-                               showsOnlyPopular: $showsOnlyPopular, isCustomized: options.isCustomized,
-                               hasLocation: app.observerContext != nil)
+                               showsOnlyPopular: $showsOnlyPopular, showsOnlyImaged: $showsOnlyImaged,
+                               isCustomized: options.isCustomized, hasLocation: app.observerContext != nil,
+                               onImport: { isImporting = true }, onExport: exportFavorites,
+                               hasFavorites: !app.settings.favoriteObjectIDs.isEmpty)
                 .disabled(isSearching)
             HelpButton(topic: .objects)
         }
@@ -267,7 +294,12 @@ struct ObjectsView: View {
     private var options: ObjectsListOptions {
         ObjectsListOptions(grouping: grouping, sortOrder: sortOrder, showsOnlyAboveHorizon: showsOnlyAboveHorizon,
                            hidesFaintObjects: hidesFaintObjects, catalogue: catalogueFilter,
-                           showsOnlyPopular: showsOnlyPopular, showsOnlyVisibleTonight: showsOnlyVisibleTonight)
+                           showsOnlyPopular: showsOnlyPopular, showsOnlyVisibleTonight: showsOnlyVisibleTonight,
+                           showsOnlyImaged: showsOnlyImaged)
+    }
+
+    private var isShowingImportProblem: Binding<Bool> {
+        Binding(get: { importProblem != nil }, set: { if !$0 { importProblem = nil } })
     }
 
     /// The site's recorded skyline, when it has one.
@@ -301,7 +333,7 @@ struct ObjectsView: View {
         return ObjectsListBuilder.sections(options: options, catalog: catalog, index: index,
                                            favoriteIDs: app.settings.favoriteObjectIDs,
                                            recentIDs: app.settings.recentObjectIDs, positions: positions.positions,
-                                           tonight: positions.tonight)
+                                           tonight: positions.tonight, imagedIDs: app.sessionLog.imagedTargetIDs)
     }
 
     /// Favorites, recents and search results that the browse listing does not include, whose positions are
@@ -339,6 +371,39 @@ struct ObjectsView: View {
                            catalogue: catalogueFilter,
                            extraIDs: offListObjects.map(\.id),
                            isTabSelected: app.selectedTab == .objects)
+    }
+
+    // MARK: Lists
+
+    /// Reads the list the person chose and shows it in the import sheet.
+    private func importFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importProblem = ObjectsListFile.message(for: error)
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            Task {
+                do {
+                    importedList = ObjectsImportedList(list: try await ObjectsListFile.read(url))
+                } catch {
+                    importProblem = ObjectsListFile.message(for: error)
+                }
+            }
+        }
+    }
+
+    /// Offers the favorites as a CSV table or a SkySafari observing list.
+    private func exportFavorites(_ format: ObservingListFormat) {
+        guard let catalog = app.catalog.catalog else { return }
+        let entries = ObjectsListFile.entries(forFavorites: app.settings.favoriteObjectIDs, in: catalog)
+        switch format {
+        case .skySafari:
+            export.present(text: ObservingListCodec.encodeSkySafari(entries), contentType: InterchangeFileType.skylist,
+                           filename: "Lodestar Favorites")
+        case .genericCSV, .telescopiusCSV:
+            export.present(text: ObservingListCodec.encodeCSV(entries), contentType: .commaSeparatedText,
+                           filename: "Lodestar Favorites")
+        }
     }
 
     // MARK: Tasks

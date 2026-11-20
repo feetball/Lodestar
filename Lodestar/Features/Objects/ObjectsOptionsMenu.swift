@@ -8,10 +8,17 @@ struct ObjectsOptionsMenu: View {
     @Binding var showsOnlyVisibleTonight: Bool
     @Binding var hidesFaintObjects: Bool
     @Binding var showsOnlyPopular: Bool
+    @Binding var showsOnlyImaged: Bool
     /// Filled when any option differs from the default list.
     let isCustomized: Bool
     /// The horizon and tonight filters and the altitude, rise-time and hours-tonight orders need an observer.
     let hasLocation: Bool
+    /// Opens the file picker of "Import List\u{2026}".
+    let onImport: () -> Void
+    /// Starts the export of the favorites in `format` (a table or a SkySafari list).
+    let onExport: (ObservingListFormat) -> Void
+    /// Whether there are favorites to export.
+    let hasFavorites: Bool
 
     /// The order the list is really in: without a location the orders that need the sky's positions fall back to name
     /// order (see `ObjectsListBuilder.sections`), so the menu checks that one instead of the unusable choice.
@@ -58,6 +65,23 @@ struct ObjectsOptionsMenu: View {
                 Toggle(isOn: $showsOnlyPopular) {
                     Label("Popular Only", systemImage: "star.circle")
                 }
+                Toggle(isOn: $showsOnlyImaged) {
+                    Label("Imaged Only", systemImage: "checkmark.circle")
+                }
+            }
+            Section("Lists") {
+                Button {
+                    onImport()
+                } label: {
+                    Label("Import List\u{2026}", systemImage: "square.and.arrow.down")
+                }
+                Menu {
+                    Button("CSV Table\u{2026}") { onExport(.genericCSV) }
+                    Button("SkySafari List\u{2026}") { onExport(.skySafari) }
+                } label: {
+                    Label("Export Favorites\u{2026}", systemImage: "square.and.arrow.up")
+                }
+                .disabled(!hasFavorites)
             }
         } label: {
             Label("Group, Sort and Filter",

@@ -17,6 +17,8 @@ struct ObjectRow: View {
     /// them; `nil` otherwise.
     var tonight: UnobstructedVisibility?
     var isFavorite = false
+    /// Whether the session log has an entry for the object that is marked as imaged.
+    var isImaged = false
     /// The observer's time zone, for rising times.
     var timeZone: TimeZone = .current
     /// Whether to name how prominent a deep-sky object is (the catalogue lists and the prominence order).
@@ -39,9 +41,14 @@ struct ObjectRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ObjectsFormat.spokenSummary(of: object, position: position, tonight: tonight,
-                                                        isFavorite: isFavorite, in: timeZone,
-                                                        showsProminence: showsProminence))
+        .accessibilityLabel(spokenLabel)
+    }
+
+    private var spokenLabel: String {
+        let summary = ObjectsFormat.spokenSummary(of: object, position: position, tonight: tonight,
+                                                  isFavorite: isFavorite, in: timeZone,
+                                                  showsProminence: showsProminence)
+        return isImaged ? summary + ", imaged" : summary
     }
 
     /// At the largest text sizes nothing is cut: every line wraps instead.
@@ -82,16 +89,22 @@ struct ObjectRow: View {
                 if isFavorite {
                     favoriteStar
                 }
+                if isImaged {
+                    imagedMark
+                }
             }
             VStack(alignment: .leading, spacing: 2) {
                 nameText
-                if designation != nil || isFavorite {
+                if designation != nil || isFavorite || isImaged {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         if let designation {
                             designationText(designation)
                         }
                         if isFavorite {
                             favoriteStar
+                        }
+                        if isImaged {
+                            imagedMark
                         }
                     }
                 }
@@ -115,6 +128,12 @@ struct ObjectRow: View {
 
     private var favoriteStar: some View {
         Image(systemName: "star.fill")
+            .font(.caption)
+            .foregroundStyle(palette.accent)
+    }
+
+    private var imagedMark: some View {
+        Image(systemName: "checkmark.circle.fill")
             .font(.caption)
             .foregroundStyle(palette.accent)
     }

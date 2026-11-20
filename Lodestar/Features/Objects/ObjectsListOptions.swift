@@ -104,6 +104,8 @@ struct ObjectsListOptions: Equatable, Sendable {
     /// Keeps only objects that are above the site's skyline, and at least 20° high, for `ObjectsTonight.minimumHours`
     /// tonight.
     var showsOnlyVisibleTonight = false
+    /// Keeps only objects that have a session log entry marked as imaged.
+    var showsOnlyImaged = false
 
     /// `true` when the list needs each object's hours tonight, to order or to filter by.
     var needsTonightHours: Bool {
