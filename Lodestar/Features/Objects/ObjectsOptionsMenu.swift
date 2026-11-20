@@ -1,4 +1,5 @@
 import SwiftUI
+import LodestarKit
 
 /// The toolbar menu that groups, orders and filters the Objects list.
 struct ObjectsOptionsMenu: View {

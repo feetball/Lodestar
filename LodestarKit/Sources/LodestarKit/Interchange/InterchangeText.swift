@@ -80,11 +80,6 @@ enum InterchangeText {
         return String(result)
     }
 
-    /// The first `limit` Unicode scalars of `text`.
-    static func prefixScalars(_ text: String, _ limit: Int) -> String {
-        String(String.UnicodeScalarView(text.unicodeScalars.prefix(max(limit, 0))))
-    }
-
     /// Whether a scalar is dropped from user text: control characters (the caller decides about line breaks), format
     /// characters, private use, unassigned and surrogate code points.
     private static func isDroppedCategory(_ scalar: Unicode.Scalar) -> Bool {
