@@ -6,6 +6,9 @@ import Observation
 struct EventsTransitItem: Identifiable, Hashable, Sendable {
     let transit: SatelliteTransit
     let satelliteName: String
+    /// Whether the satellite's element set is still within its freshness limit at the moment of the transit, so the
+    /// time is good to the second. A later transit rests on an orbit that will have changed and is shown to the minute.
+    let hasFreshElements: Bool
 
     /// Tells transits apart: the satellite, the body and the moment.
     var id: String {
@@ -63,7 +66,9 @@ enum EventsTransits {
                     satellite: entry.satellite, body: body, observer: observer, from: start, to: end,
                     maxGroundDistanceMeters: maxGroundDistanceMeters
                 )
-                found.append(contentsOf: transits.map { EventsTransitItem(transit: $0, satelliteName: name) })
+                found.append(contentsOf: transits.map {
+                    EventsTransitItem(transit: $0, satelliteName: name, hasFreshElements: entry.isFresh(at: $0.date))
+                })
             }
         }
         return found.sorted { $0.transit.date < $1.transit.date }

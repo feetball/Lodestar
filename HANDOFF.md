@@ -1,4 +1,4 @@
-# Lodestar 1.1 handoff (updated 2026-10-20)
+# Lodestar 1.1 handoff (updated 2026-11-20)
 
 How to continue Lodestar 1.1 on another computer. This file is for Claude Code and for Daniel (repo owner
 `feetball`). The same file is in both repositories.
@@ -19,7 +19,7 @@ Submission", never released (checked through the API), so the features below go 
 | Repo | `feetball/Lodestar` | `feetball/Lodestar-Android` (public) |
 | 1.1 code | **`main`** (features-1.1 and the review branch were merged on 2026-10-19) | **`main`** |
 | Version | 1.0 on all four targets (app, iOS widgets, watch app, watch widgets) | 1.1, versionCode 3 |
-| CI | `.github/workflows/ci.yml` on macOS runners. `main` is red since `5b1dc75` (see "What is left") | `ci.yml`, green |
+| CI | `.github/workflows/ci.yml` on macOS runners; `main` was green on 2026-11-20 (`gh run list --branch main` shows the state now) | `ci.yml`, green |
 | Visual review | `review.yml` (`gh workflow run review.yml --ref <branch>`), shot lists in `Tools/review/` | `emulator.yml` with `-f set=review`, `tools/capture_review.sh` |
 | Store text | `AppStore/metadata-en-US.json` (description and promotional text; no What's New, because iOS ships these features as 1.0) | `PlayStore/listing/en-US/` (`full_description.txt`, `release_notes.txt`) |
 | Engine | `LodestarKit/` (Swift 6, Foundation only) | `lodestar-kit/` (pure Kotlin/JVM, a line-for-line twin) |
@@ -62,7 +62,7 @@ A pixel scan checks that night mode is pure red (no green or blue).
 
 - **Android:** all fixes are on `main` (merged from `review-harness`, PR #1). The review set now also photographs the
   simulated Sky-Watcher mount (`mt-16` … `mt-30`). Night mode is pure red on every screen; no crashes.
-- **iOS:** fixes are in pull requests against `main`, not merged yet (Daniel's call):
+- **iOS:** the fixes were made in four pull requests, all merged to `main` on 2026-10-20:
   - #13 review harness: the long iPhone capture job is split in two (it ran into its timeout), Aim without a target is
     photographed, the Online Data sheet opens reliably, a stale-state race in `capture.sh` is fixed;
   - #14 Aim / Mount / Satellites: opaque cards and chips over the sky, the Aim controls bar no longer hidden behind the
@@ -78,13 +78,23 @@ A pixel scan checks that night mode is pure red (no green or blue).
 
 ## What is left (in order)
 
-1. **iOS `main` CI is red** since `5b1dc75` ("Refactor location handling in watchOS app and widgets", which also changed
-   22 `LodestarKit` files): `SkyWatcherMountTests.testANudgeIntoTheOverheadLimitEndsAndTrackingContinues` fails (the
-   nudge ends at 89.2°, the overhead limit is 88.6°). Fix it, and mirror every engine change of that commit in the
-   Kotlin twin (`lodestar-kit/`) with the same tests.
-2. **iOS PRs #13–#16**: review and merge. Check #16 on a device (frame rate on the Aim tab with the camera, VoiceOver,
-   touches through the overlay). The Sky tab has the same problem #14 fixed for Aim: its time-travel bar is partly under
-   the app's own tab bar; the general fix belongs in `RootView` / `AppTabBar`.
+State on `main` on 2026-11-20: CI is green, and the iOS pull requests #13-#16 (review fixes), #22 and #23 (the nudge
+test) and #43-#63 (the list below) are merged. The live state is `gh pr list` and `gh run list --branch main`. Items 3
+to 5 (the store and release steps) were last checked on 2026-10-20.
+
+Landed since 2026-10-20 on iOS (the Android twins are tracked as pull requests in `feetball/Lodestar-Android`): Pluto,
+the mount stop fixes, alignment hygiene, the exposure helpers, the meridian-flip countdown, hours visible tonight,
+meteor camera advice, the filter-aware Moon, apparent size in degrees, the cloud-forecast fields, light pollution, the
+terrain horizon, aim time travel, camera profiles, ISS transits, Jupiter events, Siri / Shortcuts / Control Center /
+Live Activity / red torch, the alignment finder, spoken guidance and the watch Aim page, and the session log with list
+import and export.
+
+1. **Open pull requests**: `gh pr list` in each repository. Any engine change goes into **both** engines
+   (`LodestarKit/` and `lodestar-kit/`) with the same tests. (The nudge test that turned `main` red after `5b1dc75` was
+   fixed in the Swift engine by `39f0ed3` and `3ece950`.)
+2. **Checks on a device, open since the 2026-10-20 review** (not re-checked): night mode on iOS 26 (frame rate on the Aim
+   tab with the camera, VoiceOver, touches through the overlay), and the Sky tab's time-travel bar, which sat partly
+   under the app's own tab bar (the fix belongs in `RootView` / `AppTabBar`).
 3. **Android release 1.1 (3)**
    - Build a signed bundle:
      `./gradlew :app:bundleRelease -Plodestar.signing.storeFile=<keystore> -Plodestar.signing.storePassword=<pw> -Plodestar.signing.keyAlias=upload -Plodestar.signing.keyPassword=<pw> --no-configuration-cache`
@@ -114,8 +124,9 @@ A pixel scan checks that night mode is pure red (no green or blue).
   at the peak (both engines). Decide the rule; change both engines and their tests together.
 - **Aim chip "Not aligned"** stays while a Sky-Watcher mount is aligned on two stars (it means the phone's alignment);
   consider a clearer word.
-- **Sky-Watcher and "Send location and time when connecting"**: the switch is on, while the set-up says nothing is sent
-  to that mount.
+- **Sky-Watcher and "Send location and time when connecting"**: on iOS the switch is now hidden for a mount that Lodestar
+  aligns itself (Sky-Watcher) and a line says that nothing is sent to it (`MountConnectionView.swift`, the
+  `usesLodestarAlignment` branch of the mount settings). Check that the Android twin matches, then drop this item.
 - **Copy** left as it is: the privacy paragraph in Settings ▸ About, the event hero line ("19° western of the Sun"),
   "Moon and The Pleiades", the Moon card's "Age … at …" line, "Dark sky" meaning two things.
 - **Tablets**: sheets and forms stretch to the full width on the 7" tablet (no maximum width).
@@ -149,16 +160,19 @@ They were on the old machine only. Copy them to the new PC with a USB stick or a
 The second PC (WSL2, 2026-10-19) has none of them, and no JDK, Android SDK, Swift or Python either: everything was built
 and tested on GitHub Actions.
 
-| What | Old path | If lost |
-|---|---|---|
-| App Store Connect API key, ID `X4SGLL26Q3` (issuer in App Store Connect › Users and Access › Integrations) | `/root/.appstoreconnect/private_keys/AuthKey_X4SGLL26Q3.p8` | Create a new key there |
-| Google Play service account JSON (`lodestar-play@lodestar-play.iam.gserviceaccount.com`) | `/root/.play/lodestar-play.json` | Create a new key in Google Cloud for that service account |
-| Android upload keystore, alias `upload`, plus its password | `/root/lodestar-android-upload-key/` | Request an upload-key reset in Play Console (Play App Signing holds the real app key) |
+| What | If lost |
+|---|---|
+| App Store Connect API key (the issuer is in App Store Connect › Users and Access › Integrations) | Create a new key there |
+| Google Play service account JSON | Create a new key in Google Cloud for that service account |
+| Android upload keystore, alias `upload`, plus its password | Request an upload-key reset in Play Console (Play App Signing holds the real app key) |
+
+The key ID, the service account and where each file lies are in the owner's password manager, not in this file: both
+repositories are public.
 
 - `tools/play_api.py` reads the service account path from `PLAY_SERVICE_ACCOUNT`.
 - An App Store Connect client is a few lines of PyJWT (ES256, `aud: appstoreconnect-v1`).
-- The `.gitignore` files already exclude keys and signing material. Keep it that way.
-- The Play service account currently has full admin. Trim it to Lodestar-only release permissions when convenient.
+- This repository's `.gitignore` excludes `*.p8`, `*.p12`, `*.mobileprovision` and `AuthKey_*`. Keep keystores and
+  service-account JSON files outside both checkouts.
 
 ## Tooling
 
@@ -166,8 +180,9 @@ and tested on GitHub Actions.
   The Emulator workflow runs smoke tests and screenshots on GitHub (`-f set=review` for the full review set, about
   70 minutes, 270 pictures per size).
 - **iOS:**
-  - On a Mac: Xcode with the iOS 27 SDK. The project is generated by XcodeGen from `project.yml` (keep the committed
-    `.pbxproj` in sync). CI uses Xcode 26.6 with iOS 26 simulators.
+  - On a Mac: Xcode with the iOS 27 SDK. The committed `Lodestar.xcodeproj` is the primary project; `project.yml` is
+    the XcodeGen fallback that rebuilds an equivalent one (keep the two in sync, see the header of `project.yml`). CI uses
+    the newest Xcode on the runner image (`ci.yml`).
   - Without a Mac: run `swift test` in `LodestarKit/` (Linux works), and use `gh workflow run ci.yml --ref <branch>`
     for app builds.
 - **GitHub API:** poll CI at most once a minute. Several agents watching runs at once hit the rate limit.

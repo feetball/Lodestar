@@ -30,9 +30,16 @@ private struct HorizonFlowModifier: ViewModifier {
                 Button("Clear Skyline", role: .destructive) { clear(site) }
                 Button("Keep", role: .cancel) {}
             } message: { site in
-                Text("\u{201C}\(site.name)\u{201D} goes back to an open horizon. You can record the skyline again, but "
-                     + "this one cannot be brought back.")
+                Text(Self.clearMessage(for: site))
             }
+    }
+
+    /// What clearing the skyline of `site` leaves: its terrain horizon when it has one that hides anything, otherwise
+    /// an open horizon.
+    private static func clearMessage(for site: SavedSite) -> String {
+        let hasTerrain = site.terrainHorizon.map { !$0.isFlat } ?? false
+        return "\u{201C}\(site.name)\u{201D} goes back to \(hasTerrain ? "its terrain horizon" : "an open horizon"). "
+            + "You can record the skyline again, but this one cannot be brought back."
     }
 
     private var isConfirmingClear: Binding<Bool> {

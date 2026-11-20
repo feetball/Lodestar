@@ -881,6 +881,41 @@ final class SkyWatcherMountTests: XCTestCase {
         XCTAssertEqual(rig.controller.poll().isTracking, true, "tracking stopped: \(String(describing: rig.driver.trackingStopReason))")
     }
 
+    func testANudgeAwayFromTheOverheadLimitIsAllowedFromInsideTheTrackingSlack() throws {
+        let rig = Support.rig(mode: altAz, errors: SkyWatcherPointingErrors(axis1Index: 1.0), settings: MountSettings(maximumNudgeSeconds: 30.0))
+        try rig.controller.connect()
+        try aligned(rig, altAzimuthAlignmentStars)
+        // Scheat is 77° up, south of the zenith: north is towards the mount's overhead limit of 88°, south is away from it.
+        let scheat = EquatorialCoordinate(rightAscensionHours: 23.0629, declination: 28.0828)
+        XCTAssertTrue(try goto(rig, scheat) < 0.1)
+        try rig.controller.nudge(.north, rate: .slew, durationSeconds: 30.0)
+        for _ in 0 ..< 60 {
+            rig.clock.advance(seconds: 0.5)
+            rig.controller.poll()
+        }
+        try rig.controller.stopNudge()
+        // The nudge came to rest above the limit, inside the slack that tracking has there.
+        let resting = realAltitude(rig)
+        XCTAssertTrue((88.0 ... 89.0).contains(resting), "\(resting)")
+        XCTAssertEqual(rig.controller.poll().isTracking, true)
+        // Further up is still refused, and the refusal leaves the mount tracking where it rests.
+        XCTAssertEqual(skyWatcherThrown { try rig.controller.nudge(.north, rate: .slew, durationSeconds: 30.0) }, .mountOverheadLimit)
+        XCTAssertEqual(rig.controller.status.phase, .idle)
+        XCTAssertTrue(realAltitude(rig) <= resting + 0.05, "\(realAltitude(rig)) from \(resting)")
+        // Away from the limit is allowed, and the altitude goes down.
+        try rig.controller.nudge(.south, rate: .slew, durationSeconds: 30.0)
+        XCTAssertEqual(rig.controller.status.phase, .nudging)
+        for _ in 0 ..< 10 {
+            rig.clock.advance(seconds: 0.5)
+            rig.controller.poll()
+        }
+        try rig.controller.stopNudge()
+        let lowered = realAltitude(rig)
+        XCTAssertTrue(lowered < resting - 1.0, "\(lowered) from \(resting)")
+        XCTAssertNil(rig.driver.trackingStopReason)
+        XCTAssertEqual(rig.controller.poll().isTracking, true)
+    }
+
     func testANudgeIntoTheAzimuthLimitEndsInsteadOfUnwinding() throws {
         let rig = Support.rig(mode: altAz, settings: MountSettings(maximumNudgeSeconds: 30.0))
         try rig.controller.connect()

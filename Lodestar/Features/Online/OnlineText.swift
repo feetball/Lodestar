@@ -10,7 +10,9 @@ enum OnlineText {
 
     static let footer = "Switching a feed off deletes what it downloaded. A failed download keeps the data you already "
         + "have. Nothing runs in the background: feeds refresh when you open the app, and terrain horizons download "
-        + "only when you ask for one in a site's editor. Each request carries only the app's name and version."
+        + "only when you ask for one in a site's editor. Each request carries the app's name and version. The "
+        + "cloud forecast request also carries your location, rounded to about 10 km, and a terrain request names "
+        + "the 1\u{00B0} elevation tiles it asks for."
 
     static let firstTimeTitle = "Online data is optional"
 

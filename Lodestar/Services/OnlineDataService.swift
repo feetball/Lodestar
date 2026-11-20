@@ -236,7 +236,8 @@ final class OnlineDataService {
         case .notModified:
             update(feed) { $0.error = nil }
         case .failed(_, let message):
-            let kept = state.meta != nil ? " The saved data is kept." : ""
+            // The forecast file holds the place asked for last, so its data is kept only when it is for this place.
+            let kept = (state.meta != nil && state.meta?.key == key) ? " The saved data is kept." : ""
             update(feed) { $0.error = "The last update failed. \(message)\(kept)" }
         }
         await publishStatus(feed)

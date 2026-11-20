@@ -9,8 +9,11 @@ enum EventsTransitText {
     static let onlineData = "Online Data"
     static let finding = "Finding transits\u{2026}"
     static let none = "No transits in the next 14 days within 50 km of here."
-    static let note = "The next 14 days, within 50 km of here. Times are to the second; check again on the day, "
-        + "because the orbit changes."
+    static let note = "The next 14 days, within 50 km of here. Times are to the second only while the orbit data is "
+        + "fresh enough; later ones show no seconds and sharpen when the satellite data is refreshed closer to the "
+        + "date. Check again on the day, because the orbit changes."
+    static let approximateNote = "This is far enough ahead that the orbit will have changed by then. The time sharpens "
+        + "when the satellite data is refreshed closer to the date."
     static let exposureSun = "Burst mode, 1/2000 s or faster; a solar filter is mandatory for the Sun \u{2014} never "
         + "look at or image the Sun without one."
     static let exposureMoon = "Burst mode, 1/2000 s or faster. Start the burst a few seconds early."
@@ -36,10 +39,18 @@ enum EventsTransitText {
     /// "Aim at the Sun" / "Aim at the Moon".
     static func aimLabel(_ body: SolarSystemBody) -> String { "Aim at the \(bodyName(body))" }
 
-    /// "Sat 21:14:07": the weekday and the time to the second in the user's 12 or 24 hour style.
-    static func whenText(_ date: Date, in timeZone: TimeZone) -> String {
-        let weekday = date.formatted(Date.FormatStyle(timeZone: timeZone).weekday(.abbreviated))
-        return "\(weekday) \(SatelliteText.timeWithSeconds(date, in: timeZone))"
+    /// The time of day of a transit in the user's 12 or 24 hour style: "21:14:07" to the second while the element set
+    /// is fresh at that moment, else "21:14".
+    static func time(_ item: EventsTransitItem, in timeZone: TimeZone) -> String {
+        item.hasFreshElements
+            ? SatelliteText.timeWithSeconds(item.transit.date, in: timeZone)
+            : AppFormat.time(item.transit.date, in: timeZone)
+    }
+
+    /// "Sat 21:14:07": the weekday and the time of day.
+    static func whenText(_ item: EventsTransitItem, in timeZone: TimeZone) -> String {
+        let weekday = item.transit.date.formatted(Date.FormatStyle(timeZone: timeZone).weekday(.abbreviated))
+        return "\(weekday) \(time(item, in: timeZone))"
     }
 
     /// "0.6 s", or "<0.1 s" for a crossing shorter than that.
@@ -69,7 +80,7 @@ enum EventsTransitText {
         let tail = transit.isFromSite
             ? duration(transit.siteDurationSeconds)
             : (transit.centreline.map(centrelineSummary) ?? "")
-        return "\(whenText(transit.date, in: timeZone)) \u{00B7} \(tail)"
+        return "\(whenText(item, in: timeZone)) \u{00B7} \(tail)"
     }
 
     /// What a screen reader says for a row.

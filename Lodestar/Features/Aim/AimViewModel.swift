@@ -40,8 +40,15 @@ final class AimViewModel {
     private(set) var virtualFieldOfView: Double
     /// The zoom of the camera picture asked for; the camera may support less (`cameraZoom`).
     private var requestedCameraZoom: Double
-    /// An object the alignment sheet asks to be guided to; it replaces the app's target while it is set.
-    var alignmentTarget: CelestialObject?
+    /// An object the alignment sheet asks to be guided to. While it is set it replaces the app's target, a followed
+    /// satellite and the panels of a mosaic in progress, which lead again when it is dropped. Aligning compares the
+    /// sky with the sensors now, so choosing one also ends a time preview.
+    var alignmentTarget: CelestialObject? {
+        didSet {
+            if alignmentTarget != nil { endPreview() }
+            refreshMosaicGuidance(force: true)
+        }
+    }
     /// How far from now the sky is previewed, in seconds: 0 is live, positive looks ahead, negative back, within
     /// ±48 hours (`AimPreview.limit`). Change it with `stepPreview`, `previewAt` and `endPreview`.
     private(set) var previewOffset: TimeInterval = 0
@@ -99,12 +106,16 @@ final class AimViewModel {
     /// The mosaic being shot, shared with the Sky chart.
     var mosaicSession: MosaicSession { MosaicSession.shared }
 
+    /// Whether the guidance leads to the panels of the mosaic in progress. The alignment sheet's star takes over while
+    /// it is chosen: the arrows have to lead to the star that Sync records, not to a panel.
+    var isGuidingMosaic: Bool { mosaicSession.isActive && alignmentTarget == nil }
+
     /// The object guidance leads to: the alignment sheet's choice, else the app's target. There is none while a satellite
     /// is the target (`satelliteSource`).
     var guidanceTarget: CelestialObject? { alignmentTarget ?? (app.satelliteAim.source == nil ? app.target : nil) }
 
     /// The satellite, or the peak of its pass, that guidance leads to instead of an object. The alignment sheet's choice
-    /// of a star comes first, and a mosaic in progress replaces it as it replaces the target.
+    /// of a star comes first, and then a mosaic in progress replaces it as it replaces the target.
     var satelliteSource: SatelliteAimSource? { alignmentTarget == nil ? app.satelliteAim.source : nil }
 
     /// The Starlink streak warning for the framing: worked out about once a second.
@@ -247,7 +258,7 @@ final class AimViewModel {
 
     /// What the watch shows as the target: the mosaic's progress, the satellite or the object the guidance leads to.
     private var watchTargetName: String {
-        if mosaicSession.isActive { return mosaicSession.progressText }
+        if isGuidingMosaic { return mosaicSession.progressText }
         if let source = satelliteSource { return source.title }
         return guidanceTarget.map(SmallBodyText.displayName) ?? ""
     }
@@ -320,10 +331,11 @@ final class AimViewModel {
 
     /// Points the guidance at the current panel's place in the sky at the previewed moment (the clock's time while
     /// live). A panel of an equatorial plan moves with the stars, so this runs about once a second while a mosaic is
-    /// shot, and at once when the panel changes. It costs microseconds: one panel, not the plan.
+    /// shot, and at once when the panel changes. It costs microseconds: one panel, not the plan. The panel is put
+    /// aside while the alignment sheet's star is chosen (`isGuidingMosaic`) and taken up again when it is dropped.
     private func refreshMosaicGuidance(force: Bool) {
         let session = mosaicSession
-        guard let plan = session.plan else {
+        guard let plan = session.plan, alignmentTarget == nil else {
             if lastMosaicRefresh != nil {
                 lastMosaicRefresh = nil
                 engine.setMosaic(active: false, aim: nil)

@@ -65,6 +65,10 @@ final class TerrainHorizonModel {
                 phase = .failed(TerrainText.unreadable)
                 return
             }
+            // The tiles are remembered first, so the status the new terrain horizon shows already has them.
+            let skipped = TerrainText.skippedTiles(of: result, unavailable: unavailable).count
+            TerrainTileMemory.store(siteID: saved.id, profile: result.profile,
+                                    needed: tilesUsed + unavailable.count + skipped, skipped: skipped)
             saved.terrainHorizon = result.profile
             app.settingsStore.updateSite(saved)
             phase = .done(TerrainText.summary(of: result, tilesUsed: tilesUsed, unavailable: unavailable))
@@ -109,7 +113,7 @@ struct HorizonTerrainSection: View {
     @ViewBuilder
     private func content(for site: SavedSite) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(site.terrainHorizon.map(TerrainText.status) ?? TerrainText.notComputed)
+            Text(TerrainText.status(of: site))
             if movedAway {
                 SettingsCaption(site.terrainHorizon != nil ? TerrainText.movedStored : TerrainText.moved)
             }
@@ -194,6 +198,7 @@ struct HorizonTerrainSection: View {
         if var saved = savedSite {
             saved.terrainHorizon = nil
             app.settingsStore.updateSite(saved)
+            TerrainTileMemory.forget(siteID: saved.id)
         }
         model.reset()
     }

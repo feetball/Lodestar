@@ -97,6 +97,8 @@ final class AppModel {
 
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
     @ObservationIgnored private var timeZoneUpgradeTask: Task<Void, Never>?
+    /// The site whose time zone was looked up last, so the next foreground goes on with the sites after it.
+    @ObservationIgnored private var lastTimeZoneUpgradeSiteID: UUID?
     @ObservationIgnored private var hasRequestedLocationThisLaunch = false
     @ObservationIgnored private var lastAlignmentContext: AlignmentContext?
     @ObservationIgnored private var lastSunEvaluation: (date: Date, observer: Observer)?
@@ -357,15 +359,16 @@ final class AppModel {
             camera.stop()
         }
 
-        // Screen: dim at night, keep awake while aiming; the torch has its own brightness and keeps the screen awake.
+        // Screen: dim at night, keep awake while aiming and while a mount is connected (a locked screen sends the app
+        // to the background, which ends the mount's session); the torch has its own brightness and keeps it awake.
         if active {
             if isTorchShown {
                 screen.setBrightnessOverride(settings.torchBrightness)
             } else {
                 screen.setBrightnessOverride(isNightModeActive && settings.dimScreenAtNight ? settings.nightBrightness : nil)
             }
-            screen.setIdleTimerDisabled(
-                isTorchShown || (selectedTab == .aim && settings.keepScreenAwake) || keepsScreenAwake)
+            let awakeBySetting = settings.keepScreenAwake && (selectedTab == .aim || MountService.shared.isConnected)
+            screen.setIdleTimerDisabled(isTorchShown || awakeBySetting || keepsScreenAwake)
         } else {
             screen.restore()
         }
@@ -409,14 +412,20 @@ final class AppModel {
 
     /// Looks up the real time zone of saved sites that only have the one estimated from their longitude (they were saved
     /// without a network). That estimate has no daylight saving time, so their times are an hour off for half the year.
-    /// The lookups run one after the other off the main thread, a few per foreground, and a site that cannot be resolved
-    /// now is simply tried again at the next foreground.
+    /// The lookups run one after the other off the main thread, a few per foreground, starting after the site tried
+    /// last so that sites the geocoder cannot resolve do not keep the ones behind them from a turn. A site that cannot
+    /// be resolved now is tried again once the others had theirs.
     private func upgradeEstimatedTimeZones() {
         guard timeZoneUpgradeTask == nil else { return }
-        let pending = settings.savedSites.filter { $0.timeZone.map(SettingsFormat.isNominal) ?? true }
-        guard !pending.isEmpty else { return }
+        let sites = settings.savedSites
+        let pendingIndices = sites.indices.filter { sites[$0].timeZone.map(SettingsFormat.isNominal) ?? true }
+        guard !pendingIndices.isEmpty else { return }
+        let resumeIndex = lastTimeZoneUpgradeSiteID.flatMap { id in sites.firstIndex(where: { $0.id == id }) } ?? -1
+        let pending = (pendingIndices.filter { $0 > resumeIndex } + pendingIndices.filter { $0 <= resumeIndex })
+            .map { sites[$0] }
         timeZoneUpgradeTask = Task { [weak self] in
             for site in pending.prefix(Self.timeZoneUpgradesPerForeground) {
+                self?.lastTimeZoneUpgradeSiteID = site.id
                 guard let zone = await TimeZoneResolver.timeZone(for: site.location), !SettingsFormat.isNominal(zone) else {
                     continue
                 }

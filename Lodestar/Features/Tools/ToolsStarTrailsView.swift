@@ -80,9 +80,9 @@ private struct ToolsStarTrailsForm: View {
         .navigationTitle("Star Trails & Time-Lapse")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: SkyKey(observer: app.observerContext?.observer, targetID: app.target?.id,
-                         frame: trail.setup.fieldOfView)) {
+                         frame: trail.poleFrame)) {
             while !Task.isCancelled {
-                sky = ToolsTrailSky(app: app, frameSize: trail.setup.fieldOfView)
+                sky = ToolsTrailSky(app: app, frameSize: trail.poleFrame)
                 try? await Task.sleep(for: Self.skyRefreshInterval)
             }
         }

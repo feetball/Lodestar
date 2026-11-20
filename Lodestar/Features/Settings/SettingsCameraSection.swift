@@ -128,15 +128,19 @@ struct SettingsCameraSection: View {
     private func importPhoto(_ item: PhotosPickerItem) async {
         defer { pickedPhoto = nil }
         photoMessage = nil
-        var result: CameraPhotoResult?
+        var outcome = CameraPhotoReader.Outcome.noLens
         if let data = try? await item.loadTransferable(type: Data.self) {
-            result = await Task.detached(priority: .userInitiated) { CameraPhotoReader.result(fromImageData: data) }.value
+            outcome = await Task.detached(priority: .userInitiated) {
+                CameraPhotoReader.read(fromImageData: data)
+            }.value
         }
-        if let result {
+        switch outcome {
+        case .result(let result):
             presentation.sheet = .editor(.photo(result))
-        } else {
-            photoMessage = "That picture does not say which lens it was taken with. Choose a photo straight from the "
-                + "camera, not a screenshot or an edited copy."
+        case .focalLengthOutOfRange(let millimeters):
+            photoMessage = CameraPhotoText.focalLengthMessage(millimeters: millimeters)
+        case .noLens:
+            photoMessage = CameraPhotoText.noLensMessage
         }
     }
 }
