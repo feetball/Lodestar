@@ -59,6 +59,7 @@ struct ObjectsView: View {
     @State private var isImporting = false
     @State private var importedList: ObjectsImportedList?
     @State private var importProblem: String?
+    @State private var isShowingFavoritesFull = false
     @State private var export = InterchangeExport()
 
     var body: some View {
@@ -93,6 +94,11 @@ struct ObjectsView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(importProblem ?? "")
+        }
+        .alert("Favorites Are Full", isPresented: $isShowingFavoritesFull) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Favorites hold \(AppSettings.maximumFavorites) objects. Remove one to add another.")
         }
         .task {
             await app.catalog.load()
@@ -224,7 +230,11 @@ struct ObjectsView: View {
 
     private func favoriteAction(for object: CelestialObject, isFavorite: Bool) -> some View {
         Button {
-            app.settingsStore.toggleFavorite(object.id)
+            if !isFavorite, app.settings.favoriteObjectIDs.count >= AppSettings.maximumFavorites {
+                isShowingFavoritesFull = true
+            } else {
+                app.settingsStore.toggleFavorite(object.id)
+            }
         } label: {
             ObjectsSwipeGlyph.image(systemName: isFavorite ? "star.slash.fill" : "star.fill", color: palette.accent)
         }
