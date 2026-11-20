@@ -147,6 +147,69 @@ final class OnlineTerrainTests: XCTestCase {
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
     }
 
+    // MARK: Tiles that arrive
+
+    /// A gzip file of an elevation tile without any relief: raw DEFLATE in stored blocks (nothing is compressed), which the
+    /// Compression framework inflates like any other. The CRC-32 is left at zero, as nothing reads it.
+    private static func flatTileGzip(samples: Int = TerrainTile.lowResolutionSamples) -> Data {
+        let size = samples * samples * 2
+        var file = Data([0x1F, 0x8B, 8, 0, 0, 0, 0, 0, 0, 3])
+        var remaining = size
+        while remaining > 0 {
+            let length = min(remaining, 65_535)
+            remaining -= length
+            file.append(remaining == 0 ? 1 : 0)
+            file.append(contentsOf: [UInt8(length & 0xFF), UInt8(length >> 8), UInt8(~length & 0xFF), UInt8((~length >> 8) & 0xFF)])
+            file.append(Data(count: length))
+        }
+        file.append(contentsOf: [0, 0, 0, 0])
+        file.append(contentsOf: [size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF].map { UInt8($0) })
+        return file
+    }
+
+    func testTheTilesThatArriveAreInflatedReadAndDeleted() async throws {
+        let log = Log()
+        let gzip = Self.flatTileGzip()
+        let outcome = await fetch(loader(log) { _ in
+            .downloaded(bytes: gzip, etag: nil, lastModified: nil, expires: nil)
+        }, log)
+        guard case .tiles(let tiles, let unavailable) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(tiles.map(\.key), wanted)
+        XCTAssertTrue(unavailable.isEmpty)
+        XCTAssertEqual(log.progress.count, 2 * wanted.count, "each tile is downloaded and then read")
+        XCTAssertEqual(log.progress.last, .reading(index: wanted.count, count: wanted.count, tile: try XCTUnwrap(wanted.last)))
+        let left = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        XCTAssertTrue(left.isEmpty, "\(left)")
+    }
+
+    func testATileTheProviderDoesNotHaveIsListedAsUnavailable() async throws {
+        let log = Log()
+        let gzip = Self.flatTileGzip()
+        let missing = try XCTUnwrap(wanted.first)
+        let outcome = await fetch(loader(log) { url in
+            url.absoluteString.hasSuffix(missing.path)
+                ? .failed(.httpError, statusCode: 404)
+                : .downloaded(bytes: gzip, etag: nil, lastModified: nil, expires: nil)
+        }, log)
+        guard case .tiles(let tiles, let unavailable) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(unavailable, [missing])
+        XCTAssertEqual(tiles.map(\.key), Array(wanted.dropFirst()))
+    }
+
+    func testAGzipFileThatInflatesToSomethingElseThanATileIsRefused() async {
+        let log = Log()
+        let outcome = await fetch(loader(log) { _ in
+            .downloaded(bytes: Self.flatTileGzip(samples: 10), etag: nil, lastModified: nil, expires: nil)
+        }, log)
+        XCTAssertEqual(failureText(outcome), "The file is not an elevation tile.")
+    }
+
+    func testTheInflaterReturnsExactlyOneTile() throws {
+        let tile = try TerrainTileInflater.inflate(Self.flatTileGzip())
+        XCTAssertEqual(tile.count, TerrainTile.lowResolutionSamples * TerrainTile.lowResolutionSamples * 2)
+        XCTAssertTrue(tile.allSatisfy { $0 == 0 })
+    }
+
     func testTheInflaterRefusesAFileThatIsNotGzip() {
         XCTAssertThrowsError(try TerrainTileInflater.inflate(Data("not gzip".utf8))) {
             XCTAssertEqual(($0 as? TerrainTileFailure)?.message, "The file is not a gzip file.")
