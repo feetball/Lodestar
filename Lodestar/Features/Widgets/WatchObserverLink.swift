@@ -46,6 +46,23 @@ final class WatchObserverLink {
         flush()
     }
 
+    /// Whether a live message would reach the watch app now: the session is active, a watch is paired with the app
+    /// installed, and that app is open (reachable).
+    var isWatchReachable: Bool {
+        guard WCSession.isSupported() else { return false }
+        activateIfNeeded()
+        let session = WCSession.default
+        return session.activationState == .activated && session.isPaired && session.isWatchAppInstalled
+            && session.isReachable
+    }
+
+    /// Sends `message` to the open watch app at once. Best effort: nothing is queued and a failure is ignored, because
+    /// the next message replaces this one.
+    func sendLive(_ message: [String: Any]) {
+        guard WCSession.isSupported() else { return }
+        WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: { _ in })
+    }
+
     // MARK: Private
 
     private func activateIfNeeded() {

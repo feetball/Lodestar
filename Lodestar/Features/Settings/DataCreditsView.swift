@@ -123,6 +123,17 @@ extension DataCredit {
                 + "\u{00A9} International Meteor Organization). The radiant drift rates are least-squares fits to the "
                 + "calendar's radiant tables."),
         DataCredit(
+            id: "grs", name: "Great Red Spot longitude, 2026", usedFor: "Great Red Spot transits",
+            author: "Sky & Telescope, from the JUPOS project",
+            license: "Published data, cited with credit", licenseURL: nil,
+            sourceURL: URL(string: "https://skyandtelescope.org/observing/interactive-sky-watching-tools/"
+                           + "transit-times-of-jupiters-great-red-spot/"),
+            notice: "The default longitude of the Great Red Spot in Jupiter\u{2019}s System II, 91\u{00B0} on June 1, "
+                + "2026 and drifting 1.75\u{00B0} a month, is the one Sky & Telescope\u{2019}s online tool \u{201C}Transit "
+                + "Times of Jupiter\u{2019}s Great Red Spot\u{201D} assumes, from trends noted by JUPOS. Jupiter\u{2019}s "
+                + "central meridians and the positions of its four large moons follow Meeus, Astronomical Algorithms, "
+                + "2nd ed., chapters 43 and 44. You can enter your own longitude in Settings."),
+        DataCredit(
             id: "black-marble", name: "NASA Black Marble night lights (VIIRS, Suomi NPP)",
             usedFor: "Sky quality (Bortle estimate, darkest direction, horizon glow)",
             author: "NASA Worldview / GIBS, Black Marble (VIIRS, Suomi NPP)",

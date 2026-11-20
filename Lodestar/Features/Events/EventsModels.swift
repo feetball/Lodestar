@@ -2,7 +2,7 @@ import Foundation
 import LodestarKit
 
 /// What one run of the events calculator is asked for: where the observer is, in which time zone the days are
-/// counted and from which local day the next twelve months run.
+/// counted, from which local day the next twelve months run and which Great Red Spot the transits are worked out for.
 struct EventsKey: Sendable, Equatable {
     /// How far the observer may move before the events are worked out again, in kilometres. Their visibility and the
     /// local circumstances of an eclipse change slowly with the place.
@@ -14,11 +14,14 @@ struct EventsKey: Sendable, Equatable {
     let timeZone: TimeZone
     /// The start of the local day the calendar begins with.
     let dayStart: Date
+    /// The spot whose transits the calendar lists for its first two days.
+    let greatRedSpot: GreatRedSpot
 
-    init(context: ObserverContext, now: Date) {
+    init(context: ObserverContext, now: Date, greatRedSpot: GreatRedSpot = .reference) {
         observer = context.observer
         timeZone = context.timeZone
         dayStart = context.calendar.startOfDay(for: now)
+        self.greatRedSpot = greatRedSpot
     }
 
     /// The end of the span (inclusive), the same local time `spanDays` later.
@@ -29,10 +32,11 @@ struct EventsKey: Sendable, Equatable {
             ?? dayStart.addingTimeInterval(Double(Self.spanDays) * 86_400)
     }
 
-    /// Whether events worked out for `self` can stand in for `other`: the same local day and zone, and a place
-    /// within `placeToleranceKilometers`.
+    /// Whether events worked out for `self` can stand in for `other`: the same local day, zone and Great Red Spot, and
+    /// a place within `placeToleranceKilometers`.
     func covers(_ other: EventsKey) -> Bool {
-        dayStart == other.dayStart && timeZone.identifier == other.timeZone.identifier && isNear(other)
+        dayStart == other.dayStart && timeZone.identifier == other.timeZone.identifier
+            && greatRedSpot == other.greatRedSpot && isNear(other)
     }
 
     /// Whether `other` is within `placeToleranceKilometers` of the place, whatever the day.
@@ -101,7 +105,7 @@ struct EventsEntry: Identifiable, Hashable, Sendable {
 /// The groups the calendar's filter offers. An event can belong to several: a Moon–Venus conjunction is a
 /// conjunction and a Moon event, a lunar eclipse is an eclipse and a Moon event.
 enum EventsCategory: String, CaseIterable, Identifiable, Sendable {
-    case meteorShowers, conjunctions, eclipses, planets, moon, seasons
+    case meteorShowers, conjunctions, eclipses, planets, jupiter, moon, seasons
 
     var id: String { rawValue }
 
@@ -111,6 +115,7 @@ enum EventsCategory: String, CaseIterable, Identifiable, Sendable {
         case .conjunctions: return "Conjunctions"
         case .eclipses: return "Eclipses"
         case .planets: return "Planets"
+        case .jupiter: return "Jupiter"
         case .moon: return "Moon"
         case .seasons: return "Seasons"
         }
@@ -122,6 +127,7 @@ enum EventsCategory: String, CaseIterable, Identifiable, Sendable {
         case .conjunctions: return "circle.grid.2x1.fill"
         case .eclipses: return "circle.lefthalf.filled"
         case .planets: return "circle.circle"
+        case .jupiter: return "smallcircle.filled.circle"
         case .moon: return "moon"
         case .seasons: return "sun.max"
         }
@@ -132,7 +138,8 @@ enum EventsCategory: String, CaseIterable, Identifiable, Sendable {
     /// - Meteor showers: the peaks of the showers.
     /// - Conjunctions: every conjunction.
     /// - Eclipses: lunar and solar eclipses.
-    /// - Planets: oppositions, greatest elongations and conjunctions of two planets.
+    /// - Planets: oppositions, greatest elongations, stations and conjunctions of two planets.
+    /// - Jupiter: the Great Red Spot's transits and the Galilean moons' events.
     /// - Moon: special full Moons, lunar eclipses and every conjunction with the Moon.
     /// - Seasons: equinoxes and solstices (and the Earth's apsides, when they are asked for).
     func includes(_ event: AstronomicalEvent) -> Bool {
@@ -143,7 +150,9 @@ enum EventsCategory: String, CaseIterable, Identifiable, Sendable {
             return true
         case (.eclipses, .lunarEclipse), (.eclipses, .solarEclipse):
             return true
-        case (.planets, .opposition), (.planets, .greatestElongation):
+        case (.planets, .opposition), (.planets, .greatestElongation), (.planets, .planetStation):
+            return true
+        case (.jupiter, .greatRedSpotTransit), (.jupiter, .jupiterMoonEvent):
             return true
         case let (.planets, .conjunction(conjunction)):
             return !conjunction.involvesMoon && Self.isPlanet(conjunction.second)

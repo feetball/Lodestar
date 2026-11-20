@@ -53,7 +53,11 @@ final class AimViewModel {
     @ObservationIgnored private var hadSatellite = false
     @ObservationIgnored private var pinchStartFieldOfView: Double?
     @ObservationIgnored private var pinchStartCameraZoom: Double?
-    @ObservationIgnored private var wasOnTarget: Bool?
+    /// Whether the last frame was on target; `nil` when the on-target state starts afresh (another target, panel or
+    /// satellite, or no guidance). Spoken guidance starts a new session at the same moments.
+    @ObservationIgnored private var wasOnTarget: Bool? {
+        didSet { if wasOnTarget == nil { app.spokenGuidance.reset() } }
+    }
     /// The session revision and clock second the mosaic guidance was last refreshed for.
     @ObservationIgnored private var lastMosaicRefresh: (revision: Int, date: Date)?
 
@@ -192,8 +196,8 @@ final class AimViewModel {
         }
     }
 
-    /// Runs the aiming logic about 30 times a second until cancelled: the HUD rotation, the audio ticks and the
-    /// haptics for reaching and leaving the target.
+    /// Runs the aiming logic about 30 times a second until cancelled: the HUD rotation, the audio ticks, the spoken
+    /// guidance, the Apple Watch and the haptics for reaching and leaving the target.
     func runLoop() async {
         while !Task.isCancelled {
             step()
@@ -212,6 +216,10 @@ final class AimViewModel {
             return
         }
         app.feedback.guidanceTick(separation: guidance.separation)
+        app.spokenGuidance.update(guidance)
+        if app.settings.aimOnWatch {
+            WatchAimLink.shared.send(guidance, targetName: watchTargetName, isNight: app.isNightModeActive)
+        }
         let isOnTarget = guidance.state == .onTarget
         if let wasOnTarget, wasOnTarget != isOnTarget {
             if isOnTarget {
@@ -230,10 +238,18 @@ final class AimViewModel {
         if rotation != hudRotation { hudRotation = rotation }
     }
 
-    /// Silences the guidance audio; call when the screen goes away.
+    /// Silences the guidance audio and the spoken guidance; call when the screen goes away.
     func stopFeedback() {
         app.feedback.stopGuidanceAudio()
+        app.spokenGuidance.stop()
         wasOnTarget = nil
+    }
+
+    /// What the watch shows as the target: the mosaic's progress, the satellite or the object the guidance leads to.
+    private var watchTargetName: String {
+        if mosaicSession.isActive { return mosaicSession.progressText }
+        if let source = satelliteSource { return source.title }
+        return guidanceTarget.map(SmallBodyText.displayName) ?? ""
     }
 
     // MARK: Time preview

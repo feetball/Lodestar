@@ -3,16 +3,19 @@ import LodestarKit
 
 /// The astronomy behind the events screens. Pure, so it can run on any thread.
 enum EventsCalculator {
-    /// The options every list uses: the zone of the observer's site, and a 3° limit for the Moon's conjunctions and for
-    /// the planets' (the engine's default for the Moon, 5°, gives far more than a calendar needs).
-    static func options(timeZone: TimeZone) -> EventOptions {
-        EventOptions(planetConjunctionThreshold: 3, moonConjunctionThreshold: 3, timeZone: timeZone)
+    /// The options every list uses: every kind the calendar knows (the Great Red Spot transits and moon events of
+    /// Jupiter for the first two days only, the engine's default), the zone of the observer's site, and a 3° limit for
+    /// the Moon's conjunctions and for the planets' (the engine's default for the Moon, 5°, gives far more than a
+    /// calendar needs).
+    static func options(timeZone: TimeZone, greatRedSpot: GreatRedSpot = .reference) -> EventOptions {
+        EventOptions(kinds: EventKind.calendarKinds, planetConjunctionThreshold: 3, moonConjunctionThreshold: 3,
+                     timeZone: timeZone, greatRedSpot: greatRedSpot)
     }
 
     /// The events of the next twelve months for the observer, in time order, with their visibility.
     static func entries(for key: EventsKey) -> [EventsEntry] {
         let events = EventCalculator.events(from: key.dayStart, to: key.end, observer: key.observer,
-                                            options: options(timeZone: key.timeZone))
+                                            options: options(timeZone: key.timeZone, greatRedSpot: key.greatRedSpot))
         return events.map { entry(for: $0, observer: key.observer) }
     }
 

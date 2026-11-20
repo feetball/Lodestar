@@ -72,6 +72,16 @@ struct SavedSite: Codable, Identifiable, Hashable, Sendable {
     var timeZone: TimeZone? { timeZoneIdentifier.flatMap(TimeZone.init(identifier:)) }
 }
 
+/// The Great Red Spot's System II longitude as the user read it (`longitude`, degrees, [0, 360)) on the day `asOf`.
+/// The kit moves it on from there with the spot's usual drift. Absent, the kit's dated default applies.
+struct GreatRedSpotSetting: Codable, Equatable, Sendable {
+    var longitude: Double
+    var asOf: Date
+
+    /// The spot this describes, or `nil` when the values are not usable.
+    var spot: GreatRedSpot? { GreatRedSpot(longitude: longitude, epoch: asOf) }
+}
+
 enum NightModeSetting: String, Codable, CaseIterable, Identifiable, Sendable {
     case off, on, automatic
     var id: String { rawValue }
@@ -102,6 +112,13 @@ enum CoordinateStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case sexagesimal, decimal
     var id: String { rawValue }
     var title: String { self == .sexagesimal ? "h m s / ° ′ ″" : "Decimal" }
+}
+
+/// How fast spoken guidance talks.
+enum SpokenGuidanceRate: String, Codable, CaseIterable, Identifiable, Sendable {
+    case slow, normal
+    var id: String { rawValue }
+    var title: String { self == .slow ? "Slow" : "Normal" }
 }
 
 /// Every persisted user preference. Decoding is forward compatible: missing or invalid keys fall
@@ -165,6 +182,11 @@ struct AppSettings: Codable, Equatable, Sendable {
     var hapticsEnabled = true
     var audioCuesEnabled = false
     var keepScreenAwake = true
+    /// Speaks the pan and tilt to make while aiming ("Pan right 12, tilt up 3").
+    var spokenGuidance = false
+    var spokenGuidanceRate: SpokenGuidanceRate = .normal
+    /// Shows the aiming on the Apple Watch while Aim is open (nothing is sent without a watch).
+    var aimOnWatch = true
 
     // Sky display
     var showConstellationLines = true
@@ -185,6 +207,10 @@ struct AppSettings: Codable, Equatable, Sendable {
     // Objects
     var favoriteObjectIDs: [String] = []
     var recentObjectIDs: [String] = []
+
+    // Jupiter
+    /// The Great Red Spot's longitude the user entered, or `nil` for the kit's dated default.
+    var greatRedSpot: GreatRedSpotSetting?
 
     init() {}
 
@@ -224,6 +250,9 @@ struct AppSettings: Codable, Equatable, Sendable {
         hapticsEnabled = value(.hapticsEnabled, d.hapticsEnabled)
         audioCuesEnabled = value(.audioCuesEnabled, d.audioCuesEnabled)
         keepScreenAwake = value(.keepScreenAwake, d.keepScreenAwake)
+        spokenGuidance = value(.spokenGuidance, d.spokenGuidance)
+        spokenGuidanceRate = value(.spokenGuidanceRate, d.spokenGuidanceRate)
+        aimOnWatch = value(.aimOnWatch, d.aimOnWatch)
         showConstellationLines = value(.showConstellationLines, d.showConstellationLines)
         showConstellationNames = value(.showConstellationNames, d.showConstellationNames)
         showDeepSkyObjects = value(.showDeepSkyObjects, d.showDeepSkyObjects)
@@ -236,6 +265,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         pressureMillibars = value(.pressureMillibars, d.pressureMillibars)
         favoriteObjectIDs = Array(value(.favoriteObjectIDs, d.favoriteObjectIDs).prefix(Self.maximumFavorites))
         recentObjectIDs = Array(value(.recentObjectIDs, d.recentObjectIDs).prefix(Self.maximumRecents))
+        greatRedSpot = value(.greatRedSpot, d.greatRedSpot)
         sanitize()
     }
 
@@ -258,11 +288,15 @@ struct AppSettings: Codable, Equatable, Sendable {
         if case .site(let id) = locationSource, !savedSites.contains(where: { $0.id == id }) {
             locationSource = .device
         }
+        if let setting = greatRedSpot, setting.spot == nil { greatRedSpot = nil }
     }
 
     var atmosphere: Atmosphere {
         Atmosphere(pressureMillibars: pressureMillibars, temperatureCelsius: temperatureCelsius)
     }
+
+    /// The Great Red Spot to compute with: the user's longitude, else `GreatRedSpot.reference`.
+    var greatRedSpotOrDefault: GreatRedSpot { greatRedSpot?.spot ?? .reference }
 
     // MARK: Camera profiles
 

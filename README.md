@@ -11,7 +11,8 @@ tilt the tripod head until it is in your frame.
 - **Guided aiming** — a live finder (camera view or virtual sky) with the target marker, an arrow
   pointing the shortest way, "Pan right 23.4° / Tilt up 12.1°" read-outs for pan-tilt heads, the
   distance to go, an on-target state with haptics, optional audio ticks that speed up as you get
-  closer, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
+  closer, optional spoken guidance ("Pan right 12, tilt up 3 … Almost there … On target") for when
+  the phone is above eye level, a level gauge, and the outline of *your* camera's frame (from sensor size and focal length).
   Keep a **camera profile** for each body and lens, start from a smart-telescope preset (Seestar, Dwarf,
   Vespera) or read a profile from a photo's EXIF data, and switch with one tap; a **fisheye** lens gets a
   curved or circular frame. With no target it names what is in the middle of the picture, and the camera
@@ -49,12 +50,18 @@ tilt the tripod head until it is in your frame.
   same estimate shows on every site, and the sky chart can draw a thin glow ring on the horizon.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
-  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
-  and where to look and a button to aim at it. With the satellite feed on, a section lists when the ISS or Tiangong
+  solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, the stations
+  of the planets, and for planet imagers the Great Red Spot's transits and the Galilean moons' transits, shadows
+  and eclipses (with a "Moons tonight" diagram on Jupiter's screen), each with when and where to look and a button
+  to aim at it.
+With the satellite feed on, a section lists when the ISS or Tiangong
   crosses the Sun or the Moon in the next 14 days, from your site or from a centreline within 50 km, with the time
   to the second, the duration and the coordinates to copy.
 - **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
   order, guided panel by panel in Aim), and star-trail and time-lapse planners.
+  - **Alignment finder** — when does the Milky Way core, the Moon or any object stand over a ridge or in a gap
+    between trees? Pick a point of your recorded skyline (or an azimuth and altitude window), a period, how dark
+    it must be and what the Moon may do, and get the matching nights, with the sky chart at that time and Aim.
 - **Session log and lists** — a private diary of what you shot (frames, exposure, ISO, filter, notes) with CSV
   and OpenAstronomyLog 2.1 export, a check mark on the objects you imaged, observing lists imported from CSV,
   Telescopius and SkySafari files into your favorites (favorites export as CSV or a SkySafari list), and mosaic
@@ -84,7 +91,8 @@ tilt the tripod head until it is in your frame.
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
   worked out on the device for where you are (Core Location in the widget, no App Group, no network),
-  and a tap opens the Tonight tab. The watch app adds a small Tonight screen.
+  and a tap opens the Tonight tab. The watch app adds a small Tonight screen and an Aim page that
+  mirrors the phone while it aims (arrow, pan and tilt, distance, a tap on target, red in night mode).
 - **Siri, Shortcuts, Control Center and the red torch** — "Aim Lodestar at Andromeda", "When is it dark in Lodestar" (spoken
   from the device, no app launch), night mode and the red torch by voice or from the Shortcuts app; Night Mode, Red Torch and
   Aim controls for Control Center and the Lock Screen (iOS 18); a Live Activity on the Lock Screen and in the Dynamic
@@ -142,7 +150,7 @@ Lodestar/            iOS app (SwiftUI, Observation, Swift 5 mode with complete c
   Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools, Widgets (links, watch link)
 LodestarWidgets/     iOS widget extension: the Home Screen layouts of the Tonight widget, the Control Center controls and the
                      Live Activity of a satellite pass
-LodestarWatch/       Apple Watch app (watchOS 10, embedded in the iPhone app): the Tonight screen
+LodestarWatch/       Apple Watch app (watchOS 10, embedded in the iPhone app): the Tonight screen and the Aim page
 LodestarWatchWidgets/  watch complications
 WidgetShared/        what the three share: tonight's entries from LodestarKit (no catalog), the location,
                      the timeline provider, the Lock Screen / complication views and the widget look; the App Intents
