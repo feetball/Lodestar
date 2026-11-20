@@ -10,6 +10,40 @@ struct SmallBodyTonight: Sendable {
     static let none = SmallBodyTonight(bright: [], targets: [])
 }
 
+/// How a comet of the "Bright Comets" card stands in the dark hours of the night, said the way the Best Targets rows
+/// say it: the highest it gets, and for how long it is above `TonightCalculator.minimumTargetAltitude`.
+struct SmallBodyNightSight: Sendable, Equatable {
+    /// The highest geometric altitude reached while it is dark, in degrees.
+    let peakAltitude: Double
+    /// When that happens.
+    let peakTime: Date
+    /// The hours of darkness it is at or above `TonightCalculator.minimumTargetAltitude` (and above the skyline, when
+    /// `isOverSkyline`).
+    let hoursAboveMinimum: Double
+    /// Whether the site's recorded skyline was applied.
+    let isOverSkyline: Bool
+
+    /// "Highest 34° at 23:40 · 3h 10m above 20°", or with a skyline "… · 3.4 h clear of your skyline". A comet that
+    /// never gets high enough says so: "Stays below 20° while it is dark", "Behind your skyline while it is dark".
+    func text(in timeZone: TimeZone, spoken: Bool = false) -> String {
+        let minimum = Int(TonightCalculator.minimumTargetAltitude)
+        let degrees = spoken ? " degrees" : "\u{00B0}"
+        guard hoursAboveMinimum > 0 else {
+            if isOverSkyline, peakAltitude >= TonightCalculator.minimumTargetAltitude {
+                return "Behind your skyline while it is dark"
+            }
+            return "Stays below \(minimum)\(degrees) while it is dark"
+        }
+        let best = "Highest \(AngleFormatter.formatDegrees(peakAltitude, decimals: 0)) at "
+            + AppFormat.time(peakTime, in: timeZone)
+        let above = isOverSkyline
+            ? "\(ObjectsFormat.hours(hoursAboveMinimum, spoken: spoken)) clear of your skyline"
+            : "\(TonightFormat.duration(hours: hoursAboveMinimum)) above \(minimum)\(degrees)"
+        guard !spoken else { return "\(best), \(above)" }
+        return TonightFormat.dotted([TonightFormat.solid(best), TonightFormat.solid(above)])
+    }
+}
+
 /// Plans the comets and asteroids of a night. Pure, so it can run on any thread (a few milliseconds).
 enum SmallBodyTonightPlanner {
     /// The most comets the card shows.
@@ -36,6 +70,11 @@ enum SmallBodyTonightPlanner {
         let date = summary.referenceDate
         let bright = SmallBodyBrightLists.entries(in: catalog, at: date, period: .now, limit: cardMagnitudeLimit,
                                                   kind: .comets, maximumCount: cardCount)
+            .map { entry -> SmallBodyListEntry in
+                var entry = entry
+                entry.night = nightSight(of: entry.object, summary: summary, skyline: skyline)
+                return entry
+            }
         return SmallBodyTonight(bright: bright,
                                 targets: targets(catalog: catalog, summary: summary, skyline: skyline, date: date,
                                                  bodies: bodies))
@@ -66,6 +105,16 @@ enum SmallBodyTonightPlanner {
                 note: SmallBodyText.summary(of: object, info: info)))
         }
         return targets
+    }
+
+    /// How `object` stands in the dark hours of the night; `nil` when there is no astronomical darkness to judge by.
+    private static func nightSight(of object: CelestialObject, summary: NightSummary,
+                                   skyline: HorizonProfile?) -> SmallBodyNightSight? {
+        guard summary.hasAstronomicalDarkness else { return nil }
+        let found = visibility(of: object, summary: summary, skyline: skyline)
+        guard let peak = found.maxAltitudeDuringDarkness, let time = found.bestTime, !peak.isNaN else { return nil }
+        return SmallBodyNightSight(peakAltitude: peak, peakTime: time, hoursAboveMinimum: found.hoursAboveMinimum,
+                                   isOverSkyline: skyline != nil)
     }
 
     /// How well `object` can be observed during the dark hours of the night (the planner's one-object call, about 1 ms).

@@ -28,6 +28,11 @@ struct ObjectsOptionsMenu: View {
                 set: { sortOrder = $0 })
     }
 
+    /// A menu shows no footer, so without a location the title says why the horizon and tonight filters are dimmed.
+    private var filtersTitle: String {
+        hasLocation ? "Filters" : "Filters (Some Need a Location)"
+    }
+
     var body: some View {
         Menu {
             Section("Group By") {
@@ -50,7 +55,7 @@ struct ObjectsOptionsMenu: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             }
-            Section("Filters") {
+            Section(filtersTitle) {
                 Toggle(isOn: $showsOnlyAboveHorizon) {
                     Label("Above Horizon Now", systemImage: "arrow.up.right")
                 }
