@@ -55,7 +55,7 @@ struct HelpTopic: Identifiable, Hashable {
         case gettingStarted, mounting, aimScreen, alignment, compassAndGyro
         case objects, skyChart, planFraming, tonight, events
         case mosaic, trailsAndExposure, skyline, sites
-        case cameraAndLens, mounts, nightMode, onlineData, widgets
+        case cameraAndLens, mounts, nightMode, onlineData, widgets, shortcuts
         case troubleshooting, glossary
     }
 

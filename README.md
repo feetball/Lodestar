@@ -81,6 +81,11 @@ tilt the tripod head until it is in your frame.
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
   worked out on the device for where you are (Core Location in the widget, no App Group, no network),
   and a tap opens the Tonight tab. The watch app adds a small Tonight screen.
+- **Siri, Shortcuts, Control Center and the red torch** — "Aim Lodestar at Andromeda", "When is it dark in Lodestar" (spoken
+  from the device, no app launch), night mode and the red torch by voice or from the Shortcuts app; Night Mode, Red Torch and
+  Aim controls for Control Center and the Lock Screen (iOS 18); a Live Activity on the Lock Screen and in the Dynamic
+  Island that counts down to the rise and the peak of a satellite pass you follow in Aim; and a full-screen red torch with a
+  brightness bar, white light behind a confirmation, and a double-tap to close.
 - **Night mode** — a pure red-on-black interface (no green or blue light at all), automatic after
   sunset, with screen dimming and a red-filtered camera view. Lodestar also explains how to set up
   iOS Color Filters for a system-wide red screen.
@@ -131,11 +136,13 @@ Lodestar/            iOS app (SwiftUI, Observation, Swift 5 mode with complete c
   Services/          location, device motion (CoreMotion), camera (AVFoundation + CoreImage),
                      haptics/audio, screen brightness, catalog loading, time-zone lookup
   Features/          Aim, Objects, SkyChart, Tonight, Settings, Onboarding, Tools, Widgets (links, watch link)
-LodestarWidgets/     iOS widget extension: the Home Screen layouts of the Tonight widget
+LodestarWidgets/     iOS widget extension: the Home Screen layouts of the Tonight widget, the Control Center controls and the
+                     Live Activity of a satellite pass
 LodestarWatch/       Apple Watch app (watchOS 10, embedded in the iPhone app): the Tonight screen
 LodestarWatchWidgets/  watch complications
 WidgetShared/        what the three share: tonight's entries from LodestarKit (no catalog), the location,
-                     the timeline provider, the Lock Screen / complication views and the widget look
+                     the timeline provider, the Lock Screen / complication views and the widget look; the App Intents
+                     and the Live Activity's attributes (also compiled into the app)
 LodestarKit/         Swift package, Foundation only, builds and tests on macOS and Linux
   Foundation/        time scales, coordinates, precession/nutation/aberration, refraction, SkyFrame
   Ephemeris/         Sun & planets (VSOP87), Pluto (Meeus), Moon (ELP-2000/82 after Meeus), rise/set,
