@@ -5,6 +5,8 @@ import SwiftUI
 struct WatchTonightView: View {
     /// How often the entries are worked out again while the screen is open.
     private static let refreshInterval: Duration = .seconds(30 * 60)
+    /// How often while location is allowed but no fix has come, which ends by itself.
+    private static let waitingForFixInterval: Duration = .seconds(5 * 60)
 
     @Environment(WatchTonightModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
@@ -33,7 +35,8 @@ struct WatchTonightView: View {
             model.start()
             while !Task.isCancelled {
                 await model.refresh()
-                try? await Task.sleep(for: Self.refreshInterval)
+                let isWaiting = model.needsLocation && model.locationIssue == .waitingForFix
+                try? await Task.sleep(for: isWaiting ? Self.waitingForFixInterval : Self.refreshInterval)
             }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -185,7 +188,7 @@ struct WatchTonightView: View {
 
     private var needsLocation: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "location.slash")
+            Image(systemName: TonightNeedsLocationText.symbol(model.locationIssue))
                 .font(.title2)
                 .foregroundStyle(TonightStyle.accent)
                 .accessibilityHidden(true)
