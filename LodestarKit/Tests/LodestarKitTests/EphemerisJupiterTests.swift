@@ -77,9 +77,9 @@ final class EphemerisJupiterTests: XCTestCase {
     func testGalileanMoonsAgreeWithJplHorizons() {
         // JPL Horizons vector tables (jup365 satellites, DE441 Jupiter, Sun and Earth; queried 2026-11-19) turned into
         // Jupiter's axes (X west along the equator of the IAU 2015 pole, Y north) as seen from the geocentre: the four
-        // moons 2615 s of light-time before 2026-11-19 00:42:15.8 UTC, in Jupiter radii (equatorial 71 492 km).
+        // moons 2615 s of light-time before 2026-11-19 00:42:16 UTC, in Jupiter radii (equatorial 71 492 km).
         let truth = [(0.889, 0.027), (-2.349, -0.111), (4.544, 0.062), (-20.011, -0.028)]
-        let state = GalileanMoons.positions(at: JulianDate(date: utc("2026-11-19T00:42:15.8Z")))
+        let state = GalileanMoons.positions(at: JulianDate(date: utc("2026-11-19T00:42:16Z")))
         for (index, moon) in state.moons.enumerated() {
             assertNear(truth[index].0, moon.x, 0.12, "\(moon.moon) X")
             assertNear(truth[index].1, moon.y, 0.15, "\(moon.moon) Y")
