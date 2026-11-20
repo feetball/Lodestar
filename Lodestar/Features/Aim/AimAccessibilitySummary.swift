@@ -26,7 +26,7 @@ struct AimAccessibilitySummary: View {
         guard let moment = model.previewMoment else { return "" }
         let lead = AimPreview.spokenChip(time: moment.time, day: moment.day, isDaylight: model.isDaylightAtPreview == true)
         guard let target = model.guidanceTarget, let placed = model.engine.frame()?.target,
-              !model.mosaicSession.isActive, model.isSkyBuiltForPreview else { return lead + " " }
+              !model.isGuidingMosaic, model.isSkyBuiltForPreview else { return lead + " " }
         let place = AimPreview.spokenPlace(name: target.name, altitude: placed.horizontal.altitude, time: moment.text,
                                            isFuture: moment.isFuture)
         return lead + " " + place + " "
@@ -38,7 +38,7 @@ struct AimAccessibilitySummary: View {
             " The sky overlay shades the ground below the \(HorizonText.spokenName(app.observerContext?.horizonSource)), up to \(AimFormat.spoken($0.highestAltitude)) high."
         } ?? ""
         let session = model.mosaicSession
-        if session.isActive {
+        if model.isGuidingMosaic {
             return mosaicSummary(session: session, frame: frame) + skyline
         }
         if let source = model.satelliteSource {

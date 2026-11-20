@@ -17,6 +17,9 @@ struct AlignmentSheet: View {
     @State private var notice: AimAlignmentNotice?
     /// Whether the sync also tells a connected GoTo mount that it points at the object.
     @State private var syncsMount = true
+    /// Whether the footer shows how the mount's sync went after the object is dropped, which removes the row with the
+    /// toggle that shows it while an object is chosen.
+    @State private var showsMountOutcome = false
     /// While Sync waits for a steady camera: how much of the steady window has passed, from 0 to 1; `nil` otherwise.
     @State private var holdProgress: Double?
 
@@ -107,6 +110,9 @@ struct AlignmentSheet: View {
                 Button("Choose another object") { deselect() }
                     .buttonStyle(.lodestarSecondary)
             } else {
+                if showsMountOutcome {
+                    MountAlignmentSyncOutcome()
+                }
                 Text("Choose a bright star or planet from the list.")
                     .font(.footnote)
                     .foregroundStyle(palette.secondaryText)
@@ -170,6 +176,7 @@ struct AlignmentSheet: View {
     private func select(_ candidate: AimAlignmentCandidate) {
         selected = candidate
         notice = nil
+        showsMountOutcome = false
         model.alignmentTarget = candidate.object
     }
 
@@ -254,6 +261,7 @@ struct AlignmentSheet: View {
     /// The star is centred in the camera, which sits on the GoTo mount: the mount takes it as its position as well.
     private func syncMountIfWanted(to object: CelestialObject, observer: Observer) {
         guard syncsMount, MountService.shared.isConnected, MountService.shared.capabilities?.canSync == true else { return }
+        showsMountOutcome = true
         Task { await MountService.shared.syncMount(to: object, observer: observer) }
     }
 
