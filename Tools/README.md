@@ -1,7 +1,31 @@
 # Tools
 
-Generators for the data Lodestar ships with. Every script pins its upstream sources and checks
-them, so the generated files can be rebuilt byte for byte.
+Generators for the data Lodestar ships with. The scripts that build the bundled catalogs, the coefficient tables, the
+night-lights grid and the asteroid file pin their upstream sources by hash and check them, so their output can be rebuilt
+byte for byte. The scripts that write comet and asteroid test data from live JPL and MPC answers are not pinned: their
+committed output is the record of one day's snapshot, and a re-run gives different numbers. The table says which is
+which.
+
+| Script | Writes | Inputs | Rebuilds byte for byte |
+| --- | --- | --- | --- |
+| `build_catalogs.py` | the four JSON catalogs | GitHub commits and CDS files pinned in `sources.lock.json` | yes; `--check` verifies |
+| `build_light_pollution.py` | `lightpollution.bin` | 200 GIBS tiles pinned in `lightpollution.lock.json` | yes; `--check` verifies |
+| `build_bright_asteroids.py` | `asteroids.txt` | one MPCORB snapshot pinned in `asteroids.lock.json` (the MPC keeps no archive) | yes, from that snapshot; `--check` verifies offline |
+| `generate_wmm_coefficients.py` | `WMM2025Coefficients.swift` | NOAA's WMM2025 zip, pinned by sha256 | yes; `--check` verifies |
+| `ephemeris/gen_lunar_theory.py`, `gen_pluto_theory.py` | `LunarTheory.swift`, `PlutoTheory.swift` (and its Kotlin twin) | tables in the repository, no network | yes |
+| `ephemeris/gen_planetary_theory.py` | `PlanetaryTheory.swift` | the eight IMCCE `VSOP87B.*` files you download; their digests go into the header, the script does not compare them with a pin | yes, from the same files |
+| `make_fixtures.py` | the Skyfield / DE440s fixtures | `de440s.bsp` pinned by sha256; Skyfield and its helpers pinned in `requirements-fixtures.txt`; seeded sampling | yes, with those library versions |
+| `make_satellite_fixtures.py` | the satellite fixtures | `sgp4`, `passes`, `streaks`: downloads pinned by sha256 (table below); `snapshot`: CelesTrak data of the day | yes, except `snapshot` |
+| `make_satellite_transit_reference.py` | prints the ISS transit reference | the committed TLE fixture; `de440s.bsp` from `~/.cache/lodestar-fixtures`, which it does not hash itself | yes, given that kernel |
+| `make_app_icon.py` | the three app icon PNGs | none: drawn from fixed seeds (needs Pillow and NumPy) | the same artwork |
+| `gen_kepler.py` | `CometsKeplerData.kt` / `.swift` | none: Kepler solutions at 60 digits with mpmath (version not pinned) | deterministic |
+| `fetch_refs.py`, `gen_refs.py`, `fetch_topo.py`, `fetch_mpc_cases.py`, `gen_ref_sources.py`, `gen_testdata.py`, `make_asteroid_reference.py` | the Horizons and MPC test data | live JPL Horizons, JPL small-body and MPC answers; no hash, no lock | **no**, see "Comet and asteroid test data" |
+| `coverage_report.py` | prints line coverage | the llvm-cov JSON of `swift test --enable-code-coverage` | not applicable |
+
+`check-embedded-products.sh` checks that a built app holds the widgets and the watch app (CI runs it).
+`capture_screenshots.sh` takes the App Store screenshots on a Mac; it builds its own clone in `~/Lodestar`, not the
+checkout it is started from. `review/` holds the capture scripts and shot lists of the visual review (`review.yml`);
+`review/night_leaks.py` needs NumPy and Pillow.
 
 ## Catalog data
 
@@ -318,12 +342,30 @@ Android engine) with subcommands `sgp4`, `snapshot`, `passes` and `streaks`. Pin
 | `AIAA-2006-6753.zip` (verification TLEs and MATLAB output) | `3642043b706c76be87cf012db3f22e04da6b80498d00f515e51879e0ffadc115` |
 | JPL DE421 `de421.bsp` (Skyfield reference positions) | `a20a7139da04cbc462454634918e9a9ca69127044e2cc9d4f9c16e238d2deedc` |
 
-`snapshot` saves small CelesTrak GP snapshots (2026-10-18); the tests never touch the network.
+`snapshot` saves small CelesTrak GP snapshots (the committed ones are of 2026-10-18; CelesTrak data changes continuously,
+so a new snapshot gives new numbers); the tests never touch the network.
 
-## Comet test data
+## Comet and asteroid test data: live snapshots
 
-The comet generators (`gen_comet*.py` and companions copied from the comets work) rebuild the Kepler and Horizons
-test tables in `CometsKeplerData`/`CometsHorizonsData` from JPL Horizons queries and an independent mpmath solver.
+`gen_refs.py`, `fetch_topo.py`, `fetch_mpc_cases.py`, `gen_ref_sources.py`, `gen_testdata.py` (with `fetch_refs.py`, the
+Horizons client they share) and `make_asteroid_reference.py` have no hash and no lock. They ask JPL Horizons, the JPL
+small-body API and the MPC files for what they hold on the day, and Horizons answers with the orbit solution it has that
+day. The committed `CometsHorizonsData`, `CometsTestData` and `CatalogAsteroidReferenceData` files in
+`LodestarKit/Tests/LodestarKitTests/` (and their Kotlin twins) are the record of the snapshot of 2026-10-18; a re-run on
+another day writes different numbers. `gen_ref_sources.py` also has the query date and the Horizons solution labels
+(`solution 2026-Jul-28`, ...) written into it and so into the headers of its output, and `make_asteroid_reference.py` has
+the epoch and the query date as constants: edit them when you re-run, or the new numbers carry the old labels.
+
+The steps: `gen_refs.py` writes `refs.json` and the `hz_*.txt` tables and `fetch_topo.py` writes `topo.json`;
+`gen_ref_sources.py` turns both into `CometsHorizonsData.kt` / `.swift`. `fetch_mpc_cases.py` writes `mpc_cases.json`;
+`gen_testdata.py` turns it and the MPC and JPL files named in its docstring into `CometsTestData.kt` / `.swift`.
+`gen_kepler.py` needs no network, only mpmath (`pip install mpmath`), and writes `CometsKeplerData.kt` / `.swift`, the
+classical Kepler solutions at 60 digits.
+
+All of these except `make_asteroid_reference.py`, which takes its two output paths as arguments, read and write fixed
+file names in the current directory, and `.gitignore` does not cover them. Run them from an empty scratch directory
+(`/dev/shm/...`; give the script's path in full) with `python3 -I`, then copy the generated Swift file to
+`LodestarKit/Tests/LodestarKitTests/` and the Kotlin file to the Android repository.
 
 ## Night lights — `build_light_pollution.py`
 
@@ -370,4 +412,4 @@ Builds `asteroids.txt` (bundled in both engines): the 216 asteroids that can rea
 (H ≤ 10.5 and a best-case opposition magnitude ≤ 11.0) from the MPC orbit file, pinned in `asteroids.lock.json`
 (the MPC rewrites the file daily and keeps no archive, so the lock pins one snapshot; `--refresh-lock` re-pins it, then
 update the count, epoch and reference data in the tests). `--check` verifies the shipped files offline.
-`make_asteroid_reference.py` writes the JPL Horizons test data.
+`make_asteroid_reference.py` writes the JPL Horizons test data (a live snapshot, see above).

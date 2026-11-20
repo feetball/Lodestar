@@ -164,6 +164,7 @@ private struct MountControlPanel: View {
                     .foregroundStyle(palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            MountSiteChangeRow()
             MountMessages()
             if service.capabilities?.canSetTracking == true {
                 Toggle("Tracking", isOn: Binding(

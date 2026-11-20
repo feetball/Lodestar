@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import WidgetKit
 
-/// The state of the watch app's Tonight screen: the place (the iPhone's observer if it sent one, otherwise the
-/// watch's own location) and a day of entries worked out for it.
+/// The state of the watch app's Tonight screen: the place (the iPhone's observer if it sent one that is still fresh,
+/// otherwise the watch's own location) and a day of entries worked out for it.
 @MainActor
 @Observable
 final class WatchTonightModel {
@@ -21,7 +21,7 @@ final class WatchTonightModel {
 
     @ObservationIgnored private let locator = TonightLocator()
     @ObservationIgnored private var link: WatchPhoneLink?
-    @ObservationIgnored private var phonePlace = TonightPlaceStore.load(.phone)
+    @ObservationIgnored private var phonePlace = TonightPlaceStore.loadPhonePlace()
     @ObservationIgnored private var isRefreshing = false
     /// The Aim page's model, which gets the aim messages that arrive on the phone link.
     @ObservationIgnored private let aim: WatchAimModel
@@ -45,6 +45,10 @@ final class WatchTonightModel {
         // The visual review fixes the place, so it must not ask for the location.
         if WatchReviewMode.current != nil { return }
         #endif
+        // The prompt's answer arrives while the refresh loop sleeps, so it asks for a refresh itself.
+        locator.onAuthorizationChange = { [weak self] in
+            Task { @MainActor [weak self] in await self?.refresh() }
+        }
         locator.requestAuthorization()
     }
 
@@ -55,7 +59,7 @@ final class WatchTonightModel {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        var phone: TonightPlace?
+        var phone: TonightPhonePlace?
         var computed: (entries: [TonightEntry], source: TonightPlaceStore.Source)?
         repeat {
             phone = phonePlace
@@ -86,20 +90,22 @@ final class WatchTonightModel {
         return (built, source)
     }
 
-    /// The place to work for, where it came from, and the moment to start from. (The visual review of the Simulator
-    /// fixes the place and the moment.)
+    /// The place to work for, where it came from, and the moment to start from: the iPhone's place while it is fresh
+    /// (see `TonightPhonePlace`), otherwise the watch's own. (The visual review of the Simulator fixes the place and
+    /// the moment.)
     private func placeAndDate() async -> (TonightPlace?, TonightPlaceStore.Source, Date) {
         #if DEBUG
         if let review = WatchReviewMode.current { return (review.place, .device, review.date) }
         #endif
-        if let phonePlace { return (phonePlace, .phone, Date()) }
+        let now = Date()
+        if let phonePlace, phonePlace.isFresh(at: now) { return (phonePlace.place, .phone, now) }
         return (await locator.currentPlace(), .device, Date())
     }
 
-    private func receive(_ place: TonightPlace) async {
+    private func receive(_ place: TonightPhonePlace) async {
         guard place != phonePlace else { return }
         phonePlace = place
-        TonightPlaceStore.save(place, as: .phone)
+        TonightPlaceStore.savePhonePlace(place)
         // A refresh already under way sees the new place and starts over.
         await refresh()
     }

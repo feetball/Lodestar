@@ -51,12 +51,15 @@ enum TonightLocationIssue: Sendable, Equatable {
     case notAsked
     /// The user said no, or location is restricted: only Settings can change that.
     case deniedOrRestricted
+    /// The user has allowed location, but no fix has arrived yet and none is remembered: there is nothing to change,
+    /// only to wait.
+    case waitingForFix
 }
 
 /// What a widget or complication shows at one moment of its timeline.
 struct TonightEntry: Sendable, Equatable {
     enum Content: Sendable, Equatable {
-        /// No place is known: the user has to allow location first, in Lodestar or in Settings.
+        /// No place is known: the user has to allow location first, in Lodestar or in Settings, or to wait for a fix.
         case needsLocation(TonightLocationIssue)
         case night(TonightNight)
     }

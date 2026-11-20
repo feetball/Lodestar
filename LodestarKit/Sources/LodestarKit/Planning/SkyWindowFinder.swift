@@ -186,6 +186,11 @@ public struct SkyWindowMatch: Sendable, Hashable {
 /// same again, and a comet or asteroid, whose orbit is propagated for every sample, a few seconds. Limits: a range
 /// touches at most `maximumNightCount` nights and the result holds at most `maximumMatchCount` matches (the
 /// earliest). A call shares no state and may run on any thread.
+///
+/// A search that is no longer wanted can be stopped: it checks `Task.isCancelled` before every night and throws
+/// `CancellationError` when the task it runs in has been cancelled, so it ends within one night's work. It throws
+/// instead of returning the matches found so far, because that list would read as a complete answer (and an empty
+/// one as "no match").
 public enum SkyWindowFinder {
     /// The longest gap between samples, in seconds.
     public static let sampleInterval = 300.0
@@ -211,7 +216,8 @@ public enum SkyWindowFinder {
     ///   - timeZone: The time zone that defines the nights.
     /// - Throws: `SkyWindowError.invalidRange` for an unusable range, `SkyWindowError.rangeTooLong` beyond
     ///   `maximumNightCount` nights, `SkyWindowError.invalidTarget` for a target without a finite position and
-    ///   `SkyWindowError.invalidMoonRule` for a fraction outside [0, 1].
+    ///   `SkyWindowError.invalidMoonRule` for a fraction outside [0, 1]; `CancellationError` when the calling task is
+    ///   cancelled before the search has finished.
     public static func matches(target: SkyWindowTarget, window: SkyWindow, observer: Observer,
                                horizon: HorizonProfile? = nil, from: Date, to: Date,
                                darkness: SkyWindowDarkness = .astronomical,
@@ -227,6 +233,7 @@ public enum SkyWindowFinder {
                                 darkness: darkness, rule: moon)
         var found = [SkyWindowMatch]()
         for night in nights {
+            try Task.checkCancellation()
             let rangeStart = max(night.start.timeIntervalSinceReferenceDate, start)
             let rangeEnd = min(night.end.timeIntervalSinceReferenceDate, end)
             guard rangeEnd > rangeStart else { continue }

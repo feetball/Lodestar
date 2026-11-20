@@ -130,7 +130,7 @@ struct SessionLogView: View {
     }
 
     private func rowDetail(_ entry: SessionLogEntry) -> String {
-        let time = entry.date.formatted(date: .omitted, time: .shortened)
+        let time = SessionLogFormat.timeText(of: entry)
         return entry.siteName.isEmpty ? time : "\(time) \u{00B7} \(entry.siteName)"
     }
 

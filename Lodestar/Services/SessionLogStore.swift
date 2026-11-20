@@ -1,11 +1,12 @@
 import Foundation
 import LodestarKit
+import UIKit
 
 /// The session log: what was shot (or tried) on which night. It lives in one JSON file in Application Support, on this
 /// device only, and holds at most `maximumEntries` entries.
 ///
 /// Changes are written after a short pause, off the main actor; `saveNow()` writes at once (the app calls it when it goes
-/// to the background).
+/// to the background, and asks iOS for time to finish the write there).
 @MainActor
 @Observable
 final class SessionLogStore {
@@ -23,6 +24,8 @@ final class SessionLogStore {
     @ObservationIgnored private let fileURL: URL?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
     @ObservationIgnored private var writeTask: Task<Void, Never>?
+    @ObservationIgnored private var writesInFlight = 0
+    @ObservationIgnored private var backgroundTask = UIBackgroundTaskIdentifier.invalid
 
     /// Reads the file, if there is one; a file that cannot be read gives an empty log.
     init(fileURL: URL? = SessionLogFile.defaultURL()) {
@@ -74,10 +77,36 @@ final class SessionLogStore {
         guard let fileURL else { return }
         let snapshot = entries
         let previous = writeTask
+        writesInFlight += 1
+        beginBackgroundTask()
+        // `self` is held on purpose: the write must be able to end the background task, however long it takes.
         writeTask = Task.detached(priority: .utility) {
             await previous?.value
             SessionLogFile.write(snapshot, to: fileURL)
+            await self.writeFinished()
         }
+    }
+
+    /// Ends the background task once the last queued write is done. `SessionLogFile.write` does not throw, so a write
+    /// that fails also gets here.
+    private func writeFinished() {
+        writesInFlight -= 1
+        if writesInFlight == 0 { endBackgroundTask() }
+    }
+
+    /// Asks iOS to keep the app running until the queued writes are done, in case the app is leaving the screen.
+    private func beginBackgroundTask() {
+        guard backgroundTask == .invalid else { return }
+        // iOS calls the handler on the main thread and wants the task ended before it returns, so no hop to a Task.
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Save the session log") { [weak self] in
+            MainActor.assumeIsolated { self?.endBackgroundTask() }
+        }
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask)
+        backgroundTask = .invalid
     }
 
     private func scheduleSave() {

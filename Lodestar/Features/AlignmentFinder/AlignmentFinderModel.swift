@@ -246,12 +246,16 @@ enum AlignmentFinderSearch {
     /// Days between the nights checked for darkness when a search finds nothing.
     private static let darknessSampleDays = 10
 
-    /// The matches of `request`. A search that finds nothing is repeated with the Moon rule and then the darkness
-    /// relaxed, which tells which setting is in the way; a year of searching takes under a second, so that is cheap.
-    static func run(_ request: AlignmentFinderRequest) -> AlignmentFinderOutcome {
+    /// The matches of `request`, or `nil` when the task running the search was cancelled: the engine then stops at its
+    /// next night and no relaxed search is started. A search that finds nothing is repeated with the Moon rule and
+    /// then the darkness relaxed, which tells which setting is in the way; a year of searching takes under a second,
+    /// so that is cheap.
+    static func run(_ request: AlignmentFinderRequest) -> AlignmentFinderOutcome? {
         let found: [SkyWindowMatch]
         do {
             found = try matches(request)
+        } catch is CancellationError {
+            return nil
         } catch let error as SkyWindowError {
             return .failed(failure(error))
         } catch {
@@ -260,7 +264,11 @@ enum AlignmentFinderSearch {
         if !found.isEmpty {
             return .found(found, isCutShort: found.count >= SkyWindowFinder.maximumMatchCount)
         }
-        return .empty(reason(for: request))
+        do {
+            return .empty(try reason(for: request))
+        } catch {
+            return nil
+        }
     }
 
     private static func matches(_ request: AlignmentFinderRequest) throws -> [SkyWindowMatch] {
@@ -269,19 +277,28 @@ enum AlignmentFinderSearch {
                                     darkness: request.darkness, moon: request.moon, timeZone: request.timeZone)
     }
 
-    private static func reason(for request: AlignmentFinderRequest) -> AlignmentFinderEmptyReason {
+    /// Throws `CancellationError` when the task is cancelled during one of the relaxed searches.
+    private static func reason(for request: AlignmentFinderRequest) throws -> AlignmentFinderEmptyReason {
         if request.darkness != .anyTime && isNeverDark(request) { return .neverDark }
         var anyMoon = request
         anyMoon.moon = .unrestricted
-        if request.moon != .unrestricted && hasMatches(anyMoon) { return .onlyWithMoon }
+        if try request.moon != .unrestricted && hasMatches(anyMoon) { return .onlyWithMoon }
         var anyTime = anyMoon
         anyTime.darkness = .anyTime
-        if request.darkness != .anyTime && hasMatches(anyTime) { return .onlyInLight }
+        if try request.darkness != .anyTime && hasMatches(anyTime) { return .onlyInLight }
         return .neverInWindow
     }
 
-    private static func hasMatches(_ request: AlignmentFinderRequest) -> Bool {
-        (try? matches(request))?.isEmpty == false
+    /// Whether `request` has any match; a search the engine refuses counts as none. Throws `CancellationError` when
+    /// the task is cancelled, so that a stale search does not go on to the next relaxed pass.
+    private static func hasMatches(_ request: AlignmentFinderRequest) throws -> Bool {
+        do {
+            return try !matches(request).isEmpty
+        } catch let cancelled as CancellationError {
+            throw cancelled
+        } catch {
+            return false
+        }
     }
 
     /// Whether the Sun stays above the darkness limit at every sampled night of the range, as in a polar summer.

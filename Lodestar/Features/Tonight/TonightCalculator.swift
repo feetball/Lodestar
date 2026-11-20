@@ -74,10 +74,15 @@ enum TonightCalculator {
                                 movingTargets: [TonightTarget], filter: ImagingFilter) -> TonightTargetsOutcome {
         guard summary.hasAstronomicalDarkness else { return .noDarkness }
         guard let catalog else { return .catalogPending }
-        // With a skyline the hours of the comets and asteroids are the hours above it too.
-        let moving = skyline == nil ? movingTargets : movingTargets.map { target -> TonightTarget in
+        // With a skyline the hours of the comets and asteroids are the hours above it too. They come first, as always,
+        // but get the Moon's assessment at their best time through `moonAssessment`, the same call as the deep-sky
+        // objects, so that a comet beside a bright Moon is not listed without a word about it, and so that the
+        // skyline rule holds for them too: a Moon hidden behind the skyline at that time is down for the comet.
+        let moving = movingTargets.map { target -> TonightTarget in
             var target = target
-            target.unobstructedHours = target.hoursAboveMinimum
+            if skyline != nil { target.unobstructedHours = target.hoursAboveMinimum }
+            target.moon = moonAssessment(of: target.object, at: target.peakTime, summary: summary, skyline: skyline,
+                                         filter: filter)
             return target
         }
         return .ranked(moving + rankedTargets(in: catalog, summary: summary, skyline: skyline, filter: filter))

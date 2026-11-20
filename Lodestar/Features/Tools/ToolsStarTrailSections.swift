@@ -223,6 +223,10 @@ struct ToolsStarTrailSections: View {
                                     + "arcs low in the sky.")
                 if let target = sky.target {
                     SettingsCaption(Self.targetLine(target))
+                    if inputs.projection.isFisheye {
+                        SettingsCaption("A fisheye lens bends the picture, so near the edges of the frame this is "
+                                        + "only approximate.")
+                    }
                 }
             } else {
                 SettingsCaption("Lodestar needs an observing location to find the pole. Choose one in Settings.")

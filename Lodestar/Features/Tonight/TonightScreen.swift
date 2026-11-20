@@ -13,6 +13,9 @@ private struct TonightTaskKey: Equatable {
 struct TonightScreen: View {
     /// The most nights from tonight the selector reaches in either direction.
     private static let reachInDays = 366
+    /// How long the night and the filter must hold still before the report is worked out. Stepping through the nights
+    /// quickly then computes the night it stops on, not every night it passes.
+    private static let settleDelay: Duration = .milliseconds(400)
 
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
@@ -159,6 +162,10 @@ struct TonightScreen: View {
     /// Works the night out off the main thread and keeps going: once the night under way is over the next one becomes
     /// tonight, which moves "tonight" itself and the label of any other chosen night ("Tomorrow night") with it.
     private func keepReportFresh(for key: TonightTaskKey) async {
+        // A new key cancels this task, so only the last of a quick run of taps gets past the pause. The computation
+        // cannot be stopped once it has started, which is why it must not start for every tap.
+        try? await Task.sleep(for: Self.settleDelay)
+        guard !Task.isCancelled else { return }
         repeat {
             let input = TonightInput(key: key.night, now: app.clock.now, catalog: app.catalog.catalog,
                                      imagingFilter: key.imagingFilter)

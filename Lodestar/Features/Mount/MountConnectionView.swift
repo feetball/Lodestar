@@ -43,7 +43,7 @@ struct MountConnectionView: View {
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("Mount Control")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { service.updateObserver(app.observerContext?.observer) }
+        .onAppear { service.updateObserver(app.observerContext) }
         .onDisappear { service.cancelDiscovery() }
     }
 }
@@ -128,6 +128,7 @@ private struct MountStatusSection: View {
         if let address = service.connectedAddress {
             InfoRow(label: "Address", value: address)
         }
+        MountSiteRow()
         if let capabilities = service.capabilities {
             InfoRow(label: "Firmware", value: capabilities.firmware ?? AppFormat.missing)
             InfoRow(label: "Lodestar can", value: MountStatusText.capabilities(capabilities))
@@ -157,6 +158,7 @@ private struct MountStatusSection: View {
                 .foregroundStyle(palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        MountSiteChangeRow()
         MountMessages()
         MountStopButton(minHeight: 52)
         Button {
@@ -415,8 +417,9 @@ private struct MountConnectSection: View {
         }()
         SettingsSection(title: "Connect",
                         footer: "Connecting does not move the mount. Nothing moves until you tap GoTo or an arrow.") {
+            MountSiteRow()
             Button {
-                service.connect(observer: app.observerContext?.observer)
+                service.connect(context: app.observerContext)
             } label: {
                 Label(isLost ? "Reconnect" : "Connect", systemImage: "wifi")
                     .frame(maxWidth: .infinity)
@@ -425,7 +428,7 @@ private struct MountConnectSection: View {
             .disabled(!canConnect)
             ForEach(MountConnectionOption.demos) { demo in
                 Button {
-                    service.connectDemo(demo, observer: app.observerContext?.observer)
+                    service.connectDemo(demo, context: app.observerContext)
                 } label: {
                     Label(demo.title, systemImage: "play.circle")
                 }
@@ -465,9 +468,10 @@ private struct MountControlsSection: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.lodestarSecondary)
-                    .disabled(service.isWorking)
-                    SettingsCaption("Sends your location and the iPhone's clock (UTC) to the mount, for mounts that work "
-                                    + "out their own sky. Do it again after moving to a new place.")
+                    .disabled(service.isWorking || service.pendingSite != nil)
+                    SettingsCaption("Sends your location (\(app.observerContext?.name ?? AppFormat.missing)) and the "
+                                    + "iPhone's clock (UTC) to the mount, for mounts that work out their own sky. "
+                                    + "Do it again after moving to a new place.")
                 }
             }
             SettingsCaption("Move the mount with the Nudge button on the Aim screen.")
@@ -633,7 +637,11 @@ private struct MountSafetySection: View {
             Stop is always one tap away on the Aim screen. If the app cannot reach the mount, \
             stop it on its hand controller or switch it off.
             """),
-        Note(symbol: "iphone.slash", text: "When Lodestar goes to the background it stops the mount and disconnects."),
+        Note(symbol: "iphone.slash", text: """
+            When Lodestar goes to the background, it stops a slew or nudge and disconnects. A mount that is tracking \
+            at that moment keeps tracking, and Lodestar no longer watches its limits, so check on it or switch it off. \
+            An alt-azimuth Sky-Watcher mount stops instead, because Lodestar does its tracking.
+            """),
         Note(symbol: "scope", text: """
             Align the mount on its own hand controller before the first GoTo, and sync on a star you have \
             centred to improve it.

@@ -44,7 +44,7 @@ struct TonightTarget: Identifiable, Sendable {
     /// `TonightCalculator.minimumTargetAltitude` high (the same number as `hoursAboveMinimum`, named for the skyline);
     /// `nil` for an open horizon.
     var unobstructedHours: Double?
-    /// What the Moon does to the target at `peakTime`, with the user's filter; `nil` for comets and asteroids.
+    /// What the Moon does to the target at `peakTime`, with the user's filter.
     var moon: ObjectMoonAssessment?
 
     var id: String { object.id }

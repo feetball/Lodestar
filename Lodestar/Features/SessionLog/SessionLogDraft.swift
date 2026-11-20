@@ -28,6 +28,10 @@ struct SessionLogDraft: Equatable {
     var notes: String
     var isImaged: Bool
 
+    /// The decimals the exposure field shows when an entry is opened. Six keep 1/8000 s (0.000125 s) whole; fewer round
+    /// a short exposure to "0", and that is what Save would then store. Trailing zeros are dropped, so 30 s reads "30".
+    private static let exposureFractionDigits = 6
+
     /// A new entry for `object`: now, the observing site, the camera and lens of Settings, the NPF exposure as the exposure
     /// to start from, and the filter chosen in Settings.
     static func new(for object: CelestialObject, context: ObserverContext?, lens: LensSetup,
@@ -75,7 +79,8 @@ struct SessionLogDraft: Equatable {
         lensAperture = entry.lensAperture
         sensorPixelsX = entry.sensorPixelsX
         sensorPixelsY = entry.sensorPixelsY
-        exposureText = entry.exposureSeconds > 0 ? SettingsNumberText.text(for: entry.exposureSeconds, fractionDigits: 3) : ""
+        exposureText = entry.exposureSeconds > 0
+            ? SettingsNumberText.text(for: entry.exposureSeconds, fractionDigits: Self.exposureFractionDigits) : ""
         isoText = entry.iso > 0 ? String(entry.iso) : ""
         framesText = entry.frameCount > 0 ? String(entry.frameCount) : ""
         filter = entry.filter
@@ -173,9 +178,35 @@ enum SessionLogFormat {
         return parts.joined(separator: " \u{00B7} ")
     }
 
-    /// The date and time of an entry in the time zone of the device.
+    /// The time zone of the entry's site when its times are shown in that and not in the device's, otherwise `nil`.
+    /// An entry keeps only its site's standard offset from UTC (the night it belongs to follows from it), so this is a
+    /// fixed offset without daylight saving time. The device's zone is kept when it has the same standard offset: the
+    /// entry was then most likely made where the device is, and the device's zone knows daylight saving time.
+    private static func siteZone(of entry: SessionLogEntry) -> TimeZone? {
+        guard let minutes = entry.siteUTCOffsetMinutes else { return nil }
+        let device = TimeZone.current
+        let daylightSaving = Int(device.daylightSavingTimeOffset(for: entry.date))
+        let deviceStandardSeconds = device.secondsFromGMT(for: entry.date) - daylightSaving
+        guard deviceStandardSeconds != minutes * 60 else { return nil }
+        return TimeZone(secondsFromGMT: minutes * 60)
+    }
+
+    /// " GMT+9" after a time that is shown in the zone of the entry's site, empty otherwise.
+    private static func zoneSuffix(_ zone: TimeZone?, at date: Date) -> String {
+        zone?.abbreviation(for: date).map { " \($0)" } ?? ""
+    }
+
+    /// The time of an entry: "21:34" in the time zone of the device, or "21:34 GMT+9" in the time zone of the entry's
+    /// site when that is another one.
+    static func timeText(of entry: SessionLogEntry) -> String {
+        guard let zone = siteZone(of: entry) else { return entry.date.formatted(date: .omitted, time: .shortened) }
+        return AppFormat.time(entry.date, in: zone) + zoneSuffix(zone, at: entry.date)
+    }
+
+    /// The date and time of an entry, in the time zone of the entry's site when that is not the device's.
     static func dateText(of entry: SessionLogEntry) -> String {
-        entry.date.formatted(date: .abbreviated, time: .shortened)
+        guard let zone = siteZone(of: entry) else { return entry.date.formatted(date: .abbreviated, time: .shortened) }
+        return AppFormat.dateTime(entry.date, in: zone) + zoneSuffix(zone, at: entry.date)
     }
 
     /// "Night of Fri, Nov 18": the title of a night's section.

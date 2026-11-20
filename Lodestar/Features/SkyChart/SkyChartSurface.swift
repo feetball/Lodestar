@@ -117,7 +117,7 @@ struct SkyChartSurface: View {
         let zoom = model.zoom
         let modelPan = model.pan
         let center = showsFixedFrame ? model.framingCenter : nil
-        if rotatesToHeading {
+        if followsHeading {
             TimelineView(.animation(minimumInterval: Self.liveInterval, paused: !isMotionRunning)) { _ in
                 let pose = currentPose()
                 let rotation = headingHold.rotation(for: pose)
@@ -177,13 +177,16 @@ struct SkyChartSurface: View {
             VStack {
                 HStack(alignment: .top, spacing: 6) {
                     StatusChip(systemImage: "location.north.line",
-                               text: rotatesToHeading && pose != nil ? "Heading up" : "North up")
+                               text: followsHeading && pose != nil ? "Heading up" : "North up")
                     if viewport.zoom > 1.05 {
                         StatusChip(systemImage: "magnifyingglass", text: zoomText(viewport.zoom))
                     }
                     Spacer(minLength: 6)
                     if layers.cameraView, let pose {
                         SkyChartCameraReadout(pose: pose)
+                    } else if isHeadingMissing {
+                        StatusChip(systemImage: "exclamationmark.triangle.fill", text: "Heading not set",
+                                   tone: .warning)
                     }
                 }
                 Spacer()
@@ -233,7 +236,7 @@ struct SkyChartSurface: View {
 
     /// The chart as it would be drawn without the fixed frame: the model's pan, and the heading's rotation.
     private func freeViewport(in size: CGSize) -> PlanisphereViewport {
-        let rotation = rotatesToHeading ? headingHold.rotation(for: currentPose()) : 0
+        let rotation = followsHeading ? headingHold.rotation(for: currentPose()) : 0
         return PlanisphereViewport(size: size, zoom: model.zoom, pan: model.pan, rotation: rotation)
     }
 
@@ -247,7 +250,7 @@ struct SkyChartSurface: View {
     /// Takes the camera frame off the chart, leaving the chart where the frame had it.
     private func releaseFrame(in size: CGSize) {
         if let center = model.framingCenter {
-            let rotation = rotatesToHeading ? headingHold.rotation(for: currentPose()) : 0
+            let rotation = followsHeading ? headingHold.rotation(for: currentPose()) : 0
             model.setPan(SkyChartFraming.pan(centering: center, frame: content.frame, size: size, zoom: model.zoom,
                                              rotation: rotation), in: size)
         }
@@ -260,6 +263,21 @@ struct SkyChartSurface: View {
         app.motion.status == .running
     }
 
+    /// False in Gyro Lock until the heading is set, by the transfer from the compass or by a star alignment.
+    private var isHeadingKnown: Bool {
+        SkyChartCameraPose.isHeadingKnown(in: app.motion, mount: app.mountProfile, alignment: app.alignment)
+    }
+
+    /// Whether the chart turns with the camera's heading: when asked to, and only while that heading is known.
+    private var followsHeading: Bool {
+        rotatesToHeading && isHeadingKnown
+    }
+
+    /// True when the chart is asked to show the camera's heading but has none, so it shows no camera pose.
+    private var isHeadingMissing: Bool {
+        isMotionRunning && (layers.cameraView || rotatesToHeading) && !isHeadingKnown
+    }
+
     private func currentPose() -> SkyChartCameraPose? {
         SkyChartCameraPose.current(from: app.motion, mount: app.mountProfile, alignment: app.alignment,
                                    lens: app.lensSetup)
@@ -267,7 +285,7 @@ struct SkyChartSurface: View {
 
     /// The viewport as the chart is drawn right now, for turning a tap into a chart position.
     private func viewport(in size: CGSize) -> PlanisphereViewport {
-        let rotation = rotatesToHeading ? headingHold.rotation(for: currentPose()) : 0
+        let rotation = followsHeading ? headingHold.rotation(for: currentPose()) : 0
         let center = showsFixedFrame ? model.framingCenter : nil
         return PlanisphereViewport(
             size: size, zoom: model.zoom,
