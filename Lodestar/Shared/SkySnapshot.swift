@@ -144,8 +144,10 @@ enum SkySnapshotBuilder {
 
         var deepSky: [SkySnapshot.DeepSky] = []
         if options.includeDeepSky {
+            // Deep-sky objects of type "Other" (M 73, NGC 405) are in the special group as well: each is added once.
+            var added = Set<String>()
             func add(_ object: CelestialObject) {
-                guard case .fixed(let position, _) = object.position else { return }
+                guard case .fixed(let position, _) = object.position, added.insert(object.id).inserted else { return }
                 deepSky.append(SkySnapshot.DeepSky(object: object, direction: direction(ofJ2000: position),
                                                    majorAxis: object.angularSize.map { $0.majorArcminutes / 60 }))
             }
