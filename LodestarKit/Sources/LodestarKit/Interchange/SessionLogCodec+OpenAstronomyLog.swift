@@ -140,7 +140,9 @@ private struct OpenAstronomyLogDocument {
         var scopeIdentifier: String?
         var lensText = ""
         if let focalLength = entry.focalLength, let aperture = entry.lensAperture {
-            lensText = "\(InterchangeText.decimal(focalLength, maximumDecimals: 1)) mm f/\(InterchangeText.decimal(aperture, maximumDecimals: 1))"
+            let focalLengthText = InterchangeText.decimal(focalLength, maximumDecimals: 1)
+            let apertureText = InterchangeText.decimal(aperture, maximumDecimals: SessionLogCodec.apertureDecimals)
+            lensText = "\(focalLengthText) mm f/\(apertureText)"
             scopeIdentifier = scopes.identifier(for: lensText) { identifier in
                 "    <scope id=\"\(identifier)\" xsi:type=\"oal:scopeType\">\n"
                     + Self.element("model", "Camera lens \(lensText)", indent: 3)
@@ -193,12 +195,14 @@ private struct OpenAstronomyLogDocument {
     /// What the result of an observation says: whether it was imaged, the frames, ISO, filter, lens and camera, then the notes.
     private static func resultText(of entry: SessionLogEntry, lens: String) -> String {
         var parts: [String] = []
+        let exposureDecimals = SessionLogCodec.exposureDecimals
+        let exposureText = InterchangeText.decimal(entry.exposureSeconds, maximumDecimals: exposureDecimals)
         if entry.frameCount > 0 && entry.exposureSeconds > 0 {
-            parts.append("\(entry.frameCount) × \(InterchangeText.decimal(entry.exposureSeconds, maximumDecimals: 3)) s")
+            parts.append("\(entry.frameCount) × \(exposureText) s")
         } else if entry.frameCount > 0 {
             parts.append("\(entry.frameCount) frames")
         } else if entry.exposureSeconds > 0 {
-            parts.append("\(InterchangeText.decimal(entry.exposureSeconds, maximumDecimals: 3)) s")
+            parts.append("\(exposureText) s")
         }
         if entry.iso > 0 { parts.append("ISO \(entry.iso)") }
         if !entry.filter.isEmpty { parts.append("filter \(entry.filter)") }

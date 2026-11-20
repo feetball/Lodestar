@@ -12,6 +12,9 @@ struct TonightSkyQualityCard: View {
     let night: DateInterval
 
     @State private var reading: SkyReading?
+    /// The time the forecast's age is judged at, taken from the clock once a minute. The age counts in hours, and
+    /// reading the clock in `body` would draw the card again every second.
+    @State private var now = Date()
 
     /// A forecast older than this does not go into the imaging score.
     private static let forecastFreshFor: TimeInterval = 12 * 3600
@@ -24,6 +27,17 @@ struct TonightSkyQualityCard: View {
         }
         .task(id: SkyQualityKey(summary.observer.location)) {
             reading = await SkyQualityMapStore.shared.reading(at: summary.observer.location)
+        }
+        .task {
+            await keepNowFresh()
+        }
+    }
+
+    /// Takes the clock's time once a minute for `now`.
+    private func keepNowFresh() async {
+        while !Task.isCancelled {
+            now = app.clock.now
+            try? await Task.sleep(for: .seconds(60))
         }
     }
 
@@ -125,7 +139,7 @@ struct TonightSkyQualityCard: View {
         let place = summary.observer.location
         let key = OnlineCoordinates.key(latitude: place.latitude, longitude: place.longitude)
         guard let forecast = online.forecast, forecast.key == key else { return nil }
-        guard app.clock.now.timeIntervalSince(forecast.issuedAt) <= Self.forecastFreshFor else { return nil }
+        guard now.timeIntervalSince(forecast.issuedAt) <= Self.forecastFreshFor else { return nil }
         let slots = ForecastNight.slots(forecast, night: night)
         guard !slots.isEmpty else { return nil }
         return ForecastNight.meanTotal(slots) / 100

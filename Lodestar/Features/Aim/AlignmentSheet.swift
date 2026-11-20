@@ -17,12 +17,18 @@ struct AlignmentSheet: View {
     @State private var notice: AimAlignmentNotice?
     /// Whether the sync also tells a connected GoTo mount that it points at the object.
     @State private var syncsMount = true
+    /// Whether the footer shows how the mount's sync went after the object is dropped, which removes the row with the
+    /// toggle that shows it while an object is chosen.
+    @State private var showsMountOutcome = false
     /// While Sync waits for a steady camera: how much of the steady window has passed, from 0 to 1; `nil` otherwise.
     @State private var holdProgress: Double?
 
     /// Seconds between the refreshes of the candidates' positions and of their order.
     private static let candidateRefreshInterval = 30.0
     private static let sortInterval = 2.5
+    /// Time zero of the clock that times the hold-still wait. It is static so that every reading is measured from the
+    /// same moment, however often SwiftUI makes the view value again.
+    private static let clockOrigin = ContinuousClock.now
 
     var body: some View {
         VStack(spacing: 0) {
@@ -104,6 +110,9 @@ struct AlignmentSheet: View {
                 Button("Choose another object") { deselect() }
                     .buttonStyle(.lodestarSecondary)
             } else {
+                if showsMountOutcome {
+                    MountAlignmentSyncOutcome()
+                }
                 Text("Choose a bright star or planet from the list.")
                     .font(.footnote)
                     .foregroundStyle(palette.secondaryText)
@@ -167,6 +176,7 @@ struct AlignmentSheet: View {
     private func select(_ candidate: AimAlignmentCandidate) {
         selected = candidate
         notice = nil
+        showsMountOutcome = false
         model.alignmentTarget = candidate.object
     }
 
@@ -189,15 +199,21 @@ struct AlignmentSheet: View {
         AccessibilityNotification.Announcement("Hold still").post()
     }
 
+    /// Seconds on a monotonic clock, which is what `AimHoldStill` is fed. This is not `ProcessInfo.systemUptime`, which
+    /// Apple lists as a system boot time API that the privacy manifest would have to declare.
+    private static var clockSeconds: Double {
+        (ContinuousClock.now - clockOrigin) / .seconds(1)
+    }
+
     /// Syncs the moment the camera has been still for the whole window, and gives up after a few seconds.
     private func holdStill() async {
         guard holdProgress != nil else { return }
-        var wait = AimHoldStill(startedAt: ProcessInfo.processInfo.systemUptime)
+        var wait = AimHoldStill(startedAt: Self.clockSeconds)
         while !Task.isCancelled {
             let mount = app.mountProfile
             let motionSample = app.motion.latestSample()
             let sample = motionSample.flatMap { SteadinessSample(attitude: $0.rawAttitude, mount: mount) }
-            switch wait.update(now: ProcessInfo.processInfo.systemUptime, sample: sample) {
+            switch wait.update(now: Self.clockSeconds, sample: sample) {
             case .waiting(let progress):
                 // In steps of 2 %, so that the sheet is not redrawn at the polling rate for a bar that moves slowly.
                 let shown = (progress * 50).rounded(.down) / 50
@@ -245,6 +261,7 @@ struct AlignmentSheet: View {
     /// The star is centred in the camera, which sits on the GoTo mount: the mount takes it as its position as well.
     private func syncMountIfWanted(to object: CelestialObject, observer: Observer) {
         guard syncsMount, MountService.shared.isConnected, MountService.shared.capabilities?.canSync == true else { return }
+        showsMountOutcome = true
         Task { await MountService.shared.syncMount(to: object, observer: observer) }
     }
 

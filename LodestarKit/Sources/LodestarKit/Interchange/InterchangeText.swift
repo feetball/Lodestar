@@ -89,9 +89,11 @@ enum InterchangeText {
     }
 
     /// Whether a scalar is dropped from user text: control characters (the caller decides about line breaks), format
-    /// characters, private use, unassigned and surrogate code points.
+    /// characters other than the joiners and direction marks that scripts and emoji need, private use, unassigned and
+    /// surrogate code points.
     private static func isDroppedCategory(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.properties.generalCategory {
+        case .format where UserText.isJoinerOrDirectionMark(scalar): false
         case .control, .format, .privateUse, .unassigned, .surrogate: true
         default: false
         }

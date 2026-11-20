@@ -295,6 +295,205 @@ final class MountControllerTests: XCTestCase {
         }
     }
 
+    // MARK: Sun policy
+
+    private func sunAltitude(at date: Date) -> Double {
+        SkyFrame(date: date, observer: Support.boulder).horizontal(of: .sun, refraction: false).altitude
+    }
+
+    /// The moment on the morning of the fixtures' day (18 October 2026, from 12:00 to 15:00 UTC, six to nine o'clock in
+    /// Colorado) at which the Sun, seen from Boulder, stands at `altitude` degrees. The Sun rises steadily through that
+    /// stretch, about a fifth of a degree a minute, so bisection finds it.
+    private func morning(sunAt altitude: Double) -> Date {
+        var before = Support.start.addingTimeInterval(8.0 * 3_600.0)
+        var after = Support.start.addingTimeInterval(11.0 * 3_600.0)
+        XCTAssertLessThan(sunAltitude(at: before), altitude)
+        XCTAssertGreaterThan(sunAltitude(at: after), altitude)
+        for _ in 0 ..< 40 {
+            let middle = before.addingTimeInterval(after.timeIntervalSince(before) / 2.0)
+            if sunAltitude(at: middle) < altitude { before = middle } else { after = middle }
+        }
+        return after
+    }
+
+    func testGotoJustBeforeSunriseIsRefusedByTheLookaheadAlone() throws {
+        // The Sun is a tenth of a degree below the -1 degree line now and above it a minute from now.
+        let dawn = morning(sunAt: -1.1)
+        XCTAssertLessThanOrEqual(sunAltitude(at: dawn), -1.0)
+        XCTAssertGreaterThan(sunAltitude(at: dawn.addingTimeInterval(60.0)), -1.0)
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: dawn)
+            try rig.controller.connect()
+            let nearby = target(nearTheSunOf: rig, degreesAbove: 8.0)
+            guard case let .nearSun(separation, limit)? = mountError({ try rig.controller.goto(nearby) }) else {
+                XCTFail(name)
+                continue
+            }
+            XCTAssertEqual(separation, 8.0, accuracy: 0.1, name)
+            XCTAssertEqual(limit, 15.0, accuracy: 0.0, name)
+            XCTAssertEqual(rig.mount.slewsStarted, 0, name)
+            XCTAssertEqual(rig.controller.status.phase, .idle, name)
+            // Without the second look, the same target is accepted: the lookahead is what refused it.
+            let blind = Support.rig(name, settings: MountSettings(horizonLookaheadSeconds: 0.0), begin: dawn)
+            try blind.controller.connect()
+            try blind.controller.goto(target(nearTheSunOf: blind, degreesAbove: 8.0))
+            XCTAssertEqual(blind.controller.status.phase, .slewing, name)
+        }
+    }
+
+    func testTheSunCountsAsUpFromMinusOneDegrees() throws {
+        let lookingNowOnly = MountSettings(horizonLookaheadSeconds: 0.0)
+        for name in Support.rigNames {
+            let risen = Support.rig(name, settings: lookingNowOnly, begin: morning(sunAt: -0.9))
+            try risen.controller.connect()
+            guard case let .nearSun(separation, _)? = mountError({
+                try risen.controller.goto(target(nearTheSunOf: risen, degreesAbove: 8.0))
+            }) else {
+                XCTFail(name)
+                continue
+            }
+            XCTAssertEqual(separation, 8.0, accuracy: 0.1, name)
+            XCTAssertEqual(risen.mount.slewsStarted, 0, name)
+            let below = Support.rig(name, settings: lookingNowOnly, begin: morning(sunAt: -1.1))
+            try below.controller.connect()
+            try below.controller.goto(target(nearTheSunOf: below, degreesAbove: 8.0))
+            XCTAssertEqual(below.controller.status.phase, .slewing, name)
+        }
+    }
+
+    func testTrackingStopsWhenTheSunRisesIntoTheExclusion() throws {
+        for name in Support.rigNames where name != "lx200-meade-low" {
+            // Two degrees below the horizon: the GoTo is accepted, the Sun being down now and a minute from now.
+            let rig = Support.rig(name, begin: morning(sunAt: -2.0))
+            try rig.controller.connect()
+            try rig.controller.goto(target(nearTheSunOf: rig, degreesAbove: 8.0))
+            rig.controller.awaitSettled()
+            XCTAssertEqual(rig.controller.status.phase, .idle, name)
+            XCTAssertEqual(rig.controller.status.isTracking, true, name)
+            // A while later, still short of the -1 degree line even a minute ahead: tracking goes on.
+            rig.clock.advance(seconds: 30.0)
+            XCTAssertLessThan(sunAltitude(at: rig.clock.now().addingTimeInterval(60.0)), -1.0, name)
+            let early = rig.controller.poll()
+            XCTAssertEqual(early.isTracking, true, name)
+            XCTAssertNil(early.lastError, name)
+            XCTAssertTrue(rig.mount.isTracking, name)
+            // The Sun comes up, eight degrees from where the mount points.
+            rig.clock.advance(seconds: morning(sunAt: -0.5).timeIntervalSince(rig.clock.now()))
+            let risen = rig.controller.poll()
+            XCTAssertEqual(risen.isTracking, false, name)
+            XCTAssertFalse(rig.mount.isTracking, name)
+            XCTAssertEqual(risen.phase, .idle, name)
+            guard case let .nearSun(separation, limit)? = risen.lastError else {
+                XCTFail("\(name): \(String(describing: risen.lastError))")
+                continue
+            }
+            XCTAssertEqual(separation, 8.0, accuracy: 0.2, name)
+            XCTAssertEqual(limit, 15.0, accuracy: 0.0, name)
+            // Nothing more happens while tracking stays off, and the error does not come back.
+            rig.clock.advance(seconds: 10.0)
+            let later = rig.controller.poll()
+            XCTAssertEqual(later.isTracking, false, name)
+            XCTAssertNil(later.lastError, name)
+        }
+    }
+
+    func testTrackingKeepsGoingFarFromTheRisingSun() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: morning(sunAt: -2.0))
+            try rig.controller.connect()
+            // Thirty degrees above the Sun, well outside the 15 degree exclusion.
+            try rig.controller.goto(target(nearTheSunOf: rig, degreesAbove: 30.0))
+            rig.controller.awaitSettled()
+            rig.clock.advance(seconds: morning(sunAt: 5.0).timeIntervalSince(rig.clock.now()))
+            let status = rig.controller.poll()
+            let expected: Bool? = name == "lx200-meade-low" ? nil : true
+            XCTAssertEqual(status.isTracking, expected, name)
+            XCTAssertNil(status.lastError, name)
+            XCTAssertTrue(rig.mount.isTracking, name)
+        }
+    }
+
+    func testAMountThatCannotSwitchTrackingIsLeftAloneAsTheSunRises() throws {
+        let rig = Support.rig("lx200-meade-low", begin: morning(sunAt: -2.0))
+        try rig.controller.connect()
+        try rig.controller.goto(target(nearTheSunOf: rig, degreesAbove: 8.0))
+        rig.controller.awaitSettled()
+        rig.clock.advance(seconds: morning(sunAt: -0.5).timeIntervalSince(rig.clock.now()))
+        let status = rig.controller.poll()
+        XCTAssertNil(status.isTracking)
+        XCTAssertNil(status.lastError)
+        XCTAssertTrue(rig.mount.isTracking)
+    }
+
+    func testANudgeIsRefusedNearTheDaytimeSunAndAllowedAwayFromIt() throws {
+        for name in Support.rigNames {
+            let rig = Support.rig(name, begin: Support.midday)
+            try rig.controller.connect()
+            // A sync is not held to the Sun guard: it tells the mount that it points eight degrees above the Sun.
+            try rig.controller.sync(target(nearTheSunOf: rig, degreesAbove: 8.0))
+            guard case let .nearSun(separation, limit)? = mountError({ try rig.controller.nudge(.north) }) else {
+                XCTFail(name)
+                continue
+            }
+            XCTAssertEqual(separation, 8.0, accuracy: 0.1, name)
+            XCTAssertEqual(limit, 15.0, accuracy: 0.0, name)
+            XCTAssertFalse(rig.mount.isNudging, name)
+            XCTAssertEqual(rig.controller.status.phase, .idle, name)
+            // Twenty degrees from the Sun is outside the exclusion, and the nudge goes ahead.
+            try rig.controller.sync(target(nearTheSunOf: rig, degreesAbove: 20.0))
+            try rig.controller.nudge(.north, rate: .center, durationSeconds: 1.0)
+            XCTAssertTrue(rig.mount.isNudging, name)
+            XCTAssertEqual(rig.controller.status.phase, .nudging, name)
+        }
+    }
+
+    func testANudgeNearTheSunIsAllowedOnceItHasSet() throws {
+        var evening = Support.midday
+        for _ in 0 ..< 1_000 {
+            if sunAltitude(at: evening) < -4.0 { break }
+            evening = evening.addingTimeInterval(60.0)
+        }
+        let rig = Support.rig("lx200-onstep", begin: evening)
+        try rig.controller.connect()
+        try rig.controller.sync(target(nearTheSunOf: rig, degreesAbove: 8.0))
+        try rig.controller.nudge(.north, rate: .center, durationSeconds: 1.0)
+        XCTAssertTrue(rig.mount.isNudging)
+    }
+
+    func testANudgeIsNotHeldToTheAltitudeLimit() throws {
+        // The mount starts below a 60 degree altitude limit, where a GoTo to its own place would be refused, and a nudge
+        // from there is not: it is how the mount is moved up from below the limit.
+        let rig = Support.rig("lx200-onstep", settings: MountSettings(altitudeLimit: 60.0))
+        try rig.controller.connect()
+        let place = try XCTUnwrap(rig.controller.status.position)
+        XCTAssertLessThan(Support.altitude(of: place, clock: rig.clock), 60.0)
+        guard case .belowHorizonLimit? = mountError({ try rig.controller.goto(place) }) else {
+            return XCTFail("expected a refusal")
+        }
+        try rig.controller.nudge(.north, rate: .center, durationSeconds: 1.0)
+        XCTAssertTrue(rig.mount.isNudging)
+    }
+
+    func testAHeldNudgeThatReachesTheSunExclusionIsRefusedAndStopped() throws {
+        let rig = Support.rig("lx200-onstep", begin: Support.midday)
+        try rig.controller.connect()
+        // Just outside the exclusion, and south is the way to the Sun: the pad moves the mount at 0.53 degrees a second.
+        try rig.controller.sync(target(nearTheSunOf: rig, degreesAbove: 15.8))
+        try rig.controller.nudge(.south, rate: .slew, durationSeconds: 5.0)
+        rig.clock.advance(seconds: 2.0)
+        let partway = rig.controller.poll()
+        XCTAssertEqual(partway.phase, .nudging)
+        let sun = rig.frame().horizontal(of: .sun, refraction: false)
+        let place = rig.frame().horizontal(j2000: try XCTUnwrap(partway.position), properMotion: nil, refraction: false)
+        XCTAssertLessThan(place.angularSeparation(to: sun), 15.0)
+        // The next pulse of the pad finds the mount inside the exclusion: it is refused, and the one running is stopped.
+        guard case .nearSun? = mountError({ try rig.controller.nudge(.south, rate: .slew, durationSeconds: 5.0) }) else {
+            return XCTFail("expected a refusal")
+        }
+        XCTAssertFalse(rig.mount.isNudging)
+        XCTAssertEqual(rig.controller.status.phase, .idle)
+    }
+
     func testInvalidTargetsAreRefused() throws {
         let rig = Support.rig("lx200-onstep")
         try rig.controller.connect()

@@ -153,4 +153,23 @@ final class InterchangeTextTests: XCTestCase {
         XCTAssertEqual(InterchangeText.multiLine("a\r\nb\rc\nd\u{7}\te", limit: 100), "a\nb\nc\nd e")
         XCTAssertEqual(InterchangeText.multiLine("abcdef", limit: 4), "abcd")
     }
+
+    func testSingleLineAndMultiLineKeepJoinersAndDirectionMarks() {
+        // A family emoji: man, woman and girl joined by U+200D.
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+        // "mikhaham" (I want): the ZWNJ keeps the prefix from joining the stem, and the marks surround it.
+        let persian = "\u{200F}\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}\u{200E}"
+        XCTAssertEqual(InterchangeText.singleLine(family, limit: 100), family)
+        XCTAssertEqual(InterchangeText.singleLine(persian, limit: 100), persian)
+        XCTAssertEqual(InterchangeText.singleLine("  \(persian) \t \(family)\n", limit: 100), "\(persian) \(family)")
+        XCTAssertEqual(InterchangeText.multiLine("\(family)\r\n\(persian)", limit: 100), "\(family)\n\(persian)")
+        XCTAssertEqual(InterchangeText.singleLine(family, limit: 100).count, 1, "the sequence stays one character")
+    }
+
+    func testSingleLineAndMultiLineStillDropOtherFormatCharacters() {
+        // U+202E (right-to-left override) and U+2066 (left-to-right isolate) can reorder or hide the text around them.
+        XCTAssertEqual(InterchangeText.singleLine("gpj\u{202E}.exe", limit: 100), "gpj.exe")
+        XCTAssertEqual(InterchangeText.multiLine("a\u{202E}b\u{2066}c\u{2069}", limit: 100), "abc")
+        XCTAssertEqual(InterchangeText.multiLine("a\u{200B}b\u{FEFF}c\u{E0067}d", limit: 100), "abcd")
+    }
 }

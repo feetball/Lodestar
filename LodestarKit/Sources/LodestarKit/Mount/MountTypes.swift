@@ -278,7 +278,7 @@ public struct MountStatus: Hashable, Sendable {
     public let isMoving: Bool?
     /// Seconds since the current slew started; nil when not slewing.
     public let slewElapsedSeconds: Double?
-    /// How the last finished slew ended; cleared when a new slew starts.
+    /// How the last finished slew ended; cleared when a new slew starts and when the mount is nudged or synced.
     public let outcome: MountSlewOutcome?
     /// The last communication error, cleared by the next successful poll.
     public let lastError: MountError?

@@ -8,6 +8,13 @@ public enum SessionLogCodec {
     /// The most entries written.
     public static let maximumEntries = 5_000
 
+    /// The most decimals written for an exposure in seconds: enough for 1/4000 s (0.00025) and 1/8000 s (0.000125),
+    /// which three decimals would both write as "0".
+    static let exposureDecimals = 6
+
+    /// The most decimals written for a lens aperture as an f-number, so that f/0.95 and f/1.25 keep their digits.
+    static let apertureDecimals = 2
+
     // MARK: Nights
 
     /// The night of an instant as a day count since 1970-01-01: the local calendar day of the time twelve hours earlier, so
@@ -59,11 +66,11 @@ public enum SessionLogCodec {
                 entry.siteLongitude.map { InterchangeText.decimal($0, maximumDecimals: 5) } ?? "",
                 InterchangeCSV.guarded(entry.camera),
                 entry.focalLength.map { InterchangeText.decimal($0, maximumDecimals: 1) } ?? "",
-                entry.lensAperture.map { InterchangeText.decimal($0, maximumDecimals: 1) } ?? "",
-                InterchangeText.decimal(entry.exposureSeconds, maximumDecimals: 3),
+                entry.lensAperture.map { InterchangeText.decimal($0, maximumDecimals: apertureDecimals) } ?? "",
+                InterchangeText.decimal(entry.exposureSeconds, maximumDecimals: exposureDecimals),
                 entry.iso > 0 ? String(entry.iso) : "",
                 String(entry.frameCount),
-                InterchangeText.decimal(entry.totalExposureSeconds, maximumDecimals: 3),
+                InterchangeText.decimal(entry.totalExposureSeconds, maximumDecimals: exposureDecimals),
                 InterchangeCSV.guarded(entry.filter),
                 entry.isImaged ? "yes" : "no",
                 InterchangeCSV.guarded(entry.notes),

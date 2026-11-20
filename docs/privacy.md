@@ -4,7 +4,7 @@ title: Lodestar privacy policy
 
 # Privacy policy
 
-*Effective October 18, 2026*
+*Effective November 20, 2026*
 
 Lodestar is designed to work entirely on your iPhone. **It does not collect any data about you.** There
 are no accounts, no analytics, no advertising and no tracking, and the developer never receives your
@@ -22,13 +22,18 @@ location or anything else from the app.
 - **Saved sites and settings** are stored only on your iPhone (and in your device backups, as for any
   app).
 
+The Home Screen and Lock Screen widgets and the Apple Watch app (with its watch-face complications) use the location of
+the device they run on, your iPhone or your watch, only on that device, to work out when it gets dark and where the Moon
+and the Milky Way are tonight. They make no network requests and send nothing anywhere. The iPhone app can also pass
+your observing place to a paired watch over the direct connection between the two devices; it never goes to a server.
+
 ## Network use
 
 Lodestar's catalogs and calculations are all on the device. By default the only network requests go to Apple:
 
 - **Apple Maps** loads map tiles when you open the site map.
-- **Apple's geocoding service** receives the coordinates of an observing site you add or edit, to look
-  up its time zone.
+- **Apple's geocoding service** receives the coordinates of an observing site you add or edit, rounded to about 1 km, to
+  look up its time zone (and again later if the site was saved without a network).
 
 Apple handles these requests under its own privacy policy (<https://www.apple.com/legal/privacy/>).
 If you choose to share analytics with app developers in iOS Settings, Apple may provide anonymous crash

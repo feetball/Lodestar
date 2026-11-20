@@ -20,9 +20,12 @@ struct SettingsAboutSection: View {
                      + "Apple Maps, which loads map tiles when you open the site map, by Apple's geocoding service, "
                      + "which receives a site's coordinates, rounded to about 1 km, to look up its time zone when you "
                      + "add or edit it (and again later if it was saved without a network), and by "
-                     + "the optional downloads in Online Data, which are off until you switch them on: CelesTrak, the "
-                     + "Minor Planet Center and MET Norway see your IP address, and MET Norway also your location "
-                     + "rounded to about 10 km. GoTo mount control talks to the mount on your local network only.")
+                     + "the optional downloads in Online Data, which are off until you switch them on. CelesTrak, the "
+                     + "Minor Planet Center, MET Norway and the AWS Open Data tile server see your IP address. MET "
+                     + "Norway also sees your location, rounded to about 10 km. When you ask a saved site for its "
+                     + "terrain horizon, the tile server also sees which 1\u{00B0} elevation tiles you request, which "
+                     + "is where the site is to within about 100 km. GoTo mount control talks to the mount on your "
+                     + "local network only.")
                     .font(.subheadline)
                     .foregroundStyle(palette.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
