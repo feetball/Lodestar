@@ -144,10 +144,8 @@ private struct Workspace {
 
     /// The night shown at `date`: the one under way, or the coming one once the Sun has risen on the night before.
     mutating func night(at date: Date) -> NightFacts {
-        let yesterday = calendar.date(byAdding: .day, value: -1, to: date) ?? date.addingTimeInterval(-86_400)
-        let previous = twilight(on: yesterday)
-        let isPreviousUnderWay = date < previous.interval.end && date < (previous.sunrise ?? previous.interval.end)
-        let anchor = isPreviousUnderWay ? yesterday : date
+        let underWay = TwilightCalculator.nightUnderWay(at: date, calendar: calendar) { day in twilight(on: day) }
+        let anchor = underWay?.day ?? date
         let key = calendar.startOfDay(for: anchor)
         if let cached = nights[key] { return cached }
         let summary = NightPlanner.summary(nightStartingOn: anchor, observer: observer, timeZone: timeZone)

@@ -34,8 +34,6 @@ final class HorizonSkyFrames {
     static let chunkLength: Double = 6 * 3600
     /// Times further than this (about 300 000 years) from the reference date are not evaluated.
     static let maximumTime: Double = 1e13
-    /// The rate at which local sidereal time advances, in degrees per second of UT.
-    static let siderealDegreesPerSecond = 360.985_647_366_29 / JulianDate.secondsPerDay
 
     let observer: Observer
     private var chunks = [Int: Chunk]()
@@ -131,7 +129,7 @@ final class HorizonFixedTrack: HorizonSkyTrack {
             directionChunk = chunk
         }
         let siderealAngle = chunk.referenceSiderealAngle
-            + HorizonSkyFrames.siderealDegreesPerSecond * (time - chunk.referenceTime)
+            + SiderealTime.degreesPerSecond * (time - chunk.referenceTime)
         let angle = AstroMath.radians(siderealAngle)
         let c = cos(angle)
         let s = sin(angle)
@@ -173,7 +171,7 @@ final class HorizonBodyTrack: HorizonSkyTrack {
         }
         let chunk = frames.chunk(containing: time)
         let siderealAngle = chunk.referenceSiderealAngle
-            + HorizonSkyFrames.siderealDegreesPerSecond * (time - chunk.referenceTime)
+            + SiderealTime.degreesPerSecond * (time - chunk.referenceTime)
         let angle = AstroMath.radians(siderealAngle)
         let c = cos(angle)
         let s = sin(angle)

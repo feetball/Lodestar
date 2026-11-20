@@ -3,11 +3,6 @@ import Foundation
 /// The objects that are not in the data files: the solar-system bodies, the Milky Way core and
 /// the celestial poles.
 enum BuiltInObjects {
-    /// Right ascension of Sagittarius A* (J2000): 17h 45m 40.04s, in hours.
-    private static let sagittariusARightAscensionHours = 17.0 + 45.0 / 60 + 40.04 / 3600
-    /// Declination of Sagittarius A* (J2000): −29° 00′ 28.1″.
-    private static let sagittariusADeclination = -(29.0 + 28.1 / 3600)
-
     /// The Sun, the Moon, the seven other planets and Pluto, in `SolarSystemBody.allCases` order.
     static func solarSystem() -> [CelestialObject] {
         SolarSystemBody.allCases.map { body in
@@ -63,8 +58,7 @@ enum BuiltInObjects {
                 id: "special.galacticCenter", name: "Galactic Center", designations: ["Sgr A*"],
                 alternateNames: ["Sagittarius A*", "Galactic Centre", "Milky Way Core", "Galactic Core"],
                 category: .milkyWay, constellation: "Sgr", constellationName: constellationName("Sgr"),
-                position: .fixed(EquatorialCoordinate(rightAscensionHours: sagittariusARightAscensionHours,
-                                                      declination: sagittariusADeclination), nil),
+                position: .fixed(MilkyWayCoreVisibility.galacticCentre, nil),
                 isListed: true,
                 notes: "The direction of Sagittarius A*, the center of the Milky Way. The brightest part of the Milky Way band, and a favorite for wide-field astrophotography.",
                 prominence: .showpiece),
