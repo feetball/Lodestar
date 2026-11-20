@@ -22,6 +22,18 @@ enum CloudCardText {
         let age = ageHours < 48 ? "\(ageHours) hours" : "\(ageHours / 24) days"
         return "This forecast is \(age) old and has not been refreshed."
     }
+
+    /// What the card says while it has no forecast for this place: that one is on its way, what went wrong, or from
+    /// when the next request is allowed ("Next update possible after 16:30."). The request rules can hold a request
+    /// back (the last one was less than ten minutes ago, for another place), and then nothing is loading.
+    static func waiting(_ status: OnlineFeedStatus, now: Date, timeZone: TimeZone) -> String {
+        if status.isUpdating { return loading }
+        if let error = status.error { return error }
+        if let next = status.nextRequest, next > now {
+            return OnlineText.nextUpdate(AppFormat.time(next, in: timeZone))
+        }
+        return loading
+    }
 }
 
 /// "Clouds tonight": the hourly cloud cover from dusk to dawn of the night shown, total and the low, medium and high
@@ -39,10 +51,22 @@ struct TonightCloudCard: View {
     /// whether anything is requested. Nothing runs while the app is in the background.
     private static let recheck: Duration = .seconds(15 * 60)
 
-    /// What restarts the refresh loop: another place (more than the rounding) or the app coming back to the front.
+    /// What restarts the refresh loop: another place (more than the rounding), the app coming back to the front, or
+    /// another time for the next allowed request. The service sets that time only after it has looked at the request
+    /// rules, so its change is what tells the loop how long to wait.
     private struct RefreshKey: Equatable {
         var place: String
         var isActive: Bool
+        var nextRequest: Date?
+    }
+
+    /// How long the loop sleeps before it looks again: the quarter of an hour, or less when the request rules let the
+    /// next request through sooner, so that the card is not left waiting once the request is possible. A second is
+    /// added because the timer and the rules do not share a clock. A time that is not in the future says nothing.
+    private static func pause(until next: Date?, now: Date) -> Duration {
+        guard let next, next > now else { return recheck }
+        let untilNext = Duration.seconds(next.timeIntervalSince(now) + 1)
+        return min(recheck, untilNext)
     }
 
     var body: some View {
@@ -50,22 +74,22 @@ struct TonightCloudCard: View {
         if online.isEnabled(.clouds) {
             let key = OnlineCoordinates.key(latitude: place.latitude, longitude: place.longitude)
             let forecast = online.forecast.flatMap { $0.key == key ? $0 : nil }
+            let status = online.status(.clouds)
             VStack(alignment: .leading, spacing: 10) {
                 CardTitle(title: CloudCardText.title, systemImage: "cloud")
                 if let forecast {
                     CloudForecastContent(forecast: forecast, night: night, timeZone: timeZone, now: app.clock.now)
                 } else {
-                    let status = online.status(.clouds)
-                    TonightNote(text: status.isUpdating ? CloudCardText.loading : (status.error ?? CloudCardText.loading))
+                    TonightNote(text: CloudCardText.waiting(status, now: app.clock.now, timeZone: timeZone))
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .card(palette)
-            .task(id: RefreshKey(place: key, isActive: app.scenePhase == .active)) {
+            .task(id: RefreshKey(place: key, isActive: app.scenePhase == .active, nextRequest: status.nextRequest)) {
                 guard app.scenePhase == .active else { return }
                 while !Task.isCancelled {
                     app.online.refreshForecast()
-                    try? await Task.sleep(for: Self.recheck)
+                    try? await Task.sleep(for: Self.pause(until: app.online.status(.clouds).nextRequest, now: Date()))
                 }
             }
         }
