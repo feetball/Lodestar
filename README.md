@@ -50,7 +50,9 @@ tilt the tripod head until it is in your frame.
 - **Events calendar** — meteor showers (with hourly rates, the radiant's altitude from your site, the best camera
   direction, away from the radiant and the Moon, and how many meteors to expect in your lens's frame), lunar and
   solar eclipses, conjunctions, oppositions and elongations, supermoons, equinoxes and solstices, each with when
-  and where to look and a button to aim at it.
+  and where to look and a button to aim at it. With the satellite feed on, a section lists when the ISS or Tiangong
+  crosses the Sun or the Moon in the next 14 days, from your site or from a centreline within 50 km, with the time
+  to the second, the duration and the coordinates to copy.
 - **Photo planners** — a mosaic planner for panoramas such as the Milky Way arch (panels, overlap and shooting
   order, guided panel by panel in Aim), and star-trail and time-lapse planners.
 - **Exposure calculator** — the longest exposure before stars trail by the NPF, 500, 400 and 300 rules for your
@@ -70,9 +72,10 @@ tilt the tripod head until it is in your frame.
   an always-available Stop, with altitude limits, a meridian countdown that warns before the mount has to flip,
   and a built-in simulated mount to try it without hardware.
 - **Optional online data** — all off until switched on in Settings: ISS and bright-satellite passes (follow one in
-  Aim), Starlink streak warnings for the planned exposure, fresh comet orbits, and tonight's cloud forecast with dew,
-  wind, fog and temperature (MET Norway, location rounded to about 10 km) and terrain horizons (elevation tiles from
-  AWS Open Data, only when you ask a site for one).
+  Aim, and the ISS's transits of the Sun and Moon in the Events calendar), Starlink streak warnings for the planned
+  exposure, fresh comet orbits, and tonight's cloud forecast with dew, wind, fog and temperature (MET Norway,
+  location rounded to about 10 km) and terrain horizons (elevation tiles from AWS Open Data, only when you ask a
+  site for one).
 - **Widgets and Apple Watch** — Home Screen and Lock Screen widgets (small, medium, circular,
   rectangular, inline) and watch complications (circular, rectangular, inline, corner) show tonight
   at a glance: when it is dark, the Moon, when the Milky Way core is up and the next event. They are
