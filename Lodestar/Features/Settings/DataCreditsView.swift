@@ -174,8 +174,9 @@ extension DataCredit {
             notice: "Weather forecast from MET Norway (Locationforecast 2.0), downloaded only if you switch on Cloud "
                 + "forecast in Settings \u{25B8} Online Data, for your location rounded to about 10 km. MET Norway "
                 + "licenses its data under CC BY 4.0 and the Norwegian Licence for Open Government Data 2.0. Lodestar "
-                + "shows the cloud-cover values as forecast; the clear-spell summary is its own, and MET Norway does "
-                + "not endorse Lodestar."),
+                + "shows the cloud-cover, temperature, dew-point and wind values as forecast, rounded for display and "
+                + "in your region's units; the clear-spell summary and the dew, wind and fog warnings are its own, and "
+                + "MET Norway does not endorse Lodestar."),
         DataCredit(
             id: "terrain-tiles", name: "Terrain Tiles (AWS Open Data)",
             usedFor: "Terrain horizons (optional download)",

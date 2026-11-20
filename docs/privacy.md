@@ -19,13 +19,18 @@ location or anything else from the app.
   is processed on your iPhone only and is never recorded, stored or sent anywhere.
 - **Motion sensors.** The gyroscope, accelerometer and compass are read on your iPhone to tell where
   your camera points.
+- **Photos.** *From a Photo…* in Settings ▸ Camera & Lens uses the iOS photo picker, so Lodestar sees only the one
+  picture you choose. It reads that picture's metadata (the camera, focal length and aperture) on your iPhone, and
+  does not keep the picture or send it anywhere.
 - **Saved sites and settings** are stored only on your iPhone (and in your device backups, as for any
   app).
 
 The Home Screen and Lock Screen widgets and the Apple Watch app (with its watch-face complications) use the location of
 the device they run on, your iPhone or your watch, only on that device, to work out when it gets dark and where the Moon
 and the Milky Way are tonight. They make no network requests and send nothing anywhere. The iPhone app can also pass
-your observing place to a paired watch over the direct connection between the two devices; it never goes to a server.
+your observing place to a paired watch, and, while you aim at a target with the watch app open, the aiming values (the
+pan and tilt to make, the distance to go and the target's name), over the direct connection between the two devices;
+none of it goes to a server.
 
 ## Network use
 

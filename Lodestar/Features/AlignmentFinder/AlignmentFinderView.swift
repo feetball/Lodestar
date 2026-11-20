@@ -247,21 +247,8 @@ private struct AlignmentFinderResults: View {
                 SettingsSection(title: "Results") { SettingsCaption(message) }
             case .empty(let reason)?:
                 SettingsSection(title: "Results") {
-                    VStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 32, weight: .light))
-                            .foregroundStyle(palette.tertiaryText)
-                            .accessibilityHidden(true)
-                        Text(AlignmentFinderText.emptyTitle(reason, for: request))
-                            .font(.headline)
-                        Text(AlignmentFinderText.emptyMessage(reason, for: request, days: inputs.range.days))
-                            .font(.subheadline)
-                            .foregroundStyle(palette.secondaryText)
-                    }
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .accessibilityElement(children: .combine)
+                    emptyState(title: AlignmentFinderText.emptyTitle(reason, for: request),
+                               message: AlignmentFinderText.emptyMessage(reason, for: request, days: inputs.range.days))
                 }
             case .found(let matches, let isCutShort)?:
                 found(matches, isCutShort: isCutShort)
@@ -277,10 +264,36 @@ private struct AlignmentFinderResults: View {
         return AlignmentFinderText.needsLocation
     }
 
+    /// A magnifying glass over a title and what to do about it, for a search with nothing to show.
+    private func emptyState(title: String, message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 32, weight: .light))
+                .foregroundStyle(palette.tertiaryText)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(palette.secondaryText)
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+    }
+
     @ViewBuilder
     private func found(_ matches: [SkyWindowMatch], isCutShort: Bool) -> some View {
         let aimObject = inputs.aimObject { app.catalog.object(id: $0) }
-        ForEach(nights(of: matches)) { night in
+        let upcoming = nights(of: matches)
+        if upcoming.isEmpty {
+            SettingsSection(title: "Results") {
+                emptyState(title: AlignmentFinderText.allEndedTitle,
+                           message: AlignmentFinderText.allEndedMessage(days: inputs.range.days))
+            }
+        }
+        ForEach(upcoming) { night in
             SettingsSection(title: AlignmentFinderText.nightHeader(night.night, in: timeZone)) {
                 ForEach(night.matches, id: \.interval.start) { match in
                     AlignmentFinderMatchRow(match: match, timeZone: timeZone, openedAt: openedAt, aimObject: aimObject)

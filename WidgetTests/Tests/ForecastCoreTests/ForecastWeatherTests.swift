@@ -127,17 +127,19 @@ final class ForecastWeatherTests: XCTestCase {
         XCTAssertNil(bad.windSpeed)
         XCTAssertNil(bad.windGust)
         XCTAssertNil(bad.windFromDirection)
-        // The percentages are clamped as the cloud values are.
-        XCTAssertEqual(bad.humidity, 0.0)
-        XCTAssertEqual(bad.fog, 100.0)
+        XCTAssertNil(bad.humidity)
+        XCTAssertNil(bad.fog)
         let edges = try XCTUnwrap(ForecastParser.parseForecast(answer(
             "\"cloud_area_fraction\":10,\"air_temperature\":-90,\"dew_point_temperature\":60,\"wind_speed\":100,"
-                + "\"wind_speed_of_gust\":0,\"wind_from_direction\":360")).hours.first)
+                + "\"wind_speed_of_gust\":0,\"wind_from_direction\":360,\"relative_humidity\":100,"
+                + "\"fog_area_fraction\":0")).hours.first)
         XCTAssertEqual(edges.temperature, -90.0)
         XCTAssertEqual(edges.dewPoint, 60.0)
         XCTAssertEqual(edges.windSpeed, 100.0)
         XCTAssertEqual(edges.windGust, 0.0)
         XCTAssertEqual(edges.windFromDirection, 0.0)
+        XCTAssertEqual(edges.humidity, 100.0)
+        XCTAssertEqual(edges.fog, 0.0)
     }
 
     func testValuesThatAreNotNumbersAreDropped() throws {
