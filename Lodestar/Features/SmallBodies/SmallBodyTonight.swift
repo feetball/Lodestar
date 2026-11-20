@@ -14,8 +14,8 @@ struct SmallBodyTonight: Sendable {
 enum SmallBodyTonightPlanner {
     /// The most comets the card shows.
     static let cardCount = 3
-    /// The faintest magnitude the card lists: a camera on a tripod.
-    static let cardMagnitudeLimit = 10.0
+    /// The faintest magnitude the card lists: a camera on a tripod, the engine's limit for a photographable body.
+    static let cardMagnitudeLimit = SmallBodyEphemeris.defaultMagnitudeLimit
     /// The most comets and asteroids added to the Best Targets list.
     static let targetCount = 3
     /// The faintest magnitude of a Best Target: binoculars or a wide-field camera.

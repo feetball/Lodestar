@@ -156,11 +156,18 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
 
 /// Sidereal time (Earth rotation angle relative to the equinox).
 public enum SiderealTime {
+    /// How far sidereal time advances in one mean solar day of UT, in degrees: the rate of the Earth's rotation
+    /// relative to the equinox (the linear term of the IAU 1982 expression, Meeus 12.4).
+    public static let degreesPerDay = 360.985_647_366_29
+
+    /// How far sidereal time advances in one second of UT, in degrees.
+    public static let degreesPerSecond = degreesPerDay / JulianDate.secondsPerDay
+
     /// Greenwich mean sidereal time in degrees, [0, 360) (IAU 1982 expression, Meeus 12.4).
     public static func greenwichMean(_ jd: JulianDate) -> Double {
         let d = jd.ut - JulianDate.j2000
         let t = d / JulianDate.daysPerJulianCentury
-        let theta = 280.460_618_37 + 360.985_647_366_29 * d + 0.000_387_933 * t * t - t * t * t / 38_710_000
+        let theta = 280.460_618_37 + degreesPerDay * d + 0.000_387_933 * t * t - t * t * t / 38_710_000
         return AstroMath.normalizeDegrees(theta)
     }
 

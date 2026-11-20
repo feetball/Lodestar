@@ -231,7 +231,7 @@ public enum MountNudgeRate: String, CaseIterable, Codable, Hashable, Sendable {
     }
 
     /// The sidereal rate in degrees per second (360.98564736629 degrees per mean solar day).
-    public static let siderealDegreesPerSecond: Double = 360.98564736629 / 86_400.0
+    public static let siderealDegreesPerSecond: Double = SiderealTime.degreesPerSecond
 
     /// The rate in degrees per second.
     public var degreesPerSecond: Double { siderealMultiple * MountNudgeRate.siderealDegreesPerSecond }

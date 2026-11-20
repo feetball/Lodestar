@@ -51,13 +51,10 @@ enum TonightCalculator {
     /// An instant on the date of the night that is under way at `now`, or of the coming night once the Sun
     /// has risen on the night before.
     private static func tonightDate(now: Date, context: ObserverContext) -> Date {
-        let yesterday = context.calendar.date(byAdding: .day, value: -1, to: now) ?? now.addingTimeInterval(-86_400)
-        let previous = TwilightCalculator.night(startingOn: yesterday, observer: context.observer,
-                                                timeZone: context.timeZone)
-        if now < previous.interval.end, now < (previous.sunrise ?? previous.interval.end) {
-            return yesterday
+        let underWay = TwilightCalculator.nightUnderWay(at: now, calendar: context.calendar) { day in
+            TwilightCalculator.night(startingOn: day, observer: context.observer, timeZone: context.timeZone)
         }
-        return now
+        return underWay?.day ?? now
     }
 
     /// Noon of the calendar day that contains `date`: the instant the screen uses to stand for a night.

@@ -48,9 +48,6 @@ public enum MeridianClock {
     /// clamped into it.
     public static let limitDegreesRange: ClosedRange<Double> = 0...30
 
-    /// The rate at which the hour angle of a fixed point grows, in degrees per second of Universal Time.
-    public static let siderealDegreesPerSecond = 360.985_647_366_29 / JulianDate.secondsPerDay
-
     /// The local hour angle of an apparent place, in hours, signed with west positive, in (−12, 12].
     ///
     /// Costs one `SkyFrame` (a few microseconds).
@@ -102,7 +99,7 @@ public enum MeridianClock {
         guard hourAngle.isFinite, limitDegrees.isFinite else { return nil }
         let limit = AstroMath.clamp(limitDegrees, limitDegreesRange.lowerBound, limitDegreesRange.upperBound)
         let angle = AstroMath.normalizeSignedDegrees(hourAngle * 15)
-        return MeridianFlipWindow(secondsUntilLimit: (limit - angle) / siderealDegreesPerSecond)
+        return MeridianFlipWindow(secondsUntilLimit: (limit - angle) / SiderealTime.degreesPerSecond)
     }
 
     /// The transits within `searchHalfSpan` of `date` of a target whose hour angle in degrees at an instant is

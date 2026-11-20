@@ -97,9 +97,9 @@ public struct MilkyWayCoreVisibility: Sendable, Hashable {
     public static let minimumAltitude = 10.0
 
     /// The Galactic Centre's J2000 position: the radio source Sagittarius A*,
-    /// 17h 45m 40.04s, −29° 00′ 28.1″.
-    static let galacticCentre = EquatorialCoordinate(rightAscensionHours: 17 + 45.0 / 60 + 40.04 / 3600,
-                                                     declination: -(29 + 28.1 / 3600))
+    /// 17h 45m 40.04s, −29° 00′ 28.1″. The catalog's Milky Way core (`special.galacticCenter`) sits here too.
+    public static let galacticCentre = EquatorialCoordinate(rightAscensionHours: 17 + 45.0 / 60 + 40.04 / 3600,
+                                                            declination: -(29 + 28.1 / 3600))
 
     /// When the core rises, culminates and sets within the night, with the horizon at −0.5667°.
     public let riseTransitSet: RiseTransitSet

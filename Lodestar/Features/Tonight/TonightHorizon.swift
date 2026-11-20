@@ -5,9 +5,8 @@ import LodestarKit
 /// are judged by when they clear and sink behind the trees and ridges instead of by a flat horizon. Pure, so it can
 /// run on any thread.
 enum TonightHorizon {
-    /// The Galactic Centre (Sagittarius A*), J2000: 17h 45m 40.04s, −29° 00′ 28.1″.
-    static let galacticCentre = EquatorialCoordinate(rightAscensionHours: 17 + 45.0 / 60 + 40.04 / 3600,
-                                                     declination: -(29 + 28.1 / 3600))
+    /// The Galactic Centre (Sagittarius A*), J2000, as the engine defines it.
+    static let galacticCentre = MilkyWayCoreVisibility.galacticCentre
 
     /// The skyline to apply for `context`: the site's recorded one, or `nil` for an open horizon. A flat profile counts
     /// as none, so it neither slows the planner down nor shows a "skyline applied" note.

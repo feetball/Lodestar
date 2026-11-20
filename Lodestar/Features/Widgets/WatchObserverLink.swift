@@ -18,7 +18,8 @@ final class WatchObserverLink {
         let timeZone: String
 
         var context: [String: Any] {
-            ["lat": latitude, "lon": longitude, "elevation": elevation, "timeZone": timeZone]
+            [TonightPhoneContext.latitudeKey: latitude, TonightPhoneContext.longitudeKey: longitude,
+             TonightPhoneContext.elevationKey: elevation, TonightPhoneContext.timeZoneKey: timeZone]
         }
     }
 
