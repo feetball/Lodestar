@@ -1,44 +1,94 @@
 import Foundation
 
-/// Field-of-view calculations for a rectilinear lens on a given sensor.
+/// Field-of-view calculations for a lens on a given sensor.
 ///
-/// The angle subtended by a sensor dimension `d` at focal length `f` is `2 · atan(d / 2f)`.
-/// Fisheye and other non-rectilinear projections are not modelled. The horizontal and vertical
-/// angles refer to the sensor's width and height, that is, a camera held in landscape orientation;
-/// use `FrameSize.rotated` for portrait.
+/// The angle across a sensor dimension `d` is `2 · θ(d / 2)`, where `θ(r)` is the inverse of the lens's
+/// `LensProjection`: for a rectilinear lens of focal length `f` that is `2 · atan(d / 2f)`, and a fisheye
+/// mapping is inverted the same way. No angle exceeds 180°. The horizontal and vertical angles refer to the
+/// sensor's width and height, that is, a camera held in landscape orientation; use `FrameSize.rotated` for
+/// portrait.
+///
+/// A circular fisheye whose image circle is smaller than the sensor only fills that circle: every extent is
+/// limited to the circle's diameter (`imageCircleDiameterMillimeters`), so a circle that fits inside the
+/// frame gives the same angle in all three directions.
 ///
 /// The functions accept any positive focal length. A focal length that is not a positive finite
 /// number is replaced by `LensSetup.defaultFocalLengthMillimeters`, so the result is always a
-/// valid angle.
+/// valid angle. An image circle that is not a positive finite number is ignored.
 public enum FieldOfView: Sendable {
 
     /// The horizontal field of view, in degrees, across the sensor width.
-    public static func horizontal(sensor: SensorFormat, focalLength: Double) -> Double {
-        angleDegrees(extent: sensor.widthMillimeters, focalLength: usable(focalLength))
+    public static func horizontal(
+        sensor: SensorFormat,
+        focalLength: Double,
+        projection: LensProjection = .rectilinear,
+        imageCircleDiameterMillimeters: Double? = nil
+    ) -> Double {
+        angleDegrees(
+            extent: framedExtent(sensor.widthMillimeters, imageCircleDiameterMillimeters),
+            focalLength: usable(focalLength),
+            projection: projection
+        )
     }
 
     /// The vertical field of view, in degrees, across the sensor height.
-    public static func vertical(sensor: SensorFormat, focalLength: Double) -> Double {
-        angleDegrees(extent: sensor.heightMillimeters, focalLength: usable(focalLength))
+    public static func vertical(
+        sensor: SensorFormat,
+        focalLength: Double,
+        projection: LensProjection = .rectilinear,
+        imageCircleDiameterMillimeters: Double? = nil
+    ) -> Double {
+        angleDegrees(
+            extent: framedExtent(sensor.heightMillimeters, imageCircleDiameterMillimeters),
+            focalLength: usable(focalLength),
+            projection: projection
+        )
     }
 
     /// The diagonal field of view, in degrees, corner to corner.
-    public static func diagonal(sensor: SensorFormat, focalLength: Double) -> Double {
-        angleDegrees(extent: sensor.diagonalMillimeters, focalLength: usable(focalLength))
+    public static func diagonal(
+        sensor: SensorFormat,
+        focalLength: Double,
+        projection: LensProjection = .rectilinear,
+        imageCircleDiameterMillimeters: Double? = nil
+    ) -> Double {
+        angleDegrees(
+            extent: framedExtent(sensor.diagonalMillimeters, imageCircleDiameterMillimeters),
+            focalLength: usable(focalLength),
+            projection: projection
+        )
     }
 
     /// The horizontal, vertical and diagonal fields of view at once.
-    public static func of(sensor: SensorFormat, focalLength: Double) -> FrameSize {
-        FrameSize(sensor: sensor, focalLength: usable(focalLength))
+    public static func of(
+        sensor: SensorFormat,
+        focalLength: Double,
+        projection: LensProjection = .rectilinear,
+        imageCircleDiameterMillimeters: Double? = nil
+    ) -> FrameSize {
+        FrameSize(
+            sensor: sensor,
+            focalLength: usable(focalLength),
+            projection: projection,
+            imageCircleDiameterMillimeters: imageCircleDiameterMillimeters
+        )
     }
 
     private static func usable(_ focalLength: Double) -> Double {
         focalLength.isFinite && focalLength > 0 ? focalLength : LensSetup.defaultFocalLengthMillimeters
     }
 
-    /// `2 · atan(extent / 2f)` in degrees. The caller guarantees a positive, finite focal length.
-    fileprivate static func angleDegrees(extent: Double, focalLength: Double) -> Double {
-        2 * atan(extent / (2 * focalLength)) * 180 / .pi
+    /// The part of a sensor extent that the lens images: `extent` limited to the image circle's diameter, when there
+    /// is a usable one (a positive finite number).
+    static func framedExtent(_ extent: Double, _ imageCircleDiameterMillimeters: Double?) -> Double {
+        guard let circle = imageCircleDiameterMillimeters, circle.isFinite, circle > 0 else { return extent }
+        return min(extent, circle)
+    }
+
+    /// The angle across `extent` in degrees, at most 180: `2 · θ(extent / 2)` for the projection's inverse mapping `θ`.
+    /// The caller guarantees a positive, finite focal length.
+    fileprivate static func angleDegrees(extent: Double, focalLength: Double, projection: LensProjection) -> Double {
+        min(180, 2 * projection.angleDegrees(imageRadiusMillimeters: extent / 2, focalLength: focalLength))
     }
 }
 
@@ -62,11 +112,25 @@ public struct FrameSize: Hashable, Sendable {
 
     /// Computes the frame size of a sensor behind a lens. The caller guarantees that
     /// `focalLength` is a positive, finite number of millimetres.
-    init(sensor: SensorFormat, focalLength: Double) {
+    init(
+        sensor: SensorFormat,
+        focalLength: Double,
+        projection: LensProjection = .rectilinear,
+        imageCircleDiameterMillimeters: Double? = nil
+    ) {
         self.init(
-            horizontal: FieldOfView.angleDegrees(extent: sensor.widthMillimeters, focalLength: focalLength),
-            vertical: FieldOfView.angleDegrees(extent: sensor.heightMillimeters, focalLength: focalLength),
-            diagonal: FieldOfView.angleDegrees(extent: sensor.diagonalMillimeters, focalLength: focalLength)
+            horizontal: FieldOfView.angleDegrees(
+                extent: FieldOfView.framedExtent(sensor.widthMillimeters, imageCircleDiameterMillimeters),
+                focalLength: focalLength, projection: projection
+            ),
+            vertical: FieldOfView.angleDegrees(
+                extent: FieldOfView.framedExtent(sensor.heightMillimeters, imageCircleDiameterMillimeters),
+                focalLength: focalLength, projection: projection
+            ),
+            diagonal: FieldOfView.angleDegrees(
+                extent: FieldOfView.framedExtent(sensor.diagonalMillimeters, imageCircleDiameterMillimeters),
+                focalLength: focalLength, projection: projection
+            )
         )
     }
 

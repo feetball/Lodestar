@@ -55,7 +55,8 @@ private struct OnlineFeedRows: View {
                 .sheetDragIndicator(app.palette)
                 .themedRoot(app.palette, redFilter: app.settings.redFilterOverlay)
         }
-        if status.isEnabled {
+        // Terrain horizons have no files to keep fresh: nothing to update, no time of the last update.
+        if status.isEnabled, !feed.resources.isEmpty {
             // The "ago" text and the button's availability move on without any change to the status.
             TimelineView(.periodic(from: .now, by: 30)) { timeline in
                 updatedRow(status, now: timeline.date)

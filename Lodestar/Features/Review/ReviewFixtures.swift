@@ -50,7 +50,8 @@ extension ReviewFixtures {
 
     /// A cloud forecast in the shape of MET Norway's answer, read by the app's own parser: hourly values from half a day
     /// before `reference` to two and a half days after it, cloudy in the evening, clear in the middle of the night, high
-    /// cloud before dawn, a cloudy day after. Local solar time is taken from the longitude.
+    /// cloud before dawn, a cloudy day after; the air cools towards its dew point and a breeze rises before dawn. Local
+    /// solar time is taken from the longitude.
     static func forecast(around reference: Date, latitude: Double, longitude: Double) -> CloudForecast? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -71,11 +72,24 @@ extension ReviewFixtures {
             }
             let (low, medium, high) = layers
             let total = min(100, max(low, medium, high) + (low + medium + high) / 12)
+            // Cooling through the night until the air is close to its dew point, and a breeze before dawn.
+            let weather: (temperature: Double, dewPoint: Double, wind: Double, gust: Double)
+            switch local {
+            case 17..<21: weather = (9, 2, 2.4, 4.0)
+            case 21..<23: weather = (6, 3, 2.1, 3.6)
+            case 23..<24, 0..<3: weather = (4, 2.5, 2.3, 3.8)
+            case 3..<5.5: weather = (2, 1.2, 5.4, 8.0)
+            case 5.5..<8: weather = (3, 1.5, 3.2, 5.1)
+            default: weather = (12, 3, 3.0, 5.0)
+            }
             series.append([
                 "time": formatter.string(from: time),
                 "data": ["instant": ["details": [
                     "cloud_area_fraction": total, "cloud_area_fraction_low": low,
                     "cloud_area_fraction_medium": medium, "cloud_area_fraction_high": high,
+                    "air_temperature": weather.temperature, "dew_point_temperature": weather.dewPoint,
+                    "wind_speed": weather.wind, "wind_speed_of_gust": weather.gust, "wind_from_direction": 315.0,
+                    "fog_area_fraction": 0.0,
                 ]]],
             ])
         }
