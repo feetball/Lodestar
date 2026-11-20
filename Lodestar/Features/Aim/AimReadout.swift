@@ -12,7 +12,7 @@ struct AimReadout: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 0.1, paused: !isActive)) { _ in
             let frame = model.engine.frame()
-            if model.mosaicSession.isActive {
+            if model.isGuidingMosaic {
                 AimMosaicReadout(model: model, frame: frame)
             } else if let source = model.satelliteSource {
                 SatelliteAimReadout(model: model, source: source)

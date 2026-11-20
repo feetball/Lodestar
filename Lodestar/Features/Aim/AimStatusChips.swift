@@ -48,6 +48,8 @@ struct AimStatusChips: View {
                     .accessibilityHint("Opens the iOS settings to allow camera access. The virtual sky still works.")
                 } else if item.opensAlignment {
                     Button {
+                        // Aligning compares the sky with the phone's sensors now: align on the live sky.
+                        model.endPreview()
                         sheet = .alignment
                     } label: {
                         // Padded to the minimum touch target.
