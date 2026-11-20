@@ -80,7 +80,8 @@ public struct TopocentricApproach: Sendable, Hashable {
     public let time: Date
     /// The least separation of the centres in degrees.
     public let separation: Double
-    /// `true` when the Moon's disc covers the centre of the other body at that instant.
+    /// `true` when the discs of the Moon and the other body overlap at that instant, that is when the separation of the
+    /// centres is less than the sum of the two angular radii. A star has no disc, so the Moon must cover it.
     public let isOccultation: Bool
 
     public init(time: Date, separation: Double, isOccultation: Bool) {

@@ -171,8 +171,9 @@ public struct EarthApsis: Sendable, Hashable {
     }
 }
 
-/// Finds the Earth's perihelion and aphelion as the extremes of the Earth–Sun distance (the Earth–Moon barycentre of the
-/// VSOP87 series, as in the published tables; it differs from the Earth's centre by at most 0.00003 AU).
+/// Finds the Earth's perihelion and aphelion as the extremes of the distance between the Earth's centre and the Sun.
+/// The VSOP87 Earth series is that of the Earth's centre, not of the Earth–Moon barycentre; the two distances differ
+/// by up to about 0.00003 AU, which would move the instant of a flat-bottomed extreme by up to about a day.
 ///
 /// Each apsis is searched within a week of the mean instant of Meeus, *Astronomical Algorithms*, ch. 38 (a whole `k` is a
 /// perihelion, `k + 0.5` an aphelion). The anomalistic year is longer than the calendar year, so the apsides drift through
