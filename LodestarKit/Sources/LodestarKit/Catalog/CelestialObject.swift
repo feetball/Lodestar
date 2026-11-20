@@ -249,8 +249,12 @@ public struct CelestialObject: Identifiable, Hashable, Sendable {
                 pendingSpace = keptScalars > 0
                 continue
             }
+            // Unassigned scalars stay: they are only unassigned in this system's Unicode tables, and a newer system
+            // may have typed or saved an emoji that these tables do not know yet.
             switch scalar.properties.generalCategory {
-            case .control, .format, .surrogate, .privateUse, .unassigned:
+            case .control, .surrogate, .privateUse:
+                continue
+            case .format where !UserText.isJoinerOrDirectionMark(scalar):
                 continue
             default:
                 break

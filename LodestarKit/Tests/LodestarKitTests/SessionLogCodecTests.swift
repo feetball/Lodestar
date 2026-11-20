@@ -64,6 +64,29 @@ final class SessionLogCodecTests: XCTestCase {
         XCTAssertEqual(entry.notes.count, SessionLogEntry.maximumNotesLength)
     }
 
+    func testEntryTextKeepsJoinersAndDirectionMarksAndDropsOverrides() throws {
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}"
+        let persian = "\u{645}\u{6CC}\u{200C}\u{62E}\u{648}\u{627}\u{647}\u{645}"
+        let entry = SessionLogEntry(
+            date: first, targetID: "custom.1", targetName: "\(persian)\u{200F}", siteName: "Camp \(family)",
+            notes: "\(family)\n\(persian)\u{200F} (\u{200E}Orion)", isImaged: true
+        )
+        XCTAssertEqual(entry.targetName, "\(persian)\u{200F}")
+        XCTAssertEqual(entry.siteName, "Camp \(family)")
+        XCTAssertEqual(entry.notes, "\(family)\n\(persian)\u{200F} (\u{200E}Orion)")
+
+        let csv = SessionLogCodec.encodeCSV([entry])
+        XCTAssertTrue(csv.contains(persian + "\u{200F}"))
+        XCTAssertTrue(csv.contains(family))
+        let oal = SessionLogCodec.encodeOpenAstronomyLog([entry])
+        XCTAssertTrue(oal.contains(family))
+        XCTAssertTrue(oal.contains(persian))
+
+        let overridden = SessionLogEntry(date: first, targetID: "t", targetName: "gpj\u{202E}.exe", notes: "a\u{202E}b")
+        XCTAssertEqual(overridden.targetName, "gpj.exe")
+        XCTAssertEqual(overridden.notes, "ab")
+    }
+
     func testCoordinatesCountOnlyAsAPair() {
         XCTAssertFalse(SessionLogEntry(date: first, targetID: "x", targetName: "x", rightAscension: 10).hasCoordinates)
         XCTAssertFalse(SessionLogEntry(date: first, targetID: "x", targetName: "x", rightAscension: .nan, declination: 5).hasCoordinates)
