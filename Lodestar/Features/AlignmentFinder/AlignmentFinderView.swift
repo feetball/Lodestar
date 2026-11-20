@@ -70,14 +70,21 @@ struct AlignmentFinderView: View {
         .scrollDismissesKeyboard(.interactively)
     }
 
-    /// Runs the search for `request` once the inputs have settled, off the main thread.
+    /// Runs the search for `request` once the inputs have settled, off the main thread. `.task(id:)` cancels this
+    /// when the request changes; a detached task does not follow its parent, so it is cancelled here by hand, which
+    /// ends its search instead of leaving it to burn CPU for a result nobody will see.
     private func search(_ request: AlignmentFinderRequest?) async {
         outcome = nil
         guard let request else { return }
         try? await Task.sleep(for: Self.searchDelay)
         guard !Task.isCancelled else { return }
-        let result = await Task.detached(priority: .userInitiated) { AlignmentFinderSearch.run(request) }.value
-        guard !Task.isCancelled else { return }
+        let running = Task.detached(priority: .userInitiated) { AlignmentFinderSearch.run(request) }
+        let result = await withTaskCancellationHandler {
+            await running.value
+        } onCancel: {
+            running.cancel()
+        }
+        guard !Task.isCancelled, let result else { return }
         outcome = result
     }
 
