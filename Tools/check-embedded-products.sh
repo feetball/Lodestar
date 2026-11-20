@@ -5,11 +5,22 @@
 set -euo pipefail
 
 configuration="${1:?usage: check-embedded-products.sh <Debug-iphonesimulator|Release-iphoneos>}"
-app="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -name Lodestar.app -path "*/Build/Products/$configuration/*" | head -n 1)"
-if [ -z "$app" ]; then
-  echo "error: no Lodestar.app found for $configuration" >&2
-  exit 1
-fi
+# Exactly one build must match.  With two (say, two DerivedData folders of this project) it would be a guess which one is
+# meant, and checking the wrong one would pass or fail for the wrong reason.
+matches="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -name Lodestar.app \
+  -path "*/Build/Products/$configuration/*" | sort || true)"
+case "$matches" in
+  "")
+    echo "error: no Lodestar.app found for $configuration" >&2
+    exit 1
+    ;;
+  *$'\n'*)
+    echo "error: more than one Lodestar.app found for $configuration; delete the stale builds and run again:" >&2
+    echo "$matches" >&2
+    exit 1
+    ;;
+esac
+app="$matches"
 echo "Checking $app"
 
 widgets="$app/PlugIns/LodestarWidgets.appex"

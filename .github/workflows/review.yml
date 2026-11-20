@@ -3,10 +3,11 @@
 # an agent) looks at the pictures. It is not part of the default CI.
 #
 # The build is a Debug build of the Lodestar scheme for the Simulator, with two additions that only this workflow makes:
-# the widget views (WidgetShared and the two view files of LodestarWidgets) are copied into the app's folder and compiled
-# with -DREVIEW_WIDGETS, so that the app can draw them at the sizes of the widget families. The screens are opened by the
-# `screen=` key of screenshot mode (Lodestar/App/ScreenshotMode.swift, Lodestar/Features/Review) and photographed by
-# Tools/review/capture.sh; Tools/review/shots-*.txt list what is captured.
+# the two view files of LodestarWidgets are copied into the app's folder (WidgetShared is a synchronized folder of the
+# app target already, so it is not copied) and compiled with -DREVIEW_WIDGETS, so that the app can draw the widget views
+# at the sizes of the widget families. The screens are opened by the `screen=` key of screenshot mode
+# (Lodestar/App/ScreenshotMode.swift, Lodestar/Features/Review) and photographed by Tools/review/capture.sh;
+# Tools/review/shots-*.txt list what is captured.
 name: Review
 
 on:
@@ -68,7 +69,6 @@ jobs:
       - name: Add the widget views to the app (review build only)
         run: |
           mkdir -p Lodestar/ReviewWidgetSources
-          cp WidgetShared/*.swift WidgetShared/Core/*.swift Lodestar/ReviewWidgetSources/
           cp LodestarWidgets/TonightSystemView.swift LodestarWidgets/TonightWidget.swift Lodestar/ReviewWidgetSources/
           ls Lodestar/ReviewWidgetSources
 
