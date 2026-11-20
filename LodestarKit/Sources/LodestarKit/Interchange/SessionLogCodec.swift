@@ -59,7 +59,7 @@ public enum SessionLogCodec {
                 nightText(entry.night),
                 InterchangeCSV.guarded(entry.targetName),
                 InterchangeCSV.guarded(entry.targetID),
-                entry.rightAscension.map { InterchangeText.fixed($0, decimals: 5) } ?? "",
+                entry.rightAscension.map { InterchangeText.fixedAngle($0, decimals: 5) } ?? "",
                 entry.declination.map { InterchangeText.fixed($0, decimals: 5) } ?? "",
                 InterchangeCSV.guarded(entry.siteName),
                 entry.siteLatitude.map { InterchangeText.decimal($0, maximumDecimals: 5) } ?? "",

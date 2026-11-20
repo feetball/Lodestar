@@ -291,6 +291,14 @@ final class SkyQualityLightPollutionMapTests: XCTestCase {
         XCTAssertEqual(across, inland, accuracy: inland * 1e-9)
     }
 
+    func testADecodedAbsurdLocationLooksUpTheMapWithoutTrapping() throws {
+        let map = try shipped()
+        let location = try JSONDecoder().decode(GeographicLocation.self,
+                                                from: Data(#"{"latitude":1e18,"longitude":1e18,"elevation":0}"#.utf8))
+        XCTAssertTrue((0...15).contains(map.level(at: location)))
+        XCTAssertTrue(map.skyGlowIndex(at: location).isFinite)
+    }
+
     func testSkyGlowIsFiniteAtThePoles() throws {
         let bright = try Support.map(Support.cells { _, _ in 15 })
         for latitude in [90.0, 89.95, 85.0, -85.0, -89.95, -90.0] {

@@ -86,9 +86,9 @@ public enum MosaicPanelCodec {
                 record.panel,
                 String(record.row),
                 String(record.column),
-                InterchangeText.fixed(record.rightAscension, decimals: 5),
+                InterchangeText.fixedAngle(record.rightAscension, decimals: 5),
                 InterchangeText.fixed(record.declination, decimals: 5),
-                InterchangeText.fixed(record.positionAngle, decimals: 5),
+                InterchangeText.fixedAngle(record.positionAngle, decimals: 5),
                 String(record.order),
             ])
         }

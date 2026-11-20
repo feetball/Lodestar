@@ -38,6 +38,10 @@ public enum SmallBodySelection {
     /// The most samples taken over an interval, 64 (spans over 63 days are sampled more coarsely than daily).
     public static let maximumSampleCount = 64
 
+    /// The longest interval `brightest` accepts, 36 525 days (a century). Orbit records are osculating elements, and a
+    /// longer or non-finite interval selects nothing, so an infinite or absurdly long one cannot overflow the count.
+    public static let maximumIntervalDays = 36_525.0
+
     /// The Earth's smallest distance from the Sun in AU, rounded down.
     private static let earthMinimumDistance = 0.9831
 
@@ -57,7 +61,8 @@ public enum SmallBodySelection {
     ///
     /// - Parameters:
     ///   - bodies: The candidates (for example the result of `CometElementsParser.parse`).
-    ///   - interval: The period; the sampling is daily up to 63 days and coarser beyond.
+    ///   - interval: The period; the sampling is daily up to 63 days and coarser beyond. An interval longer than
+    ///     `maximumIntervalDays`, or infinite, selects nothing.
     ///   - magnitudeLimit: The faintest magnitude accepted (non-finite: nothing is selected).
     ///   - minimumElongation: Smallest angle from the Sun in degrees, clamped to 0…180.
     ///   - kind: Only comets or only asteroids; `nil` for both.
@@ -67,6 +72,7 @@ public enum SmallBodySelection {
                                  minimumElongation: Double = SmallBodyEphemeris.defaultMinimumElongation,
                                  kind: SmallBodyKind? = nil, maximumCount: Int = 100) -> [BrightSmallBody] {
         let days = interval.duration / JulianDate.secondsPerDay
+        guard days.isFinite, days <= maximumIntervalDays else { return [] }
         let count = days > 0 ? min(maximumSampleCount, max(2, Int(days.rounded(.up)) + 1)) : 1
         return select(bodies, start: interval.start, stepDays: count > 1 ? days / Double(count - 1) : 0.0, count: count,
                       magnitudeLimit: magnitudeLimit, minimumElongation: minimumElongation, kind: kind,
