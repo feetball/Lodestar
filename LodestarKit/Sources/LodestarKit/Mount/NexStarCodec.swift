@@ -289,6 +289,29 @@ public enum NexStarCodec {
         }
     }
 
+    /// True if a model number from the `m` command is that of a German equatorial mount, which needs an equatorial tracking
+    /// mode (`T` 2 or 3) rather than alt-azimuth tracking (`T` 1).
+    ///
+    /// Celestron numbers are those of the "NexStar Communication Protocol" (Celestron), as INDI's `CelestronDriver::get_model`
+    /// also lists them: GPS Series 1, i-Series 3, i-Series SE 4, CGE 5, Advanced GT 6, SLT 7, CPC 9, GT 10, 4/5 SE 11,
+    /// 6/8 SE 12, CGE Pro 13, CGEM DX 14, LCM 15, Sky Prodigy 16, CPC Deluxe 17, GT 16 18, StarSeeker 19, AVX 20, Cosmos 21,
+    /// Evolution 22, CGX 23, CGXL 24, Astrofi 25, SkyWatcher 26. Of these CGE, Advanced GT, CGE Pro, CGEM DX, AVX, CGX and
+    /// CGXL are German equatorial mounts. The protocol lists names only, so which model is equatorial is the product line,
+    /// not the document. The fork and tabletop mounts are alt-azimuth unless they sit on a wedge, which the model number
+    /// cannot tell; "GT 16", "LCM" and "SkyWatcher" are not known well enough to call.
+    ///
+    /// SynScan numbers are those of the "SynScan Serial Communication Protocol" 3.3 (see `modelName`): EQ6, HEQ5, EQ5, EQ3
+    /// and EQ8 (0 to 4) are equatorial. AZ-EQ6 and AZ-EQ5 (5 and 6) are used both ways, so the number does not settle it.
+    ///
+    /// Every other number answers false: alt-azimuth models, models the lists do not have and models used both ways. A
+    /// caller then keeps its alt-azimuth default for them.
+    public static func isEquatorialModel(_ model: Int, flavor: NexStarFlavor) -> Bool {
+        switch flavor {
+        case .celestron: [5, 6, 13, 14, 20, 23, 24].contains(model)
+        case .synscan: (0 ... 4).contains(model)
+        }
+    }
+
     // MARK: Helpers
 
     private static func malformed(_ what: String, _ text: String) -> MountError {

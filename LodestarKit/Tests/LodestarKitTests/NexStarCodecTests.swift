@@ -203,6 +203,23 @@ final class NexStarCodecTests: XCTestCase {
         XCTAssertFalse(version.isAtLeast(5, 0))
     }
 
+    func testOnlyGermanEquatorialModelsAreCalledEquatorial() {
+        for model in [5, 6, 13, 14, 20, 23, 24] {
+            XCTAssertTrue(NexStarCodec.isEquatorialModel(model, flavor: .celestron), "Celestron \(model)")
+        }
+        // Forks, tabletop mounts, the models that are not known well enough, and numbers the list does not have.
+        for model in [0, 1, 3, 4, 7, 9, 10, 11, 12, 15, 16, 17, 18, 19, 21, 22, 25, 26, 99, 255] {
+            XCTAssertFalse(NexStarCodec.isEquatorialModel(model, flavor: .celestron), "Celestron \(model)")
+        }
+        for model in 0 ... 4 {
+            XCTAssertTrue(NexStarCodec.isEquatorialModel(model, flavor: .synscan), "SynScan \(model)")
+        }
+        // AZ-EQ6 and AZ-EQ5 are used both ways; the rest are alt-azimuth or unknown.
+        for model in [5, 6, 7, 77, 128, 143, 144, 160, 255] {
+            XCTAssertFalse(NexStarCodec.isEquatorialModel(model, flavor: .synscan), "SynScan \(model)")
+        }
+    }
+
     func testModelNames() {
         XCTAssertEqual(NexStarCodec.modelName(12, flavor: .celestron), "Celestron NexStar 6/8 SE")
         XCTAssertEqual(NexStarCodec.modelName(9, flavor: .celestron), "Celestron CPC")
