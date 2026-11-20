@@ -82,7 +82,7 @@ final class SessionLogCodecTests: XCTestCase {
 
     func testNightsChangeAtNoonLocalTime() {
         // 2026-11-18T11:59:59 and 12:00:00 at UTC+2 (09:59:59Z and 10:00:00Z).
-        let beforeNoon = Date(timeIntervalSince1970: 1_795_000_000 - (1_795_000_000 % 86_400) + 9 * 3_600 + 59 * 60 + 59)
+        let beforeNoon = Date(timeIntervalSince1970: 1794995999)
         let atNoon = beforeNoon.addingTimeInterval(1)
         let day = SessionLogCodec.night(of: beforeNoon, utcOffsetMinutes: 120)
         XCTAssertEqual(SessionLogCodec.night(of: atNoon, utcOffsetMinutes: 120), day + 1)
