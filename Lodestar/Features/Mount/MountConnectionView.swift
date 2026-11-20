@@ -633,7 +633,11 @@ private struct MountSafetySection: View {
             Stop is always one tap away on the Aim screen. If the app cannot reach the mount, \
             stop it on its hand controller or switch it off.
             """),
-        Note(symbol: "iphone.slash", text: "When Lodestar goes to the background it stops the mount and disconnects."),
+        Note(symbol: "iphone.slash", text: """
+            When Lodestar goes to the background, it stops a slew or nudge and disconnects. A mount that is tracking \
+            at that moment keeps tracking, and Lodestar no longer watches its limits, so check on it or switch it off. \
+            An alt-azimuth Sky-Watcher mount stops instead, because Lodestar does its tracking.
+            """),
         Note(symbol: "scope", text: """
             Align the mount on its own hand controller before the first GoTo, and sync on a star you have \
             centred to improve it.
