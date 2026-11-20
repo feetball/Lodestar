@@ -63,7 +63,7 @@ extension HelpContent {
     private static let events = HelpTopic(
         topic: .events, category: .sky, title: "Events calendar", systemImage: "calendar",
         summary: "Meteor showers, eclipses, conjunctions, Jupiter\u{2019}s moons and more.",
-        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant", "meteor camera", "where to point", "meteors per hour", "great red spot", "grs", "jupiter moons", "shadow transit", "station", "retrograde"],
+        keywords: ["meteor shower", "eclipse", "conjunction", "opposition", "elongation", "supermoon", "equinox", "solstice", "zhr", "radiant", "meteor camera", "where to point", "meteors per hour", "great red spot", "grs", "jupiter moons", "shadow transit", "station", "retrograde", "iss transit", "transit", "centreline", "silhouette"],
         blocks: [
             .paragraph("The events calendar lists what the sky has coming in the next twelve months, with times for your site, so you can plan ahead."),
             .bullets([
@@ -78,8 +78,10 @@ extension HelpContent {
                 "Tap a chip such as **Meteor Showers** or **Eclipses** to narrow the list. **Visible from here only** hides what you cannot see from your site.",
                 "Tap an event for when and where to look and how to photograph it. The **Aim at \u{2026}** buttons send it to the Aim screen. **Show in Sky chart** opens the Sky tab at the time of the event.",
             ]),
+            .paragraph("**ISS transits of the Sun and Moon** sit at the top of the calendar when **Satellite passes** is on in **Settings** \u{25B8} **Online Data** and the orbit data is fresh. The card lists, for the next 14 days, when the ISS or Tiangong crosses the Sun or the Moon, either as seen from your site (**from here**) or from a place within 50 km, the **centreline**, where the satellite crosses the middle of the disc. Tap one for the time to the second, the height and direction of the Sun or Moon, how long the crossing lasts (often under a second), the satellite\u{2019}s size and distance, and the centreline\u{2019}s distance, direction and coordinates, which **Copy coordinates** puts on the clipboard. **Aim at the Moon** or **Aim at the Sun** opens the Aim screen."),
             .tip("For a meteor shower, aim about 40\u{00B0} away from the radiant, not at it. Meteors then draw long trails across the frame. Use your widest lens, the NPF exposure and continuous shooting, and keep the radiant in or near the edge of the frame."),
-            .caution("Never point a camera at the Sun without a certified solar filter. On a solar eclipse page, Lodestar asks you to confirm the filter before it aims at the Sun."),
+            .tip("For a transit, use burst mode at 1/2000 s or faster and start a few seconds early. The orbit changes from day to day, so update the orbit data and check the time again on the day."),
+            .caution("Never point a camera at the Sun without a certified solar filter. On a solar eclipse page or a Sun transit, Lodestar asks you to confirm the filter before it aims at the Sun."),
         ],
         related: [.tonight, .skyChart])
 
@@ -134,7 +136,7 @@ extension HelpContent {
         blocks: [
             .paragraph("Stars drift across the sky, so a long exposure turns them into streaks. These tools help you pick an exposure that keeps stars sharp, or plan star trails and time-lapses on purpose."),
             .bullets([
-                "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse** and **Polar Alignment**.",
+                "Open them in **Settings** \u{25B8} **Tools**: **Exposure Calculator**, **Star Trails & Time-Lapse**, **Polar Alignment** and **Red Torch**.",
                 "The **Exposure Calculator** gives the longest exposure before stars trail. The NPF rule counts your aperture and pixel size, so it suits high-resolution sensors. The 500 rule is simpler but too generous for them.",
                 "Below the result, **Tracked** shows how fast a star tracker drifts when its axis is off the pole, and the longest exposure for the polar alignment error you set. It is the worst case, for a target 90\u{00B0} from the direction of the error.",
                 "**Alt-Az Mount** shows how fast the field turns on an alt-azimuth mount, and the longest exposure at your target\u{2019}s place. Without a target, set the altitude and azimuth yourself. Due east or west the field does not turn.",

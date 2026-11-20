@@ -52,6 +52,9 @@ struct EventsCalendarView: View {
         ScrollView {
             LazyVStack(spacing: 16, pinnedViews: [.sectionHeaders]) {
                 filterCard
+                if categories.isEmpty {
+                    EventsTransitCard(context: context, now: now)
+                }
                 if let entries = model.entries {
                     let months = months(of: filtered(entries), in: context)
                     if months.isEmpty {
