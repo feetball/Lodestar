@@ -295,6 +295,21 @@ final class CometsSelectionTests: XCTestCase {
         XCTAssertEqual(SmallBodySelection.maximumSampleCount, 64)
     }
 
+    func testAnInfiniteOrAbsurdlyLongIntervalSelectsNothingInsteadOfTrapping() throws {
+        let bodies = try fixtureComets()
+        let infinite = DateInterval(start: now, duration: Double.infinity)
+        XCTAssertEqual(SmallBodySelection.brightest(in: bodies, during: infinite, magnitudeLimit: 30.0), [])
+        // More days than an Int holds.
+        let astronomical = DateInterval(start: now, duration: 1.0e300)
+        XCTAssertEqual(SmallBodySelection.brightest(in: bodies, during: astronomical, magnitudeLimit: 30.0), [])
+        // Just past the limit selects nothing; the limit itself still works.
+        let limit = SmallBodySelection.maximumIntervalDays * 86_400.0
+        let tooLong = DateInterval(start: now, duration: limit + 86_400.0)
+        XCTAssertEqual(SmallBodySelection.brightest(in: bodies, during: tooLong, magnitudeLimit: 30.0), [])
+        let atTheLimit = DateInterval(start: now, duration: limit)
+        XCTAssertFalse(SmallBodySelection.brightest(in: bodies, during: atTheLimit, magnitudeLimit: 30.0).isEmpty)
+    }
+
     func testPeakStateIsConsistentWithTheBody() throws {
         let bodies = try fixtureAsteroids()
         let result = SmallBodySelection.brightest(in: bodies, during: DateInterval(start: now, end: monthEnd), magnitudeLimit: 11.0)

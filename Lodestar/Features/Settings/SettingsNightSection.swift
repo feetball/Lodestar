@@ -46,6 +46,12 @@ struct SettingsNightSection: View {
                         + "Color Filters (below) are more reliable.",
                     isOn: $store.settings.redFilterOverlay)
             }
+            Button {
+                app.isTorchShown = true
+            } label: {
+                Label("Red Torch", systemImage: "flashlight.on.fill")
+            }
+            SettingsCaption("A full-screen red light for finding your gear. Double-tap it to close.")
         }
         SettingsSection(title: "Pure Red for the Whole iPhone") {
             ColorFiltersGuideCard(showsTitle: false)

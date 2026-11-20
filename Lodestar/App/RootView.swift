@@ -54,9 +54,15 @@ struct RootView: View {
         .onChange(of: app.settings) { _, _ in
             app.syncServices()
         }
+        .onChange(of: MountService.shared.isConnected) { _, _ in
+            app.syncServices()
+        }
         .task {
             await app.launch()
         }
         .lodestarWidgets()
+        .fullScreenCover(isPresented: $app.isTorchShown) {
+            RedTorchView()
+        }
     }
 }

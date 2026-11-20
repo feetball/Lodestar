@@ -48,7 +48,7 @@ final class EventsCalculatorTests: XCTestCase {
     func testKindsSelectTheFinders() {
         for kind in EventKind.allCases {
             let events = EventCalculator.events(from: year2026.from, to: year2026.to, observer: nil, options: EventOptions(kinds: [kind]))
-            XCTAssertTrue(!events.isEmpty || kind == .earthApsis, kind.rawValue)
+            XCTAssertFalse(events.isEmpty, kind.rawValue)
             XCTAssertTrue(events.allSatisfy { $0.kind == kind }, kind.rawValue)
         }
         XCTAssertTrue(EventCalculator.events(from: year2026.from, to: year2026.to, observer: nil, options: EventOptions(kinds: [])).isEmpty)
@@ -128,7 +128,8 @@ final class EventsCalculatorTests: XCTestCase {
     func testEventKindRawValuesAndCodable() throws {
         XCTAssertEqual(EventKind.allCases.map(\.rawValue),
                        ["meteorShower", "conjunction", "opposition", "greatestElongation", "earthApsis", "season",
-                        "fullMoonSpecial", "lunarEclipse", "solarEclipse"])
+                        "fullMoonSpecial", "lunarEclipse", "solarEclipse", "greatRedSpotTransit", "jupiterMoonEvent",
+                        "planetStation"])
         for kind in EventKind.allCases {
             XCTAssertEqual(EventKind(rawValue: kind.rawValue), kind)
             let encoded = String(decoding: try JSONEncoder().encode(kind), as: UTF8.self)
@@ -137,7 +138,8 @@ final class EventsCalculatorTests: XCTestCase {
             XCTAssertFalse(kind.displayName.isEmpty)
         }
         XCTAssertNil(EventKind(rawValue: "eclipse"))
-        XCTAssertEqual(EventKind.defaultKinds.count, EventKind.allCases.count - 1)
+        XCTAssertEqual(EventKind.defaultKinds.count, EventKind.allCases.count - 4)
+        XCTAssertEqual(EventKind.calendarKinds.count, EventKind.allCases.count - 1)
         func encoded<T: Encodable>(_ value: T) throws -> String { String(decoding: try JSONEncoder().encode(value), as: UTF8.self) }
         XCTAssertEqual(try encoded(EclipseContact.p1), "\"P1\"")
         XCTAssertEqual(EclipseContact(rawValue: "maximum"), .maximum)
@@ -191,6 +193,7 @@ final class EventsCalculatorTests: XCTestCase {
 
     func testWindowsLieInTheNightOfTheEvent() {
         let observer = Support.dallas.observer
+        var checked = 0
         for event in dallasEvents() {
             guard let visibility = event.visibility, let window = visibility.bestWindow else { continue }
             guard let best = visibility.bestTime else {
@@ -199,11 +202,13 @@ final class EventsCalculatorTests: XCTestCase {
             }
             XCTAssertTrue(best >= window.start && best <= window.end, "\(event.kind.rawValue) \(event.date)")
             if event.kind == .solarEclipse || event.kind == .lunarEclipse { continue }
+            checked += 1
             // Night windows: within a day of the event, with the Sun below the darkness limit and the target up.
             XCTAssertTrue(abs(Support.seconds(window.start, event.date)) < 86_400, "\(event.kind.rawValue) \(event.date) \(window.start)")
             let sun = SkyFrame(date: best, observer: observer).horizontal(of: .sun, refraction: false).altitude
             XCTAssertTrue(sun <= visibility.darknessLimit + 0.01, "\(event.kind.rawValue) \(event.date): Sun at \(sun)")
         }
+        XCTAssertTrue(checked > 10, "only \(checked) events had a window")
     }
 
     func testTargetIsAboveTheMinimumAltitudeInTheWindow() {
@@ -312,9 +317,11 @@ final class EventsCalculatorTests: XCTestCase {
         let tromso = Observer(location: GeographicLocation(latitude: 69.65, longitude: 18.96, elevation: 0))
         let june = EventCalculator.events(from: Support.utc("2026-06-01T00:00:00Z"), to: Support.utc("2026-07-31T00:00:00Z"),
                                           observer: tromso, options: options)
-        XCTAssertTrue(!june.isEmpty)
-        for event in june where event.kind == .meteorShower {
-            XCTAssertNil(event.visibility?.bestWindow, "\(event.date)")
+        let showers = june.filter { $0.kind == .meteorShower }
+        XCTAssertFalse(showers.isEmpty)
+        for event in showers {
+            let visibility = try XCTUnwrap(event.visibility, "\(event.date)")
+            XCTAssertNil(visibility.bestWindow, "\(event.date)")
         }
         // Tromsø in December has dark all day: the Geminid window is the whole night.
         let december = EventCalculator.events(from: Support.utc("2026-12-13T00:00:00Z"), to: Support.utc("2026-12-16T00:00:00Z"),
@@ -344,6 +351,8 @@ final class EventsCalculatorTests: XCTestCase {
             case .fullMoonSpecial, .lunarEclipse: XCTAssertEqual(targets, [.body(.moon)])
             case .solarEclipse: XCTAssertEqual(targets, [.body(.sun)])
             case .season, .earthApsis: XCTAssertTrue(targets.isEmpty)
+            case .greatRedSpotTransit, .jupiterMoonEvent: XCTAssertEqual(targets, [.body(.jupiter)])
+            case let .planetStation(station): XCTAssertEqual(targets, [.body(station.planet)])
             }
         }
     }

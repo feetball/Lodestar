@@ -173,13 +173,13 @@ extension MountServiceTests {
     func testTheObserverIsIgnoredWhenNothingChanged() async {
         let fake = await connectFake(lodestar: true)
         service.updateObserver(nil)
-        service.updateObserver(observer)
+        service.updateObserver(Self.context(observer))
         await settle()
         XCTAssertTrue(fake.siteLocations.isEmpty)
     }
 
     func testUpdatingTheObserverWithoutAConnectionIsHarmless() {
-        service.updateObserver(Observer(location: GeographicLocation(latitude: 10.0, longitude: 20.0, elevation: 0.0)))
+        service.updateObserver(Self.context(Observer(location: GeographicLocation(latitude: 10.0, longitude: 20.0, elevation: 0.0))))
         XCTAssertEqual(service.connection, .disconnected)
         XCTAssertNil(service.errorText)
     }
@@ -192,8 +192,8 @@ extension MountServiceTests {
         let moved = Observer(location: GeographicLocation(latitude: base.latitude + 0.02, longitude: base.longitude,
                                                           elevation: base.elevation))
         // 0.005 degrees is a better GPS fix; 0.02 degrees is a move.
-        service.updateObserver(jitter)
-        service.updateObserver(moved)
+        service.updateObserver(Self.context(jitter))
+        service.updateObserver(Self.context(moved))
         await mountServiceExpect("the new place to be sent") { !fake.siteLocations.isEmpty }
         await settle()
         XCTAssertEqual(fake.siteLocations, [moved.location])
@@ -204,9 +204,9 @@ extension MountServiceTests {
         let east = Observer(location: GeographicLocation(latitude: 35.0, longitude: -179.998, elevation: 0.0))
         let fake = await connectFake(lodestar: true, seenFrom: west)
         // 0.004 degrees apart across the date line.
-        service.updateObserver(east)
+        service.updateObserver(Self.context(east))
         let moved = Observer(location: GeographicLocation(latitude: 35.0, longitude: -179.9, elevation: 0.0))
-        service.updateObserver(moved)
+        service.updateObserver(Self.context(moved))
         await mountServiceExpect("the new place to be sent") { !fake.siteLocations.isEmpty }
         await settle()
         XCTAssertEqual(fake.siteLocations, [moved.location])
@@ -216,7 +216,7 @@ extension MountServiceTests {
         service.settings.sendsSiteAndTime = false
         let fake = await connectFake()
         let far = Observer(location: GeographicLocation(latitude: 50.0, longitude: 8.0, elevation: 100.0))
-        service.updateObserver(far)
+        service.updateObserver(Self.context(far))
         await settle()
         XCTAssertTrue(fake.siteLocations.isEmpty)
     }
@@ -229,7 +229,7 @@ extension MountServiceTests {
         let antipode = Observer(location: GeographicLocation(latitude: -observer.location.latitude,
                                                              longitude: observer.location.longitude + 180.0,
                                                              elevation: 0.0))
-        service.updateObserver(antipode)
+        service.updateObserver(Self.context(antipode))
         await settle()
         // The check in the service uses the observer it is given; the engine's check uses the one it was told about.
         await service.goTo(target, observer: observer)

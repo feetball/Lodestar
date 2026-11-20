@@ -23,6 +23,9 @@ private struct ObjectDetailContent: View {
     /// How often the object's position and the night's data are refreshed while the screen is open.
     private static let refreshInterval: Duration = .seconds(30)
 
+    /// The catalog identifier of Jupiter, whose screen carries the "Moons tonight" card.
+    private static let jupiterID = "planet.jupiter"
+
     @Environment(AppModel.self) private var app
     @Environment(\.palette) private var palette
 
@@ -38,6 +41,9 @@ private struct ObjectDetailContent: View {
                     ObjectDetailNowCard(current: snapshot?.current, style: app.settings.coordinateStyle)
                     ObjectDetailTonightCard(object: object, night: snapshot?.night, now: snapshot?.current.date,
                                             timeZone: context.timeZone)
+                    if object.id == Self.jupiterID {
+                        ObjectDetailJupiterMoonsCard(now: snapshot?.current.date, context: context)
+                    }
                 } else {
                     NeedsLocationView()
                         .frame(minHeight: 300)
@@ -46,6 +52,7 @@ private struct ObjectDetailContent: View {
                 SmallBodyTailCard(detail: snapshot?.current.smallBody)
                 ObjectDetailPhotographyCard(object: object, snapshot: snapshot, lens: app.lensSetup,
                                             timeZone: context?.timeZone ?? .autoupdatingCurrent)
+                SessionLogObjectCard(object: object)
                 if ObjectDetailAboutCard.hasContent(for: object) {
                     ObjectDetailAboutCard(object: object)
                 }

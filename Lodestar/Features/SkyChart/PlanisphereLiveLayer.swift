@@ -9,31 +9,41 @@ struct SkyChartCameraPose {
     /// The border of the DSLR picture as directions, clockwise as the photographer sees it.
     let footprint: [Vector3]
 
-    /// The pose for the newest motion sample, or `nil` while the sensors deliver none.
+    /// The pose for the newest motion sample, or `nil` while the sensors deliver none or the heading is not known.
     @MainActor
     static func current(from motion: MotionService, mount: MountProfile, alignment: AlignmentModel,
-                        frame: FrameSize) -> SkyChartCameraPose? {
+                        lens: LensSetup) -> SkyChartCameraPose? {
+        guard isHeadingKnown(in: motion, mount: mount, alignment: alignment) else { return nil }
         guard let sample = motion.latestSample() else { return nil }
         let solution = PointingSolution.solve(attitude: sample.attitude, mount: mount, alignment: alignment)
-        let outline = PinholeProjection.dslrFrameOutline(solution: solution, horizontalFOV: frame.horizontal,
-                                                         verticalFOV: frame.vertical, samplesPerEdge: 6)
+        let outline = AimLensFrame.worldDirections(of: AimLensFrame.outline(of: lens, rectilinearSamplesPerEdge: 6),
+                                                   pointing: solution)
         return SkyChartCameraPose(horizontal: solution.boresight, boresight: solution.boresightVector,
                                   footprint: outline)
     }
+
+    /// Whether the azimuth of the motion samples means anything. With the compass it always does. In Gyro Lock it does
+    /// once the compass heading was transferred or a star alignment set it; after a refused transfer the samples carry
+    /// an arbitrary azimuth until the user aligns, and a pose drawn from them would point the wrong way.
+    @MainActor
+    static func isHeadingKnown(in motion: MotionService, mount: MountProfile, alignment: AlignmentModel) -> Bool {
+        guard motion.headingSource == .gyroLock else { return true }
+        return motion.isGyroHeadingReferenced || (alignment.isAligned && alignment.isApplicable(to: mount))
+    }
 }
 
-/// Remembers the last well-defined camera heading. Close to the zenith the azimuth of the optical
+/// Remembers the last well-defined camera heading. Close to the zenith or the nadir the azimuth of the optical
 /// axis is meaningless and jumps about, so a chart that follows the heading keeps its rotation there.
 @MainActor
 final class SkyChartHeadingHold {
-    /// Above this altitude (degrees) the azimuth is too unreliable to follow.
+    /// Beyond this altitude (degrees), above or below the horizon, the azimuth is too unreliable to follow.
     private static let followLimit = 85.0
 
     private var rotation = 0.0
 
     /// The chart rotation in radians that puts the camera's azimuth at the top of the chart.
     func rotation(for pose: SkyChartCameraPose?) -> Double {
-        if let pose, pose.horizontal.altitude < Self.followLimit {
+        if let pose, abs(pose.horizontal.altitude) < Self.followLimit {
             rotation = AstroMath.radians(pose.horizontal.azimuth)
         }
         return rotation

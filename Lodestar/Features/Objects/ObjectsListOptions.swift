@@ -41,6 +41,8 @@ enum ObjectsSortOrder: String, CaseIterable, Identifiable, Sendable {
     case prominence
     case altitude
     case riseTime
+    /// The most hours tonight above the site's skyline (and at least 20° high) in the dark first.
+    case hoursTonight
 
     var id: String { rawValue }
 
@@ -52,6 +54,7 @@ enum ObjectsSortOrder: String, CaseIterable, Identifiable, Sendable {
         case .prominence: return "Prominence"
         case .altitude: return "Altitude Now"
         case .riseTime: return "Rise Time"
+        case .hoursTonight: return "Hours Visible Tonight"
         }
     }
 
@@ -63,12 +66,23 @@ enum ObjectsSortOrder: String, CaseIterable, Identifiable, Sendable {
         case .prominence: return "star.circle"
         case .altitude: return "arrow.up.to.line"
         case .riseTime: return "sunrise"
+        case .hoursTonight: return "moon.stars"
         }
     }
 
     /// `true` when the order needs each object's position in the observer's sky.
     var needsSkyPositions: Bool {
         self == .altitude || self == .riseTime
+    }
+
+    /// `true` when the order needs the hours each object is visible tonight.
+    var needsTonightHours: Bool {
+        self == .hoursTonight
+    }
+
+    /// `true` when the order needs an observer at all.
+    var needsObserver: Bool {
+        needsSkyPositions || needsTonightHours
     }
 }
 
@@ -87,6 +101,16 @@ struct ObjectsListOptions: Equatable, Sendable {
     var catalogue = ObjectsCatalogueFilter.all
     /// Keeps only showpiece and prominent objects.
     var showsOnlyPopular = false
+    /// Keeps only objects that are above the site's skyline, and at least 20° high, for `ObjectsTonight.minimumHours`
+    /// tonight.
+    var showsOnlyVisibleTonight = false
+    /// Keeps only objects that have a session log entry marked as imaged.
+    var showsOnlyImaged = false
+
+    /// `true` when the list needs each object's hours tonight, to order or to filter by.
+    var needsTonightHours: Bool {
+        sortOrder.needsTonightHours || showsOnlyVisibleTonight
+    }
 
     /// `true` when any option differs from the default list (the toolbar menu highlights its icon).
     var isCustomized: Bool {

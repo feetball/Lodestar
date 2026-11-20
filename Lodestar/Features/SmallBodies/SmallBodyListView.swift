@@ -4,8 +4,9 @@ import LodestarKit
 /// The navigation value that opens the lists of bright comets and asteroids on a navigation stack.
 struct SmallBodyListRoute: Hashable {}
 
-/// One bright comet or asteroid: icon, name with designation, kind with the magnitude estimate and the elongation, and
-/// with `peakDate` the day it is brightest. VoiceOver gets one sentence. Put it in a `NavigationLink(value:)`.
+/// One bright comet or asteroid: icon, name with designation, kind with the magnitude estimate and the elongation, how
+/// high it gets in the dark when the entry says (the Tonight card), and with `peakDate` the day it is brightest.
+/// VoiceOver gets one sentence. Put it in a `NavigationLink(value:)`.
 struct SmallBodyListRow: View {
     @Environment(\.palette) private var palette
 
@@ -28,7 +29,8 @@ struct SmallBodyListRow: View {
 
     private var spoken: String {
         let subtitle = SmallBodyText.subtitle(of: object, info: entry.info, isComputed: true, spoken: true)
-        return [name, designation, subtitle, peak].compactMap { $0 }.joined(separator: ", ")
+        let night = entry.night.map { $0.text(in: timeZone, spoken: true) }
+        return [name, designation, subtitle, night, peak].compactMap { $0 }.joined(separator: ", ")
     }
 
     var body: some View {
@@ -49,6 +51,11 @@ struct SmallBodyListRow: View {
                 Text(SmallBodyText.summary(of: object, info: entry.info))
                     .font(.footnote)
                     .foregroundStyle(palette.secondaryText)
+                if let night = entry.night {
+                    Text(night.text(in: timeZone))
+                        .font(.footnote)
+                        .foregroundStyle(palette.tertiaryText)
+                }
                 if let peak {
                     Text(peak)
                         .font(.footnote)

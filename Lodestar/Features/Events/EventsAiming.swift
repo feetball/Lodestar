@@ -18,7 +18,7 @@ enum EventsAiming {
                 return known
             }
             return CelestialObject.custom(name: name, j2000: position)
-        case .radiant(let name, let position):
+        case .radiant(let name, let position), .cameraField(let name, let position):
             return CelestialObject.custom(name: name, j2000: position)
         }
     }

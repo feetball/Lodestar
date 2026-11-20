@@ -639,7 +639,7 @@ extension MountServiceTests {
         let option = Self.option(for: fake, centre: { place in
             placed.add("\(place.rightAscension) \(place.declination)")
         })
-        service.connectDemo(option, observer: observer)
+        service.connectDemo(option, context: Self.context(observer))
         await mountServiceExpect("the connection") { self.service.connection == .connected }
         let target = highTarget("Centred")
         let place = try XCTUnwrap(target.j2000)

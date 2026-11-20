@@ -23,6 +23,9 @@ private enum EventsDetailFixtures {
 
     static let window = DateInterval(start: date("2026-08-13T02:10:00Z"), end: date("2026-08-13T08:50:00Z"))
 
+    /// An instant at which `window` is tonight's window in every zone of these tests, so that no date is printed with it.
+    static let now = window.start
+
     static let best = date("2026-08-13T04:00:00Z")
 
     static func visibility(altitude: Double = 40, azimuth: Double = 135, window: DateInterval? = nil, best: Date? = nil,
@@ -124,7 +127,7 @@ final class EventsDetailModelTests: XCTestCase {
     }
 
     private func times(_ entry: EventsEntry, in zone: TimeZone? = nil) -> [EventsDetailRow] {
-        EventsDetailModel.times(of: entry, timeZone: zone ?? F.utc)
+        EventsDetailModel.times(of: entry, now: F.now, timeZone: zone ?? F.utc)
     }
 
     // MARK: Rows
@@ -420,6 +423,30 @@ final class EventsDetailModelTests: XCTestCase {
         XCTAssertEqual(rows[3].value, "34\u{00B0} high, SE")
     }
 
+    func testTheWindowOfAnotherNightIsPrintedWithItsDate() {
+        let later = F.window.end.addingTimeInterval(2 * 86_400)
+        let entry = F.entry(F.meteor(), visibility: F.visible(altitude: 34))
+        let rows = EventsDetailModel.times(of: entry, now: later, timeZone: F.chicago)
+        XCTAssertEqual(rows[1].value, "\(AppFormat.day(F.window.start, in: F.chicago)) \u{00B7} "
+            + EventsFormat.window(F.window, in: F.chicago))
+        let sentence = EventsDetailModel.visibilitySentence(of: entry, now: later, timeZone: F.chicago)
+        XCTAssertEqual(sentence, "Visible from here on \(AppFormat.day(F.window.start, in: F.chicago)), between "
+            + "\(EventsFormat.window(F.window, in: F.chicago)).")
+    }
+
+    func testTonightsWindowIsPrintedWithoutADate() {
+        let entry = F.entry(F.meteor(), visibility: F.visible(altitude: 34))
+        XCTAssertNil(EventsFormat.windowDay(F.window, now: F.now, in: F.chicago))
+        XCTAssertNil(EventsFormat.windowDay(F.window, now: F.window.start.addingTimeInterval(3_600), in: F.chicago))
+        XCTAssertEqual(EventsDetailModel.times(of: entry, now: F.now, timeZone: F.chicago)[1].value,
+                       EventsFormat.window(F.window, in: F.chicago))
+    }
+
+    func testAWindowThatEndedIsPrintedWithItsDate() {
+        let afterIt = F.window.end.addingTimeInterval(60)
+        XCTAssertEqual(EventsFormat.windowDay(F.window, now: afterIt, in: F.utc), AppFormat.day(F.window.start, in: F.utc))
+    }
+
     func testTheTimesOfAnEventWithoutAnObserverAreTheInstantOnly() {
         let kinds: [(EventDetails, String)] = [
             (F.meteor(), "Peak"),
@@ -491,40 +518,40 @@ final class EventsDetailModelTests: XCTestCase {
     // MARK: Visibility sentences
 
     func testNoSentenceForAnEventNotSeenInTheSky() {
-        XCTAssertNil(EventsDetailModel.visibilitySentence(of: F.entry(F.season(.juneSolstice)), timeZone: F.utc))
-        XCTAssertNil(EventsDetailModel.visibilitySentence(of: F.entry(F.meteor()), timeZone: F.utc))
+        XCTAssertNil(EventsDetailModel.visibilitySentence(of: F.entry(F.season(.juneSolstice)), now: F.now, timeZone: F.utc))
+        XCTAssertNil(EventsDetailModel.visibilitySentence(of: F.entry(F.meteor()), now: F.now, timeZone: F.utc))
     }
 
     func testAVisibleEventSaysWhenItCanBeSeen() {
-        let sentence = EventsDetailModel.visibilitySentence(of: F.entry(F.meteor(), visibility: F.visible()), timeZone: F.chicago)
+        let sentence = EventsDetailModel.visibilitySentence(of: F.entry(F.meteor(), visibility: F.visible()), now: F.now, timeZone: F.chicago)
         XCTAssertEqual(sentence, "Visible from here between \(EventsFormat.window(F.window, in: F.chicago)).")
     }
 
     func testAVisibleEclipseSaysWhenItCanBeSeen() {
         let entry = F.entry(F.lunar(.total), visibility: F.visible())
-        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, timeZone: F.tokyo),
+        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, now: F.now, timeZone: F.tokyo),
                        "Visible from here between \(EventsFormat.window(F.window, in: F.tokyo)).")
     }
 
     func testAnInvisibleLunarEclipseSaysTheMoonIsDown() {
         let entry = F.entry(F.lunar(.partial), visibility: F.visibility(altitude: -30))
-        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, timeZone: F.utc),
+        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, now: F.now, timeZone: F.utc),
                        "The Moon is below the horizon during the eclipse as seen from here.")
     }
 
     func testAnInvisibleSolarEclipseSaysTheSunIsDown() {
         let entry = F.entry(F.solar(.total, local: F.local(.partial)), visibility: F.visibility(altitude: -30))
-        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, timeZone: F.utc),
+        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, now: F.now, timeZone: F.utc),
                        "The Sun is below the horizon during the eclipse as seen from here.")
     }
 
     func testASolarEclipseThatDoesNotTouchTheSunHereSaysSo() {
         // Even with a window, "none" means no part of the eclipse is seen.
         let entry = F.entry(F.solar(.total, local: F.local(LocalSolarEclipseKind.none)), visibility: F.visible())
-        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, timeZone: F.utc),
+        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, now: F.now, timeZone: F.utc),
                        "No part of the eclipse can be seen from here.")
         let withoutWindow = F.entry(F.solar(.total, local: F.local(LocalSolarEclipseKind.none)), visibility: F.visibility())
-        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: withoutWindow, timeZone: F.utc),
+        XCTAssertEqual(EventsDetailModel.visibilitySentence(of: withoutWindow, now: F.now, timeZone: F.utc),
                        "No part of the eclipse can be seen from here.")
     }
 
@@ -532,7 +559,7 @@ final class EventsDetailModelTests: XCTestCase {
         let expected = "There is no good viewing window from here: the target stays too low or the sky too bright that night."
         for details in [F.meteor(), F.conjunction(), F.opposition(), F.elongation(.venus, .east), F.fullMoon([.supermoon])] {
             let entry = F.entry(details, visibility: F.visibility(altitude: 5))
-            XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, timeZone: F.utc), expected)
+            XCTAssertEqual(EventsDetailModel.visibilitySentence(of: entry, now: F.now, timeZone: F.utc), expected)
         }
     }
 

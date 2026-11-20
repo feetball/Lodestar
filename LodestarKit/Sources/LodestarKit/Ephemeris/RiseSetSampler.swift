@@ -40,8 +40,6 @@ extension RiseSetCalculator {
         private static let chunkLength: TimeInterval = 6 * 3600
         /// Times further than this (about 300 000 years) from the reference date are not evaluated.
         private static let maximumTime: TimeInterval = 1e13
-        /// The rate at which local sidereal time advances, in degrees per second of UT.
-        private static let siderealDegreesPerSecond = 360.985_647_366_29 / JulianDate.secondsPerDay
 
         private let target: Target
         private let observer: Observer
@@ -65,7 +63,7 @@ extension RiseSetCalculator {
             guard time.isFinite, abs(time) < Self.maximumTime else { return Sample(centreAltitude: .nan) }
             let chunk = chunk(containing: time)
             let siderealAngle = chunk.referenceSiderealAngle
-                + Self.siderealDegreesPerSecond * (time - chunk.referenceTime)
+                + SiderealTime.degreesPerSecond * (time - chunk.referenceTime)
             let earthRotation = Matrix3.frameRotationZ(AstroMath.radians(siderealAngle))
 
             switch target {

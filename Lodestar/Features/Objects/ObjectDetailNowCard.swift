@@ -42,6 +42,9 @@ struct ObjectDetailNowCard: View {
         InfoRow(label: "Azimuth", value: AppFormat.azimuth(current.horizontal.azimuth))
         InfoRow(label: "RA (of date)", value: AppFormat.rightAscension(current.equatorial, style: style))
         InfoRow(label: "Dec (of date)", value: AppFormat.declination(current.equatorial, style: style))
+        if let meridian = current.meridian {
+            InfoRow(label: "Hour angle", value: meridian.rowText(style: style))
+        }
         if current.isSmallBody {
             // A comet or an asteroid: badges, brightness estimate, distances, elongation and phase.
             SmallBodyNowRows(detail: current.smallBody)

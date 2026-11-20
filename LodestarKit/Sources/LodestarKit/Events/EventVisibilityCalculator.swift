@@ -83,9 +83,34 @@ final class EventVisibilityCalculator {
             return lunarEclipse(eclipse)
         case let .solarEclipse(eclipse):
             return solarEclipse(eclipse)
+        case let .greatRedSpotTransit(transit):
+            return jupiterPhenomenon(event.date, span: transit.wellPlaced)
+        case .jupiterMoonEvent:
+            let margin = GalileanMoons.accuracyMinutes * 60
+            return jupiterPhenomenon(event.date, span: DateInterval(start: event.date.addingTimeInterval(-margin),
+                                                                    end: event.date.addingTimeInterval(margin)))
+        case let .planetStation(station):
+            return planet(event.date, station.planet)
         case .earthApsis, .season:
             return nil
         }
+    }
+
+    /// Jupiter's visibility for a phenomenon that lasts a short while around `date`: the viewing window of the night
+    /// cut down to `span`, so that the event counts as observable only when Jupiter is up and the sky dark while it
+    /// happens (these events come all day, and the night's window alone would call them all visible).
+    private func jupiterPhenomenon(_ date: Date, span: DateInterval) -> EventVisibility {
+        let visibility = planet(date, .jupiter)
+        guard let window = visibility.bestWindow else { return visibility }
+        guard let shared = window.intersection(with: span) else {
+            return EventVisibility(altitude: visibility.altitude, azimuth: visibility.azimuth,
+                                   sunAltitude: visibility.sunAltitude, isDark: visibility.isDark, bestWindow: nil,
+                                   bestTime: nil, darknessLimit: visibility.darknessLimit, contacts: visibility.contacts)
+        }
+        let best = shared.contains(date) ? date : (date < shared.start ? shared.start : shared.end)
+        return EventVisibility(altitude: visibility.altitude, azimuth: visibility.azimuth,
+                               sunAltitude: visibility.sunAltitude, isDark: visibility.isDark, bestWindow: shared,
+                               bestTime: best, darknessLimit: visibility.darknessLimit, contacts: visibility.contacts)
     }
 
     private func planet(_ date: Date, _ body: SolarSystemBody) -> EventVisibility {

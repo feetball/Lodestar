@@ -62,7 +62,11 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
         JulianDate(ut: ut + days)
     }
 
-    public static func < (lhs: JulianDate, rhs: JulianDate) -> Bool { lhs.ut < rhs.ut }
+    /// Orders by UT, then by ΔT, so that the order agrees with `==` and the hash, which compare both.
+    public static func < (lhs: JulianDate, rhs: JulianDate) -> Bool {
+        if lhs.ut != rhs.ut { return lhs.ut < rhs.ut }
+        return lhs.deltaT < rhs.deltaT
+    }
 
     /// The decimal year corresponding to a Julian Day number (Julian-year approximation).
     public static func decimalYear(julianDay: Double) -> Double {
@@ -91,7 +95,12 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
     /// Uses the Espenak & Meeus (2006) polynomials up to 2005, measured annual values from
     /// 2005 to 2026, a linear blend towards the Espenak & Meeus long-term expression between 2026
     /// and 2050, and that expression afterwards. Errors are well below a few seconds for the
-    /// 20th and 21st centuries, which is negligible for pointing purposes.
+    /// 20th century and up to 2026, which is negligible for pointing purposes.
+    ///
+    /// After 2026 the blend rises by about 1 s a year, while Skyfield's extrapolation stays at 69–71 s through 2049.
+    /// Measured against that, the estimate is about 5 s high in 2031 and 13 s high in 2040: 3 to 7 arcseconds for the
+    /// Moon (0.55 arcseconds a second; the Sun only 0.04). Adding each new measured year to `measuredDeltaT` keeps the
+    /// error small.
     public static func deltaT(decimalYear y: Double) -> Double {
         guard y.isFinite else { return 69.2 }
         if y >= measuredDeltaTStart && y <= measuredDeltaTEnd {
@@ -156,11 +165,18 @@ public struct JulianDate: Hashable, Comparable, Codable, Sendable {
 
 /// Sidereal time (Earth rotation angle relative to the equinox).
 public enum SiderealTime {
+    /// How far sidereal time advances in one mean solar day of UT, in degrees: the rate of the Earth's rotation
+    /// relative to the equinox (the linear term of the IAU 1982 expression, Meeus 12.4).
+    public static let degreesPerDay = 360.985_647_366_29
+
+    /// How far sidereal time advances in one second of UT, in degrees.
+    public static let degreesPerSecond = degreesPerDay / JulianDate.secondsPerDay
+
     /// Greenwich mean sidereal time in degrees, [0, 360) (IAU 1982 expression, Meeus 12.4).
     public static func greenwichMean(_ jd: JulianDate) -> Double {
         let d = jd.ut - JulianDate.j2000
         let t = d / JulianDate.daysPerJulianCentury
-        let theta = 280.460_618_37 + 360.985_647_366_29 * d + 0.000_387_933 * t * t - t * t * t / 38_710_000
+        let theta = 280.460_618_37 + degreesPerDay * d + 0.000_387_933 * t * t - t * t * t / 38_710_000
         return AstroMath.normalizeDegrees(theta)
     }
 

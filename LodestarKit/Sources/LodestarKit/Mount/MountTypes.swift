@@ -231,7 +231,7 @@ public enum MountNudgeRate: String, CaseIterable, Codable, Hashable, Sendable {
     }
 
     /// The sidereal rate in degrees per second (360.98564736629 degrees per mean solar day).
-    public static let siderealDegreesPerSecond: Double = 360.98564736629 / 86_400.0
+    public static let siderealDegreesPerSecond: Double = SiderealTime.degreesPerSecond
 
     /// The rate in degrees per second.
     public var degreesPerSecond: Double { siderealMultiple * MountNudgeRate.siderealDegreesPerSecond }
@@ -278,7 +278,7 @@ public struct MountStatus: Hashable, Sendable {
     public let isMoving: Bool?
     /// Seconds since the current slew started; nil when not slewing.
     public let slewElapsedSeconds: Double?
-    /// How the last finished slew ended; cleared when a new slew starts.
+    /// How the last finished slew ended; cleared when a new slew starts and when the mount is nudged or synced.
     public let outcome: MountSlewOutcome?
     /// The last communication error, cleared by the next successful poll.
     public let lastError: MountError?

@@ -20,9 +20,23 @@ public enum EventKind: String, CaseIterable, Sendable, Hashable, Codable {
     case lunarEclipse
     /// A partial, annular, total or hybrid solar eclipse.
     case solarEclipse
+    /// The Great Red Spot crossing Jupiter's central meridian.
+    case greatRedSpotTransit
+    /// The start or end of a transit, shadow transit, occultation or eclipse of one of Jupiter's Galilean moons.
+    case jupiterMoonEvent
+    /// A planet from Mercury to Neptune standing still among the stars: retrograde motion begins or ends.
+    case planetStation
 
-    /// Every kind except `earthApsis`, which is optional.
-    public static let defaultKinds: Set<EventKind> = Set(allCases.filter { $0 != .earthApsis })
+    /// The kinds searched unless the options say otherwise: every kind except the Earth's apsides, which are optional,
+    /// and the three that arrived with the Jupiter and station events (`greatRedSpotTransit`, `jupiterMoonEvent`,
+    /// `planetStation`), which a caller asks for (`calendarKinds`) so that screens that list "the next event" do not
+    /// fill up with them.
+    public static let defaultKinds: Set<EventKind> = Set(allCases.filter {
+        $0 != .earthApsis && $0 != .greatRedSpotTransit && $0 != .jupiterMoonEvent && $0 != .planetStation
+    })
+
+    /// Every kind except `earthApsis`: what an events calendar asks for.
+    public static let calendarKinds: Set<EventKind> = Set(allCases.filter { $0 != .earthApsis })
 
     /// The English name, e.g. "Lunar eclipse".
     public var displayName: String {
@@ -36,6 +50,9 @@ public enum EventKind: String, CaseIterable, Sendable, Hashable, Codable {
         case .fullMoonSpecial: "Special full Moon"
         case .lunarEclipse: "Lunar eclipse"
         case .solarEclipse: "Solar eclipse"
+        case .greatRedSpotTransit: "Great Red Spot transit"
+        case .jupiterMoonEvent: "Jupiter moon event"
+        case .planetStation: "Planet station"
         }
     }
 }
@@ -43,7 +60,7 @@ public enum EventKind: String, CaseIterable, Sendable, Hashable, Codable {
 /// What to search for and how strictly. The initializer replaces non-finite values with the defaults and clamps the
 /// rest into range.
 public struct EventOptions: Sendable, Hashable {
-    /// The kinds of events to include; `EventKind.defaultKinds` (everything except the Earth's apsides).
+    /// The kinds of events to include; `EventKind.defaultKinds` (the original kinds without the Earth's apsides).
     public let kinds: Set<EventKind>
     /// Largest minimum separation in degrees of a planet–planet pair that counts as a conjunction, 0…30, default 3.
     public let planetConjunctionThreshold: Double
@@ -60,10 +77,17 @@ public struct EventOptions: Sendable, Hashable {
     /// Drops events that the observer cannot see (no viewing window); has no effect without an observer or for
     /// events without a visibility (equinoxes, solstices, apsides).
     public let visibleOnly: Bool
+    /// How many days from the start of the interval the Great Red Spot transits and the moon events of Jupiter are
+    /// listed for, 0…30, default 2. They come many a day (about 2.4 transits and 8 moon events), so a calendar of a
+    /// year lists only the nearest days; 0 leaves them out.
+    public let jupiterEventDays: Double
+    /// The Great Red Spot whose transits are listed; `GreatRedSpot.reference` by default.
+    public let greatRedSpot: GreatRedSpot
 
     public init(kinds: Set<EventKind> = EventKind.defaultKinds, planetConjunctionThreshold: Double = 3,
                 moonConjunctionThreshold: Double = 5, minimumSolarElongation: Double = 10,
-                timeZone: TimeZone? = nil, minimumAltitude: Double = 10, visibleOnly: Bool = false) {
+                timeZone: TimeZone? = nil, minimumAltitude: Double = 10, visibleOnly: Bool = false,
+                jupiterEventDays: Double = 2, greatRedSpot: GreatRedSpot = .reference) {
         self.kinds = kinds
         self.planetConjunctionThreshold = Self.normalized(planetConjunctionThreshold, fallback: 3, lower: 0, upper: 30)
         self.moonConjunctionThreshold = Self.normalized(moonConjunctionThreshold, fallback: 5, lower: 0, upper: 30)
@@ -71,6 +95,8 @@ public struct EventOptions: Sendable, Hashable {
         self.timeZone = timeZone
         self.minimumAltitude = Self.normalized(minimumAltitude, fallback: 10, lower: 0, upper: 90)
         self.visibleOnly = visibleOnly
+        self.jupiterEventDays = Self.normalized(jupiterEventDays, fallback: 2, lower: 0, upper: 30)
+        self.greatRedSpot = greatRedSpot
     }
 
     private static func normalized(_ value: Double, fallback: Double, lower: Double, upper: Double) -> Double {
@@ -211,6 +237,12 @@ public enum EventDetails: Sendable, Hashable {
     case lunarEclipse(LunarEclipse)
     /// A solar eclipse.
     case solarEclipse(SolarEclipse)
+    /// The Great Red Spot on Jupiter's central meridian.
+    case greatRedSpotTransit(GreatRedSpotTransit)
+    /// A start or end of a Galilean moon's transit, shadow transit, occultation or eclipse.
+    case jupiterMoonEvent(GalileanMoonEvent)
+    /// A planet's station.
+    case planetStation(PlanetStation)
 
     /// The kind of event these details describe.
     public var kind: EventKind {
@@ -224,6 +256,9 @@ public enum EventDetails: Sendable, Hashable {
         case .fullMoonSpecial: .fullMoonSpecial
         case .lunarEclipse: .lunarEclipse
         case .solarEclipse: .solarEclipse
+        case .greatRedSpotTransit: .greatRedSpotTransit
+        case .jupiterMoonEvent: .jupiterMoonEvent
+        case .planetStation: .planetStation
         }
     }
 }
@@ -254,8 +289,9 @@ public struct AstronomicalEvent: Sendable, Hashable {
     /// The kind of event.
     public var kind: EventKind { details.kind }
 
-    /// A short English title for lists, e.g. "Perseids peak", "Venus and Jupiter", "Total lunar eclipse" or
-    /// "June solstice". The UI localizes from `details` instead.
+    /// A short English title for lists, e.g. "Perseids peak", "Venus and Jupiter", "Total lunar eclipse",
+    /// "June solstice", "Great Red Spot transit", "Io's shadow enters the disc" or "Mars stationary: retrograde motion
+    /// begins". The UI localizes from `details` instead.
     public var title: String {
         switch details {
         case let .meteorShower(peak): "\(peak.shower.name) peak"
@@ -268,12 +304,16 @@ public struct AstronomicalEvent: Sendable, Hashable {
         case let .fullMoonSpecial(special): special.categories.map(\.displayName).joined(separator: " and ")
         case let .lunarEclipse(eclipse): "\(eclipse.kind.displayName) lunar eclipse"
         case let .solarEclipse(eclipse): "\(eclipse.kind.displayName) solar eclipse"
+        case .greatRedSpotTransit: "Great Red Spot transit"
+        case let .jupiterMoonEvent(event): event.title
+        case let .planetStation(station): "\(station.planet.displayName) stationary: \(station.kind.displayName)"
         }
     }
 
     /// What to point a camera at, main subject first: the radiant of a meteor shower, the two bodies of a conjunction
     /// (the Moon first), the planet of an opposition or an elongation, the Moon for a lunar eclipse or a special full
-    /// Moon and the Sun for a solar eclipse. Empty for equinoxes, solstices and apsides.
+    /// Moon, the Sun for a solar eclipse, Jupiter for a Great Red Spot transit or a moon event and the planet of a
+    /// station. Empty for equinoxes, solstices and apsides.
     public var aimTargets: [AimTarget] {
         switch details {
         case let .meteorShower(peak): [.radiant(peak.shower)]
@@ -285,6 +325,9 @@ public struct AstronomicalEvent: Sendable, Hashable {
         case .fullMoonSpecial: [.body(.moon)]
         case .lunarEclipse: [.body(.moon)]
         case .solarEclipse: [.body(.sun)]
+        case .greatRedSpotTransit: [.body(.jupiter)]
+        case .jupiterMoonEvent: [.body(.jupiter)]
+        case let .planetStation(station): [.body(station.planet)]
         }
     }
 

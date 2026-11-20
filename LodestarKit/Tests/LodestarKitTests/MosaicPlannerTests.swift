@@ -809,6 +809,17 @@ final class MosaicPlannerTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(horizontal.pole.horizontalCoordinate).altitude, 90.0, accuracy: 1e-9)
     }
 
+    /// Milliseconds allowed for planning one mosaic. A release build needs far less; an unoptimised debug build is slower and
+    /// a shared runner slower still, so the debug bound is ten times larger and only catches a calculation that has gone badly
+    /// wrong.
+    private static let perPlanLimitMilliseconds: Double = {
+        #if DEBUG
+        return 600
+        #else
+        return 60
+        #endif
+    }()
+
     func testPlanningIsFast() throws {
         let region = equatorial(60, 80, 50)
         let frame = lens(50)
@@ -816,6 +827,6 @@ final class MosaicPlannerTests: XCTestCase {
         let start = DispatchTime.now().uptimeNanoseconds
         for _ in 0..<50 { _ = try MosaicPlanner.plan(region: region, frame: frame) }
         let perPlanMilliseconds = Double(DispatchTime.now().uptimeNanoseconds - start) / 50.0 / 1e6
-        XCTAssertLessThan(perPlanMilliseconds, 60.0, "\(perPlanMilliseconds) ms per plan")
+        XCTAssertLessThan(perPlanMilliseconds, Self.perPlanLimitMilliseconds, "\(perPlanMilliseconds) ms per plan")
     }
 }

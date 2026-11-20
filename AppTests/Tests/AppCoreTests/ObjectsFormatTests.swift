@@ -451,4 +451,66 @@ final class ObjectsFormatTests: XCTestCase {
         XCTAssertEqual(ObjectsFormat.spokenSummary(of: comet, position: nil, isFavorite: true, in: .gmt),
                        "Test Comet, C/2099 A1, Comet, Favorite")
     }
+
+    // MARK: Tonight's hours
+
+    private func tonight(hours: Double, behindSkyline: Bool = false) -> UnobstructedVisibility {
+        let start = ObjectsFormatFixture.reference
+        return UnobstructedVisibility(intervals: hours > 0 ? [DateInterval(start: start, duration: hours * 3_600)] : [],
+                                      isBehindSkyline: behindSkyline)
+    }
+
+    func testHoursHaveOneDecimal() {
+        let point = ObjectsFormatFixture.point
+        XCTAssertEqual(ObjectsFormat.hours(3.44), "3\(point)4 h")
+        XCTAssertEqual(ObjectsFormat.hours(3.44, spoken: true), "3\(point)4 hours")
+        XCTAssertEqual(ObjectsFormat.hours(12), "12\(point)0 h")
+    }
+
+    func testLessThanATwentiethOfAnHourIsNone() {
+        XCTAssertEqual(ObjectsFormat.hours(0.049), "0 h")
+        XCTAssertEqual(ObjectsFormat.hours(0.049, spoken: true), "0 hours")
+        XCTAssertEqual(ObjectsFormat.hours(0), "0 h")
+        XCTAssertEqual(ObjectsFormat.hours(-1), "0 h")
+        XCTAssertEqual(ObjectsFormat.hours(.nan), "0 h")
+        XCTAssertEqual(ObjectsFormat.hours(0.06), "0\(ObjectsFormatFixture.point)1 h", "a twentieth of an hour is the least that shows")
+    }
+
+    func testARowSaysHowManyHoursTonight() {
+        XCTAssertEqual(ObjectsFormat.tonightText(tonight(hours: 2)), "2\(ObjectsFormatFixture.point)0 h tonight")
+        XCTAssertEqual(ObjectsFormat.tonightText(tonight(hours: 2), spoken: true),
+                       "2\(ObjectsFormatFixture.point)0 hours tonight")
+        XCTAssertEqual(ObjectsFormat.tonightText(tonight(hours: 0)), "0 h tonight")
+    }
+
+    func testARowSaysWhenTheSkylineHidesTheObjectAllNight() {
+        let hidden = tonight(hours: 0, behindSkyline: true)
+        XCTAssertEqual(ObjectsFormat.tonightText(hidden), "behind skyline")
+        XCTAssertEqual(ObjectsFormat.tonightText(hidden, spoken: true), "behind your skyline tonight")
+    }
+
+    func testTheSubtitleEndsWithTonightsHoursWhenTheyAreGiven() throws {
+        let point = ObjectsFormatFixture.point
+        let andromeda = try ObjectsFormatFixture.object("dso.M31")
+        XCTAssertEqual(ObjectsFormat.subtitle(of: andromeda, magnitude: nil, tonight: tonight(hours: 3.5)),
+                       "Galaxy \(dot) Andromeda \(dot) mag 3\(point)4 \(dot) 3\(point)5 h tonight")
+        XCTAssertEqual(ObjectsFormat.subtitle(of: andromeda, magnitude: nil, spoken: true, tonight: tonight(hours: 3.5)),
+                       "Galaxy, Andromeda, magnitude 3\(point)4, 3\(point)5 hours tonight")
+    }
+
+    func testTheSubtitleOfACometEndsWithTonightsHoursToo() throws {
+        let comet = try ObjectsFormatFixture.object("comet.C/2099 A1")
+        let plain = ObjectsFormat.subtitle(of: comet, magnitude: nil)
+        let with = ObjectsFormat.subtitle(of: comet, magnitude: nil, tonight: tonight(hours: 1))
+        XCTAssertEqual(with, plain + " \(dot) 1\(ObjectsFormatFixture.point)0 h tonight")
+        let spoken = ObjectsFormat.subtitle(of: comet, magnitude: nil, spoken: true, tonight: tonight(hours: 1))
+        XCTAssertTrue(spoken.hasSuffix(", 1\(ObjectsFormatFixture.point)0 hours tonight"), spoken)
+    }
+
+    func testTheSpokenSummaryIncludesTonightsHours() throws {
+        let andromeda = try ObjectsFormatFixture.object("dso.M31")
+        let summary = ObjectsFormat.spokenSummary(of: andromeda, position: nil, tonight: tonight(hours: 3.5),
+                                                  isFavorite: false, in: .gmt)
+        XCTAssertTrue(summary.contains("3\(ObjectsFormatFixture.point)5 hours tonight"), summary)
+    }
 }

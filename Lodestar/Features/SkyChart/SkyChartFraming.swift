@@ -15,8 +15,8 @@ struct SkyChartFraming {
     static let snapTolerance = 2.0
     /// The length (degrees) of the small step on the sky that finds the picture's up direction.
     private static let probeStep = 0.1
-    /// Points along each edge of the picture's border.
-    private static let samplesPerEdge = 8
+    /// Points along each edge of a rectilinear picture's border; a fisheye picture's curves have more.
+    private static let rectilinearSamplesPerEdge = 8
 
     /// The direction of the frame's centre at the chart's instant, apparent, as an East–North–Up unit vector.
     let center: Vector3
@@ -36,32 +36,20 @@ struct SkyChartFraming {
     /// The middle of the picture's top edge, where the mark that shows which way is up goes.
     let topMiddle: Vector3
 
-    /// The frame of a camera with the field of view `size` (landscape), centred on the J2000 position `equatorial`
-    /// with the position angle `positionAngle`, at the instant of `frame`; `nil` when the field of view cannot be drawn.
-    init?(center equatorial: EquatorialCoordinate, frame: SkyFrame, size: FrameSize, positionAngle: Double) {
-        guard size.horizontal > 0, size.vertical > 0, size.horizontal < 180, size.vertical < 180 else { return nil }
+    /// The frame of the camera `lens` (landscape), centred on the J2000 position `equatorial` with the position angle
+    /// `positionAngle`, at the instant of `frame`; `nil` when the direction of the picture's top cannot be found.
+    init?(center equatorial: EquatorialCoordinate, frame: SkyFrame, lens: LensSetup, positionAngle: Double) {
         let center = frame.horizontal(j2000: equatorial).unitVector
         let horizontal = HorizontalCoordinate(vector: center)
         guard let up = Self.upDirection(at: center, equatorial: equatorial, positionAngle: positionAngle,
                                         frame: frame) else { return nil }
         // As for a camera: right is forward × up.
         let right = center.cross(up)
-        let halfWidth = AstroMath.tanDeg(size.horizontal / 2)
-        let halfHeight = AstroMath.tanDeg(size.vertical / 2)
 
-        // The same border as `PinholeProjection.dslrFrameOutline` draws for a pointing of the phone.
-        let corners = [(-1.0, 1.0), (1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)]
-        var outline: [Vector3] = []
-        outline.reserveCapacity(4 * Self.samplesPerEdge)
-        for edge in 0..<4 {
-            let start = corners[edge], end = corners[(edge + 1) % 4]
-            for step in 0..<Self.samplesPerEdge {
-                let t = Double(step) / Double(Self.samplesPerEdge)
-                let x = (start.0 + (end.0 - start.0) * t) * halfWidth
-                let y = (start.1 + (end.1 - start.1) * t) * halfHeight
-                outline.append((center + right * x + up * y).normalized)
-            }
-        }
+        // The border of the picture in the camera's frame, turned to where this frame points.
+        let outline = AimLensFrame.outline(of: lens, rectilinearSamplesPerEdge: Self.rectilinearSamplesPerEdge)
+            .map { (right * $0.x + up * $0.y + center * $0.z).normalized }
+        let top = CameraFrameOutline.topMiddle(setup: lens)
 
         self.center = center
         self.horizontal = horizontal
@@ -71,7 +59,7 @@ struct SkyChartFraming {
         self.levelledPositionAngle = Self.levelledPositionAngle(at: horizontal, equatorial: equatorial,
                                                                 positionAngle: positionAngle, frame: frame)
         self.outline = outline
-        self.topMiddle = (center + up * halfHeight).normalized
+        self.topMiddle = (right * top.x + up * top.y + center * top.z).normalized
     }
 
     // MARK: Placing the chart

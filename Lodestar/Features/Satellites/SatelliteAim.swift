@@ -23,8 +23,9 @@ struct SatelliteAimSource: Identifiable, Sendable {
     enum Mode: Sendable {
         /// The satellite itself; `pass` is the pass it was chosen from, for the note about when it rises or is over.
         case follow(Satellite, pass: SatellitePassItem?)
-        /// The point where a pass reaches its highest: the instant and the (refracted) direction.
-        case peak(Date, HorizontalCoordinate)
+        /// The point where a pass reaches its highest: the instant and the (refracted) direction, and the pass it belongs to
+        /// (for the Live Activity).
+        case peak(Date, HorizontalCoordinate, pass: SatellitePassItem?)
     }
 
     /// Tells sources apart: guidance starts afresh when it changes, and only then.
@@ -43,7 +44,7 @@ struct SatelliteAimSource: Identifiable, Sendable {
         let point = item.peak
         let look = item.satellite.look(at: point.date, observer: observer)
         return SatelliteAimSource(title: item.name, observer: observer,
-                                  mode: .peak(point.date, look?.apparentHorizontal ?? point.horizontal))
+                                  mode: .peak(point.date, look?.apparentHorizontal ?? point.horizontal, pass: item))
     }
 
     var isPeak: Bool {
@@ -57,9 +58,17 @@ struct SatelliteAimSource: Identifiable, Sendable {
         return nil
     }
 
+    /// The pass the source was chosen from, whether it follows the satellite or waits at the peak.
+    var passItem: SatellitePassItem? {
+        switch mode {
+        case .follow(_, let pass): return pass
+        case .peak(_, _, let pass): return pass
+        }
+    }
+
     /// The instant of the peak, for a source that waits for it.
     var peakDate: Date? {
-        if case .peak(let date, _) = mode { return date }
+        if case .peak(let date, _, _) = mode { return date }
         return nil
     }
 
@@ -71,7 +80,7 @@ struct SatelliteAimSource: Identifiable, Sendable {
         case .follow(let satellite, _):
             guard let look = satellite.look(in: SatelliteSkyContext(date: date, observer: observer)) else { return nil }
             return SatelliteAimFix(horizontal: look.apparentHorizontal, label: title, look: look, secondsToPeak: nil)
-        case .peak(let peak, let horizontal):
+        case .peak(let peak, let horizontal, _):
             return SatelliteAimFix(horizontal: horizontal, label: "\(title) peak", look: nil,
                                    secondsToPeak: peak.timeIntervalSince(date))
         }
@@ -86,13 +95,26 @@ final class SatelliteAimSession {
     /// The chosen satellite target, or `nil` for the ordinary target.
     private(set) var source: SatelliteAimSource?
 
-    /// Leads Aim to `source`.
+    /// Whether night mode is on, asked when a Live Activity starts so that it is drawn in red at night.
+    @ObservationIgnored var isNightProvider: () -> Bool = { false }
+
+    /// The Live Activity that counts down to the rise and the peak of the followed pass.
+    @ObservationIgnored private let liveActivity = SatellitePassActivityController()
+
+    /// Leads Aim to `source`, and starts the Live Activity of its pass.
     func start(_ source: SatelliteAimSource) {
         self.source = source
+        liveActivity.begin(for: source, isNight: isNightProvider())
     }
 
-    /// Back to the ordinary target.
+    /// Back to the ordinary target, and the end of the Live Activity.
     func stop() {
         if source != nil { source = nil }
+        liveActivity.end()
+    }
+
+    /// The app came forward: brings the Live Activity up to date with the clock.
+    func refreshLiveActivity() {
+        liveActivity.refresh()
     }
 }

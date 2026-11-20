@@ -17,6 +17,9 @@ enum EventsFormat {
         case .fullMoonSpecial: return "moonphase.full.moon"
         case .lunarEclipse: return "moon.circle.fill"
         case .solarEclipse: return "sun.max.fill"
+        case .greatRedSpotTransit: return "smallcircle.filled.circle"
+        case .jupiterMoonEvent: return "smallcircle.circle"
+        case .planetStation: return "pause.circle"
         }
     }
 
@@ -64,6 +67,18 @@ enum EventsFormat {
         let start = AppFormat.time(interval.start, in: timeZone).replacingOccurrences(of: " ", with: "\u{00A0}")
         let end = AppFormat.time(interval.end, in: timeZone).replacingOccurrences(of: " ", with: "\u{00A0}")
         return "\(start)\u{00A0}\u{2013} \(end)"
+    }
+
+    /// The date to print with a viewing window, such as "Tue, Aug 11": the day it starts on. `nil` for tonight's
+    /// window, one that is not over at `now` and starts before the next local noon, which needs no date. A window on
+    /// another night, or one that ended before `now`, always has one, so that it is not read as tonight's.
+    static func windowDay(_ interval: DateInterval, now: Date, in timeZone: TimeZone) -> String? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let nextNoon = calendar.nextDate(after: now, matching: DateComponents(hour: 12, minute: 0),
+                                         matchingPolicy: .nextTime) ?? now.addingTimeInterval(86_400)
+        if interval.end > now, interval.start < nextNoon { return nil }
+        return AppFormat.day(interval.start, in: timeZone)
     }
 
     /// A window as a spoken phrase, such as "10:10 PM to 4:50 AM".
@@ -144,6 +159,18 @@ enum EventsFormat {
             return lunarSummary(eclipse)
         case .solarEclipse(let eclipse):
             return solarSummary(eclipse, hasObserver: event.visibility != nil, timeZone: timeZone)
+        case .greatRedSpotTransit(let transit):
+            return "Crosses the central meridian at \(AppFormat.time(event.date, in: timeZone)) \u{00B7} well placed "
+                + window(transit.wellPlaced, in: timeZone)
+        case .jupiterMoonEvent:
+            var parts = ["At \(AppFormat.time(event.date, in: timeZone)) (\u{00B1}\(Int(GalileanMoons.accuracyMinutes)) min)"]
+            if let altitude = event.visibility?.altitude, altitude > 0 {
+                parts.append("Jupiter \(AngleFormatter.formatDegrees(altitude, decimals: 0)) high")
+            }
+            return parts.joined(separator: " \u{00B7} ")
+        case .planetStation(let station):
+            return station.kind == .retrogradeBegins ? "Starts to move west among the stars"
+                                                     : "Moves east among the stars again"
         }
     }
 

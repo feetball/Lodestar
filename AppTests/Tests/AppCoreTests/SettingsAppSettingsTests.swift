@@ -5,6 +5,14 @@ import XCTest
 
 /// `AppSettings`: defaults, the forward-compatible decoding, the clamping and the site list.
 final class SettingsAppSettingsTests: XCTestCase {
+    /// The defaults as the app holds them once loaded or sanitized: the single camera of the settings has become the first
+    /// camera profile, "My camera".
+    private var loadedDefaults: AppSettings {
+        var settings = AppSettings()
+        settings.sanitizeCamera()
+        return settings
+    }
+
     private func decode(_ json: String) throws -> AppSettings {
         try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
     }
@@ -84,10 +92,15 @@ final class SettingsAppSettingsTests: XCTestCase {
         XCTAssertTrue(settings.recentObjectIDs.isEmpty)
     }
 
-    func testDefaultsAreAFixedPointOfSanitizing() {
+    func testSanitizingTheDefaultsOnlyMakesTheFirstCameraProfile() {
         var settings = AppSettings()
         settings.sanitize()
-        XCTAssertEqual(settings, AppSettings())
+        XCTAssertEqual(settings, loadedDefaults)
+        XCTAssertEqual(settings.cameraProfiles.map(\.name), [CameraProfile.defaultName])
+        XCTAssertEqual(settings.activeCameraProfileID, CameraProfile.migratedID)
+        var again = settings
+        again.sanitize()
+        XCTAssertEqual(again, settings, "sanitizing a second time changes nothing")
     }
 
     func testAtmosphereCarriesThePressureAndTemperature() {
@@ -234,12 +247,12 @@ final class SettingsAppSettingsTests: XCTestCase {
     // MARK: Decoding
 
     func testAnEmptyObjectDecodesToTheDefaults() throws {
-        XCTAssertEqual(try decode("{}"), AppSettings())
+        XCTAssertEqual(try decode("{}"), loadedDefaults)
     }
 
     func testUnknownKeysAreIgnored() throws {
         let settings = try decode(#"{"someFutureSetting":{"a":1},"hapticsEnabled":false}"#)
-        var expected = AppSettings()
+        var expected = loadedDefaults
         expected.hapticsEnabled = false
         XCTAssertEqual(settings, expected)
     }
@@ -432,11 +445,13 @@ final class SettingsAppSettingsTests: XCTestCase {
         settings.pressureMillibars = 950
         settings.favoriteObjectIDs = ["dso.M31", "planet.mars"]
         settings.recentObjectIDs = ["star.hip32349"]
+        settings.sanitizeCamera()
         XCTAssertEqual(try roundTrip(settings), settings)
     }
 
     func testTheDefaultSettingsSurviveARoundTrip() throws {
-        XCTAssertEqual(try roundTrip(AppSettings()), AppSettings())
+        XCTAssertEqual(try roundTrip(loadedDefaults), loadedDefaults)
+        XCTAssertEqual(try roundTrip(AppSettings()), loadedDefaults, "what is read back is sanitized")
     }
 
     func testASiteWithASkylineSurvivesTheRoundTripOfTheSettings() throws {
@@ -446,6 +461,86 @@ final class SettingsAppSettingsTests: XCTestCase {
         settings.savedSites = [site]
         let decoded = try roundTrip(settings)
         XCTAssertEqual(decoded.savedSites.first?.horizon, skyline)
+    }
+
+    // MARK: Jupiter, exposure, guidance
+
+    func testTheGreatRedSpotIsTheKitsDatedDefaultUnlessTheUserEnteredOne() throws {
+        var settings = AppSettings()
+        XCTAssertNil(settings.greatRedSpot)
+        XCTAssertEqual(settings.greatRedSpotOrDefault, GreatRedSpot.reference)
+        let asOf = Date(timeIntervalSince1970: 1_790_000_000)
+        settings.greatRedSpot = GreatRedSpotSetting(longitude: 120, asOf: asOf)
+        XCTAssertEqual(settings.greatRedSpotOrDefault, try XCTUnwrap(GreatRedSpot(longitude: 120, epoch: asOf)))
+        XCTAssertEqual(try XCTUnwrap(settings.greatRedSpot).spot?.longitude, 120)
+    }
+
+    func testAGreatRedSpotThatCannotBeUsedIsDroppedWhenSanitizing() {
+        var settings = AppSettings()
+        settings.greatRedSpot = GreatRedSpotSetting(longitude: .nan, asOf: Date())
+        XCTAssertNil(settings.greatRedSpot?.spot)
+        settings.sanitize()
+        XCTAssertNil(settings.greatRedSpot)
+        XCTAssertEqual(settings.greatRedSpotOrDefault, GreatRedSpot.reference)
+    }
+
+    func testTheExposureAndTorchSettingsAreLimited() {
+        var settings = AppSettings()
+        settings.polarErrorDegrees = 50
+        settings.exposureISO = 10
+        settings.torchBrightness = 9
+        settings.sanitize()
+        XCTAssertEqual(settings.polarErrorDegrees, AppSettings.polarErrorRange.upperBound)
+        XCTAssertEqual(settings.exposureISO, AppSettings.exposureISORange.lowerBound)
+        XCTAssertEqual(settings.torchBrightness, 1)
+        settings.polarErrorDegrees = .nan
+        settings.exposureISO = 1_000_000
+        settings.torchBrightness = -1
+        settings.sanitize()
+        XCTAssertEqual(settings.polarErrorDegrees, 1, "a number that is not finite takes the default")
+        XCTAssertEqual(settings.exposureISO, AppSettings.exposureISORange.upperBound)
+        XCTAssertEqual(settings.torchBrightness, 0.01)
+    }
+
+    func testTheNewSettingsHaveTheirDefaults() throws {
+        let settings = try decode("{}")
+        XCTAssertEqual(settings.imagingFilter, .none)
+        XCTAssertEqual(settings.polarErrorDegrees, 1)
+        XCTAssertEqual(settings.exposureISO, 100)
+        XCTAssertEqual(settings.torchBrightness, 0.3)
+        XCTAssertFalse(settings.spokenGuidance)
+        XCTAssertEqual(settings.spokenGuidanceRate, .normal)
+        XCTAssertTrue(settings.aimOnWatch)
+        XCTAssertTrue(settings.showHorizonGlow)
+        XCTAssertNil(settings.greatRedSpot)
+    }
+
+    func testTheNewSettingsSurviveARoundTrip() throws {
+        var settings = AppSettings()
+        settings.imagingFilter = .dualNarrowband
+        settings.polarErrorDegrees = 2.5
+        settings.exposureISO = 800
+        settings.torchBrightness = 0.6
+        settings.spokenGuidance = true
+        settings.spokenGuidanceRate = .slow
+        settings.aimOnWatch = false
+        settings.showHorizonGlow = false
+        settings.greatRedSpot = GreatRedSpotSetting(longitude: 120, asOf: Date(timeIntervalSince1970: 1_790_000_000))
+        settings.sanitizeCamera()
+        XCTAssertEqual(try roundTrip(settings), settings)
+    }
+
+    func testTheGuidanceRatesHaveTitles() {
+        XCTAssertEqual(SpokenGuidanceRate.allCases, [.slow, .normal])
+        XCTAssertEqual(SpokenGuidanceRate.allCases.map(\.title), ["Slow", "Normal"])
+        XCTAssertEqual(SpokenGuidanceRate.allCases.map(\.id), ["slow", "normal"])
+    }
+
+    func testABadCameraProfileInTheStoredSettingsIsDroppedAndTheRestKept() throws {
+        let good = #"{"id":"5B2D5C4E-1111-4222-8333-444455556666","name":"Body","focalLength":50}"#
+        let settings = try decode(#"{"cameraProfiles":[\#(good),{"name":"no id"},"nonsense"]}"#)
+        XCTAssertEqual(settings.cameraProfiles.map(\.name), ["Body"])
+        XCTAssertEqual(settings.focalLength, 50, "the single camera keys follow the profile")
     }
 }
 

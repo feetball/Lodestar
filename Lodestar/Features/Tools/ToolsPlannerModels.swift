@@ -19,6 +19,12 @@ struct ToolsTrailInputs {
     var focalLength: Double
     var aperture: Double
     var pixelPitch: Double?
+    /// How the lens maps angles to the sensor. The planner has no control for it, so it stays what the camera in
+    /// Settings has.
+    let projection: LensProjection
+    /// The diameter in millimetres of the circle a fisheye draws on the sensor, or `nil` when it covers the sensor.
+    /// Kept from the camera in Settings, like `projection`.
+    let imageCircleDiameter: Double?
     var declination = 0.0
     /// The time the trails should span, in minutes.
     var durationMinutes = 60.0
@@ -36,11 +42,29 @@ struct ToolsTrailInputs {
         focalLength = camera.focalLengthMillimeters
         aperture = camera.aperture
         pixelPitch = camera.pixelPitchMicrometers
+        projection = camera.projection
+        imageCircleDiameter = camera.imageCircleDiameterMillimeters
     }
 
     var setup: LensSetup {
         LensSetup(sensor: sensor, focalLengthMillimeters: focalLength, aperture: aperture,
-                  pixelPitchMicrometers: pixelPitch)
+                  pixelPitchMicrometers: pixelPitch, projection: projection,
+                  imageCircleDiameterMillimeters: imageCircleDiameter)
+    }
+
+    /// The widest a side of the pole check's frame goes, in degrees.
+    private static let widestPoleFrameDegrees = 179.9
+
+    /// The frame the pole check works with: the lens's own frame, each side held just under 180°.
+    ///
+    /// `StarTrailPlanner.polePosition` draws a rectilinear picture and rejects a side of 180° or more, which a wide
+    /// fisheye reaches; that would read as "behind the camera". Near the edges of a fisheye frame the answer is
+    /// therefore approximate.
+    var poleFrame: FrameSize {
+        let frame = setup.fieldOfView
+        return FrameSize(horizontal: min(frame.horizontal, Self.widestPoleFrameDegrees),
+                         vertical: min(frame.vertical, Self.widestPoleFrameDegrees),
+                         diagonal: frame.diagonal)
     }
 
     var durationSeconds: Double { durationMinutes * 60 }

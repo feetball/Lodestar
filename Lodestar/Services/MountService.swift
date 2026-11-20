@@ -10,8 +10,9 @@ import Observation
 /// same worker, Stop goes first.
 ///
 /// Safety rules kept here: nothing moves unless a person asked for it with a tap; the Sun is never a target; targets
-/// below the altitude limit are refused before the engine sees them (and by the engine as well); the mount is stopped
-/// and disconnected when the app goes to the background; every failure becomes text in `errorText` and never a crash.
+/// below the altitude limit are refused before the engine sees them (and by the engine as well); a slew or a nudge is
+/// stopped and the mount disconnected when the app goes to the background; every failure becomes text in `errorText`
+/// and never a crash.
 @MainActor
 @Observable
 final class MountService {
@@ -75,6 +76,12 @@ final class MountService {
     private(set) var alignmentHomeError: Double?
     /// A connection has succeeded at some time (the simulated mount counts). Until then the Aim screen has no Mount button.
     private(set) var hasConnectedBefore = false
+    /// The observing site that the mount's altitude limit, Sun check and place follow: the one the mount was connected
+    /// with, or the last one the person accepted for it. While `pendingSite` is set it is not the site the app shows.
+    private(set) var site: ObserverContext?
+    /// The site chosen in the app since the mount connected, which a connected mount has not been given. Go to and Sync
+    /// wait until the person accepts it with `usePendingSite()` or chooses the mount's site again.
+    private(set) var pendingSite: ObserverContext?
 
     var settings = MountUserSettings() {
         didSet {
@@ -96,7 +103,7 @@ final class MountService {
     @ObservationIgnored private var session: MountSession?
     /// Changes whenever a session starts or ends; work that belongs to an older session sees the difference and stops.
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var observer: Observer?
+    private var observer: Observer? { site?.observer }
     /// The place the Sky-Watcher driver was last given.
     @ObservationIgnored private var handedLocation: GeographicLocation?
     @ObservationIgnored private var connectTask: Task<Void, Never>?
@@ -110,6 +117,8 @@ final class MountService {
     @ObservationIgnored private var discoveryFlag: MountCancelFlag?
     @ObservationIgnored private var lifecycle: MountLifecycle?
     @ObservationIgnored private var markerCache: MountMarkerCache?
+    /// The text of the notice that says tracking was stopped near the Sun, while it may still be on screen.
+    @ObservationIgnored private var sunStopNotice: String?
 
     private init() {
         settings = MountPreferences.loadSettings()
@@ -274,6 +283,7 @@ final class MountService {
         guard capabilities.canSlew else { return MountError.notSupported(feature: .slew).userMessage }
         guard let object else { return "Choose a target first." }
         if MountTargets.isSun(object) { return MountTargets.sunRefusal }
+        if let reason = pendingSiteReason { return reason }
         if let observer {
             let target = MountTargets.resolve(object, observer: observer, date: Date())
             if target.lowestAltitude < settings.altitudeLimit {
@@ -311,11 +321,20 @@ final class MountService {
         guard capabilities.canSync else { return MountError.notSupported(feature: .sync).userMessage }
         guard let object else { return "Choose a target first." }
         if MountTargets.isSun(object) { return MountTargets.sunRefusal }
+        if let reason = pendingSiteReason { return reason }
         switch status.phase {
         case .slewing: return MountError.slewInProgress.userMessage
         case .nudging: return MountError.busy.userMessage
         case .idle, .disconnected: return nil
         }
+    }
+
+    /// Why a GoTo or a sync waits for a decision about the site, or `nil` when no change of site is waiting. The checks
+    /// before them follow the site shown in the app, which the mount has not been given yet.
+    private var pendingSiteReason: String? {
+        guard let pending = pendingSite else { return nil }
+        let old = site?.name ?? "the old site"
+        return "The site changed to \(pending.name). Use it for the mount first, or choose \(old) again."
     }
 
     /// The limits the controller runs with. A mount that Lodestar aligns checks every alignment star itself, and its first
@@ -349,38 +368,39 @@ final class MountService {
     // MARK: Connecting
 
     /// Connects to the mount chosen on the connection screen. Does nothing while connecting or connected.
-    func connect(observer: Observer?) {
+    func connect(context: ObserverContext?) {
         let option = selectedOption
-        startConnection(option: option, form: form, observer: observer)
+        startConnection(option: option, form: form, context: context)
     }
 
     /// Connects again after the connection was lost: to the simulated mount if that was the one, else to the mount chosen
     /// on the connection screen.
-    func reconnect(observer: Observer?) {
+    func reconnect(context: ObserverContext?) {
         if let option = connectedOption, option.isDemo {
-            connectDemo(option, observer: observer)
+            connectDemo(option, context: context)
         } else {
-            connect(observer: observer)
+            connect(context: context)
         }
     }
 
     /// Connects to a simulated mount.
-    func connectDemo(_ option: MountConnectionOption = .demo, observer: Observer?) {
-        startConnection(option: option, form: MountConnectionForm(option: option), observer: observer)
+    func connectDemo(_ option: MountConnectionOption = .demo, context: ObserverContext?) {
+        startConnection(option: option, form: MountConnectionForm(option: option), context: context)
     }
 
-    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, observer: Observer?) {
+    private func startConnection(option: MountConnectionOption, form: MountConnectionForm, context: ObserverContext?) {
         let isDemo = option.isDemo
         switch connection {
         case .connecting, .connected: return
         case .disconnected, .lost: break
         }
         clearMessages()
-        guard let observer else {
+        guard let context else {
             errorText = "Lodestar needs to know where you are to check targets against your altitude limit. "
                 + "Allow location access or choose an observing site first."
             return
         }
+        let observer = context.observer
         if !isDemo && form.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errorText = "Enter the mount's address first."
             return
@@ -390,7 +410,8 @@ final class MountService {
                 + "from 1 to 65535."
             return
         }
-        self.observer = observer
+        site = context
+        pendingSite = nil
         self.isDemo = isDemo
         generation += 1
         let token = generation
@@ -523,8 +544,9 @@ final class MountService {
                 return
             }
             Task {
-                // A GoTo that is being set up has not moved the mount yet as far as the status knows, but it may just have.
-                if isMoving || isWorking {
+                // A GoTo that is being set up has not moved the mount yet as far as the status knows, but it may just have; the same
+                // goes for the first pulse of a nudge that is held.
+                if isMoving || isWorking || nudgeTask != nil || nudgeGate != nil {
                     stopNudgeLoop()
                     motionGate?.cancel()
                     motionGate = nil
@@ -580,28 +602,55 @@ final class MountService {
         case .connected:
             guard let ending = session else { return }
             lifecycle?.beginBackgroundTask()
+            // The controller's phase cannot say whether something moves: it becomes .slewing or .nudging only when the driver call
+            // that starts the move returns, and the interrupt below cuts exactly that call off, after the command may have gone out.
+            // So the service's own state decides, as in `disconnect()`. The stop is not sent every time: a Sky-Watcher mount that
+            // stands still and tracks would lose its tracking.
+            let mayBeMoving = isMoving || isWorking || nudgeTask != nil || nudgeGate != nil
             stopNudgeLoop()
             // A GoTo that is still queued must not start after the stop.
             motionGate?.cancel()
             motionGate = nil
             Task {
-                // Nobody can watch the mount from here, so it is stopped and let go.
+                // Nobody can watch the mount from here, so a slew or a nudge is stopped and the mount is let go.
                 ending.interrupt()
                 let stopped = await ending.run(urgent: true) { controller in
-                    if controller.status.phase != .idle { try controller.abort() }
+                    if mayBeMoving || controller.status.phase != .idle { try controller.abort() }
                 }
                 if session === ending {
                     let reason = "Disconnected when Lodestar went to the background. "
                     if case .failure(let error) = stopped.result {
                         finishSession(lost: reason + Self.stopFailureText(error))
                     } else {
-                        finishSession(lost: reason + "The mount was stopped.")
+                        finishSession(lost: reason + Self.backgroundOutcomeText(
+                            status: stopped.status, detail: stopped.detail, lodestarAligns: usesLodestarAlignment,
+                            wasMoving: mayBeMoving))
                     }
                 }
                 lifecycle?.endBackgroundTask()
             }
         case .disconnected, .lost:
             break
+        }
+    }
+
+    /// What the notice says about the mount once Lodestar has let go of it in the background. The stop halts a slew or
+    /// a nudge but does not switch tracking off: the firmware of OnStep, LX200, NexStar and Alpaca mounts keeps it, and
+    /// so does the driver of an equatorial Sky-Watcher mount that stood still, which leaves its sidereal tracking
+    /// running. Nothing then watches the limits that Lodestar was keeping. An alt-azimuth Sky-Watcher mount is tracked
+    /// by Lodestar's own corrections, which end with the connection, and the stop of a move halts both axes of either
+    /// Sky-Watcher mount, so for those the mount really is stopped. `status` is the controller's after the stop; its
+    /// tracking flag is only what the mount last said, which is why the Sky-Watcher cases are decided here.
+    private static func backgroundOutcomeText(status: MountStatus, detail: MountDriverDetail?, lodestarAligns: Bool,
+                                              wasMoving: Bool) -> String {
+        var tracking = status.isTracking
+        if lodestarAligns, tracking == true, wasMoving || detail?.arrangement != .equatorial {
+            tracking = false
+        }
+        switch tracking {
+        case true?: return "Tracking continues; Lodestar no longer watches the mount's limits."
+        case false?: return "The mount was stopped."
+        case nil: return "Any move was stopped. The mount may still be tracking; Lodestar no longer watches its limits."
         }
     }
 
@@ -636,11 +685,33 @@ final class MountService {
         let old = status
         guard new != old else { return }
         status = new
+        // The engine clears the outcome of the last slew when the mount is nudged or synced. "Arrived at M 31" goes
+        // with it, and so does the name of that slew's target. A new slew clears the outcome too but sets its own name.
+        if old.outcome != nil, new.outcome == nil, new.phase != .slewing { slewTargetName = nil }
         if new.phase == .slewing && old.phase != .slewing {
             slewStartSeparation = new.separation
             MountLifecycle.announce("Slewing")
         } else if old.phase == .slewing && new.phase != .slewing {
             MountLifecycle.announce(Self.spokenOutcome(new.outcome))
+        }
+        noteTrackingStopNearSun(from: old, to: new)
+    }
+
+    /// Keeps the reason for a stop of tracking near the Sun on screen. The engine switches tracking off when the Sun
+    /// rises into the exclusion zone of a mount that tracks, and gives the reason (`nearSun`) only in the status of the
+    /// poll that did it, which the error line drops at the next poll. The notice stays until a status says the mount
+    /// tracks again (the person switched tracking on here or on the mount), or until it is dismissed or the person
+    /// connects anew.
+    private func noteTrackingStopNearSun(from old: MountStatus, to new: MountStatus) {
+        if old.isTracking == true, new.isTracking == false, case .nearSun(_, let limit)? = new.lastError {
+            let text = "Tracking stopped: the mount was within \(AppFormat.separation(limit)) of the Sun. "
+                + "Point it away before tracking again."
+            noticeText = text
+            sunStopNotice = text
+            MountLifecycle.announce("Tracking stopped near the Sun")
+        } else if new.isTracking == true, let shown = sunStopNotice {
+            if noticeText == shown { noticeText = nil }
+            sunStopNotice = nil
         }
     }
 
@@ -859,6 +930,15 @@ final class MountService {
         "The mount may still be moving. \(error.userMessage) Stop it on its hand controller or switch it off."
     }
 
+    /// What a refused nudge says. The engine words `nearSun` for a GoTo target ("won't slew there"); a nudge starts
+    /// from where the mount points, so it gets a sentence of its own with the same distances.
+    private static func nudgeFailureText(_ error: MountError) -> String {
+        guard case .nearSun(let separation, let limit) = error else { return error.userMessage }
+        return "The mount points \(AppFormat.separation(separation)) from the Sun, closer than the "
+            + "\(AppFormat.separation(limit)) safety limit, so Lodestar won't move it with the arrows. "
+            + "Move it away from the Sun first, with Go to or by hand."
+    }
+
     func setTracking(_ enabled: Bool) {
         guard isConnected else { return }
         Task {
@@ -906,7 +986,7 @@ final class MountService {
                     try controller.nudge(direction, rate: rate, durationSeconds: pulse)
                 }
                 if case .failure(let error) = result {
-                    if !gate.isCancelled { self.errorText = error.userMessage }
+                    if !gate.isCancelled { self.errorText = Self.nudgeFailureText(error) }
                     return
                 }
                 let remaining = Self.nudgeRepeat - (ContinuousClock.now - began)
@@ -932,7 +1012,7 @@ final class MountService {
         let pulse = Self.nudgePulseSeconds
         Task {
             let result = await execute { controller in try controller.nudge(direction, rate: rate, durationSeconds: pulse) }
-            if case .failure(let error) = result { errorText = error.userMessage }
+            if case .failure(let error) = result { errorText = Self.nudgeFailureText(error) }
         }
     }
 
@@ -946,17 +1026,54 @@ final class MountService {
     // MARK: Observer and limits
 
     /// Tells the controller where the person is, for its altitude checks and the frame of the mount's coordinates.
-    func updateObserver(_ new: Observer?) {
-        guard let new, new != observer else { return }
-        observer = new
-        guard isConnected else { return }
+    ///
+    /// The phone's own position drifting is passed on at once. A change of site, though (another saved site, or the
+    /// device's position in place of a site or the other way round), is not handed to a connected mount unasked: a
+    /// Sky-Watcher forgets its star alignment when it is given another place, and the limits and checks would leave the
+    /// place where the mount stands. Such a change waits in `pendingSite` for `usePendingSite()`.
+    func updateObserver(_ context: ObserverContext?) {
+        guard let context else { return }
+        guard context.observer != observer || context.source != site?.source else {
+            // The person chose the mount's own site again.
+            if pendingSite != nil { pendingSite = nil }
+            return
+        }
+        guard isConnected, let current = site else {
+            site = context
+            pendingSite = nil
+            return
+        }
+        let isDrift = context.source == .device && current.source == .device
+        if !isDrift, Self.isFar(context.observer.location, from: current.observer.location) {
+            pendingSite = context
+            return
+        }
+        adopt(context)
+    }
+
+    /// Hands the mount the site the person switched to, once they have said so. It waits while the mount is moving.
+    func usePendingSite() {
+        guard isConnected, !isMoving, !isWorking, let pending = pendingSite else { return }
+        adopt(pending)
+    }
+
+    /// Whether two places differ by more than the tolerance in latitude or in longitude.
+    private static func isFar(_ place: GeographicLocation, from other: GeographicLocation) -> Bool {
+        let latitude = abs(place.latitude - other.latitude)
+        let longitude = abs(AstroMath.normalizeSignedDegrees(place.longitude - other.longitude))
+        return latitude > Self.siteToleranceDegrees || longitude > Self.siteToleranceDegrees
+    }
+
+    /// Makes `context` the site of the connected mount and of its checks, and tells the controller.
+    private func adopt(_ context: ObserverContext) {
+        let new = context.observer
+        site = context
+        pendingSite = nil
         // The mount that Lodestar aligns points by the phone's location, which its driver is handed again when the phone has
         // moved. The driver forgets the alignment once the place differs by about a quarter of a degree.
         var handsOver = false
         if usesLodestarAlignment, let handed = handedLocation, status.phase != .slewing {
-            let latitude = abs(new.location.latitude - handed.latitude)
-            let longitude = abs(AstroMath.normalizeSignedDegrees(new.location.longitude - handed.longitude))
-            handsOver = latitude > Self.siteToleranceDegrees || longitude > Self.siteToleranceDegrees
+            handsOver = Self.isFar(new.location, from: handed)
         }
         if handsOver { handedLocation = new.location }
         let hadStars = !(driverDetail?.alignment?.stars.isEmpty ?? true)

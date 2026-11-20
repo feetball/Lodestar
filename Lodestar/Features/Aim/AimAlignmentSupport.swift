@@ -16,6 +16,8 @@ struct AimAlignmentRow: Identifiable {
     let candidate: AimAlignmentCandidate
     /// Degrees from the camera's boresight; `nil` while the sensors deliver nothing.
     let separation: Double?
+    /// The alignment point nearest to the candidate; `nil` while there are no points.
+    var nearest: AlignmentPointSeparation?
 
     var id: String { candidate.id }
 }
@@ -29,6 +31,12 @@ enum AimAlignmentCandidates {
     static let starMagnitudeLimit = 2.0
     /// Planets at least this bright are offered.
     static let planetMagnitudeLimit = 3.0
+
+    /// Shown in place of the list when no object is between the altitude limits; it names the limits above.
+    static var emptyListText: String {
+        "No bright star or planet is between \(Int(minimumAltitude))\u{00B0} and \(Int(maximumAltitude))\u{00B0} "
+            + "right now. Try again later or after the sky has darkened."
+    }
 
     /// The Moon, the bright planets and the bright stars that are between the altitude limits at `date`. The Sun is
     /// never offered: it must not be pointed at without a solar filter. Searches the catalog, so run it off the main
@@ -81,7 +89,9 @@ extension AlignmentError {
         case .nonFiniteInput:
             return "The sensors gave an unusable reading. Hold the phone still for a moment and sync again."
         case .boresightTooHigh(let altitude):
-            return "The camera points almost straight up (\(AngleFormatter.formatDegrees(altitude, decimals: 0))). Alignment needs an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}: choose a lower one."
+            // A negative altitude is a camera pointing at the nadir.
+            let direction = altitude < 0 ? "down" : "up"
+            return "The camera points almost straight \(direction) (\(AngleFormatter.formatDegrees(altitude, decimals: 0))). Alignment needs an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}: choose a lower one."
         case .targetTooHigh(let altitude):
             return "\(name) is too high in the sky (\(AngleFormatter.formatDegrees(altitude, decimals: 0))) for a reliable alignment. Choose an object below \(Int(AlignmentModel.maximumAltitude))\u{00B0}."
         case .implausibleCorrection(let degrees):

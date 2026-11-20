@@ -705,7 +705,8 @@ final class ObjectsDetailMoonTests: XCTestCase {
         return ObjectDetailNight(
             interval: twilight.interval, chartRange: twilight.interval, twilight: twilight, darkness: darkness,
             events: RiseTransitSet(rise: nil, transit: nil, set: nil, transitAltitude: nil, circumstance: .normal),
-            transitAltitude: nil, samples: [], twilightBands: [], hourTicks: [], bestInDarkness: best, appliesSkyline: false)
+            transitAltitude: nil, samples: [], twilightBands: [], hourTicks: [], bestInDarkness: best, appliesSkyline: false,
+            unobstructed: nil)
     }
 
     private func conditions(for object: CelestialObject, now: Date, darkness: DateInterval?,
@@ -737,6 +738,11 @@ final class ObjectsDetailMoonTests: XCTestCase {
         return CelestialObject.custom(name: "Moon spot", j2000: coordinate)
     }
 
+    /// How much the Moon disturbs a shot without a filter, from the geometry the conditions carry.
+    private func impact(of result: ObjectDetailMoonConditions) -> MoonImpact.Level {
+        result.geometry.assess(filter: .none, kind: .galaxy).level
+    }
+
     func testTheSunAndTheMoonHaveNoMoonConditions() throws {
         for id in ["sun", "moon"] {
             let object = try ObjectsDetailFixture.object(id)
@@ -754,7 +760,7 @@ final class ObjectsDetailMoonTests: XCTestCase {
         XCTAssertTrue(result.isNow)
         XCTAssertLessThan(result.separation, 2)
         XCTAssertGreaterThan(result.illuminatedFraction, 0.9)
-        XCTAssertEqual(result.impact, .severe)
+        XCTAssertEqual(impact(of: result), .severe)
     }
 
     func testAnObjectOppositeAFullMoonIsModeratelyAffected() throws {
@@ -763,7 +769,7 @@ final class ObjectsDetailMoonTests: XCTestCase {
         let result = try XCTUnwrap(conditions(for: atTheMoon(on: now, opposite: true), now: now, darkness: around(now)))
         XCTAssertGreaterThan(result.separation, 170)
         XCTAssertGreaterThan(result.illuminatedFraction, 0.9)
-        XCTAssertEqual(result.impact, .moderate)
+        XCTAssertEqual(impact(of: result), .moderate)
     }
 
     func testAnObjectFarFromAQuarterMoonIsOnlyMinorlyAffected() throws {
@@ -772,7 +778,7 @@ final class ObjectsDetailMoonTests: XCTestCase {
         XCTAssertGreaterThan(result.separation, 170)
         XCTAssertGreaterThan(result.illuminatedFraction, 0.3)
         XCTAssertLessThan(result.illuminatedFraction, 0.7)
-        XCTAssertEqual(result.impact, .minor)
+        XCTAssertEqual(impact(of: result), .minor)
     }
 
     func testWhileTheMoonIsDownItDoesNotMatter() throws {
@@ -780,7 +786,7 @@ final class ObjectsDetailMoonTests: XCTestCase {
             $0.altitude < -5
         })
         let result = try XCTUnwrap(conditions(for: star, now: now, darkness: around(now)))
-        XCTAssertEqual(result.impact, .moonDown)
+        XCTAssertEqual(impact(of: result), .moonDown)
         XCTAssertTrue(result.isNow)
     }
 
@@ -900,7 +906,7 @@ final class ObjectsDetailSnapshotTests: XCTestCase {
                           darkness: real.darkness, events: real.events, transitAltitude: real.transitAltitude,
                           samples: real.samples, twilightBands: real.twilightBands,
                           hourTicks: [Date(timeIntervalSince1970: 5)], bestInDarkness: real.bestInDarkness,
-                          appliesSkyline: real.appliesSkyline)
+                          appliesSkyline: real.appliesSkyline, unobstructed: real.unobstructed)
     }
 
     func testAnEarlierNightIsReusedWhileItIsStillTonight() throws {

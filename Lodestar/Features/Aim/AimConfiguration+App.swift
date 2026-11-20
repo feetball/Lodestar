@@ -10,7 +10,9 @@ extension AimConfiguration {
         let mount = app.mountProfile
         self.mount = mount
         alignment = app.alignment
-        lensFrame = app.lensSetup.fieldOfView
+        let lens = app.lensSetup
+        lensFrame = lens.fieldOfView
+        lensOutline = AimLensFrame.outline(of: lens)
         showConstellationLines = settings.showConstellationLines
         showConstellationNames = settings.showConstellationNames
         showDeepSkyObjects = settings.showDeepSkyObjects

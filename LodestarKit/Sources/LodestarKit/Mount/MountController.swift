@@ -12,8 +12,10 @@ import Foundation
 ///
 /// Safety rules enforced here: a target below `MountSettings.altitudeLimit` (now, and
 /// `MountSettings.horizonLookaheadSeconds` from now) is never sent, and neither is a target within
-/// `MountSettings.sunExclusionDegrees` of the Sun while the Sun is up; a goto while a slew or nudge runs is refused
-/// (`MountError.slewInProgress`, `MountError.busy`) until `abort` has been called, and so is a goto or sync while
+/// `MountSettings.sunExclusionDegrees` of the Sun while the Sun is up; a nudge is refused the same way while the mount
+/// points within that distance of the Sun, and `poll` switches tracking off when the Sun is up and within that distance
+/// of a mount that tracks; a goto while a slew or nudge runs is refused (`MountError.slewInProgress`,
+/// `MountError.busy`) until `abort` has been called, and so is a goto or sync while
 /// the mount's own "slewing" flag is set (a move started on the hand controller); a slew that exceeds
 /// `MountSettings.maximumSlewSeconds` is aborted; a nudge ends by itself after its duration (the next `poll` sends the
 /// stop, so poll at least once a second while nudging); every driver exchange has a timeout and no loop is unbounded.
@@ -25,6 +27,10 @@ public final class MountController {
 
     /// The Sun's geometric altitude (degrees) above which it counts as up for the exclusion zone.
     private static let sunUpAltitude = -1.0
+
+    /// The time (seconds) between two looks at the Sun while the mount tracks. The Sun moves a quarter of a degree a
+    /// minute against the sky, so there is no need to look at every poll.
+    private static let sunWatchSeconds = 5.0
 
     private let driver: MountDriver
     private let clock: MountClock
@@ -56,6 +62,7 @@ public final class MountController {
     private var failures = 0
     private var nudgeDirection: MountNudgeDirection?
     private var nudgeEnds: Date?
+    private var sunWatched: Date?
 
     public init(driver: MountDriver, observer: Observer, settings: MountSettings = .standard,
                 clock: MountClock = SystemMountClock()) {
@@ -101,6 +108,7 @@ public final class MountController {
             slewElapsed = nil
             nudgeDirection = nil
             nudgeEnds = nil
+            sunWatched = nil
             updated = now
             return found
         } catch let error as MountError {
@@ -147,6 +155,7 @@ public final class MountController {
             }
             failures = 0
             lastError = nil
+            stopTrackingNearSun(now: now)
         } catch let error as MountError {
             recordFailure(error)
         } catch {
@@ -244,6 +253,8 @@ public final class MountController {
             throw error
         }
         storePosition(sent, now: now)
+        // The mount's idea of where it points has just changed, so the last slew's "arrived" no longer describes it.
+        outcome = nil
         lastError = nil
         updated = now
         return MountSyncResult(offsetDegrees: offset)
@@ -257,8 +268,11 @@ public final class MountController {
         _ = try requireConnected()
         let direction = nudgeDirection
         var failure = repeatUntilDone { try driver.abort() }
-        if failure == nil, let toStop = direction {
-            failure = repeatUntilDone { try driver.stopNudge(direction: toStop) }
+        // The abort of some protocols (NexStar, Alpaca) cancels only a GoTo, so a running nudge is stopped on its own,
+        // whatever became of the abort. The first failure is the one reported.
+        if let toStop = direction {
+            let stopFailure = repeatUntilDone { try driver.stopNudge(direction: toStop) }
+            if failure == nil { failure = stopFailure }
         }
         if let failure {
             lastError = failure
@@ -275,6 +289,10 @@ public final class MountController {
     /// Moves the mount in `direction` at `rate` for `durationSeconds` (at most `MountSettings.maximumNudgeSeconds`). The
     /// nudge ends at the first `poll` after the duration, or at `stopNudge`. A nudge in another direction replaces a
     /// running one.
+    ///
+    /// - Throws: `MountError.nearSun` when the Sun is up and the mount points within
+    ///   `MountSettings.sunExclusionDegrees` of it (a running nudge is stopped then), and the errors listed at `goto`
+    ///   that apply. A nudge is not held to the altitude limit, so that the mount can be moved up from below it.
     public func nudge(_ direction: MountNudgeDirection, rate: MountNudgeRate = .center, durationSeconds: Double = 0.5) throws {
         let found = try requireConnected()
         if !(durationSeconds > 0) || durationSeconds > settings.maximumNudgeSeconds {
@@ -282,25 +300,50 @@ public final class MountController {
         }
         if phase == .slewing { throw MountError.slewInProgress }
         if !found.canNudge { throw MountError.notSupported(feature: .nudge) }
+        do {
+            try checkSunAtMountPosition()
+        } catch {
+            // The pulse that carried the mount this far must not run on.
+            try? stopNudge()
+            throw error
+        }
         if let previous = nudgeDirection, previous != direction {
             try driver.stopNudge(direction: previous)
             nudgeDirection = nil
+            nudgeEnds = nil
         }
         let now = clock.now()
         do {
             try driver.startNudge(direction: direction, rate: rate, durationSeconds: durationSeconds)
         } catch let error as MountError {
             lastError = error
+            var stopped = true
             do {
                 try driver.stopNudge(direction: direction)
             } catch {
                 // Already failing; the error above is what the caller needs to see.
+                stopped = false
+            }
+            if stopped {
+                // What ran before is stopped (the previous direction above, this one just now): the controller is idle and
+                // not left in a nudge that has no direction.
+                if phase == .nudging { phase = .idle }
+                nudgeDirection = nil
+                nudgeEnds = nil
+            } else {
+                // The move may be running although the stop could not be confirmed: it stays on the books, so that
+                // `stopNudge`, `abort` and the end of its duration still send the stop.
+                phase = .nudging
+                nudgeDirection = direction
+                nudgeEnds = now.addingTimeInterval(durationSeconds)
             }
             throw error
         }
         phase = .nudging
         nudgeDirection = direction
         nudgeEnds = now.addingTimeInterval(durationSeconds)
+        // The mount moves away from where the last slew ended, so that slew's "arrived" no longer describes it.
+        outcome = nil
         lastError = nil
     }
 
@@ -466,6 +509,41 @@ public final class MountController {
             let place = frame.horizontal(j2000: target, properMotion: properMotion, refraction: false)
             let distance = place.angularSeparation(to: sun)
             if distance < limit { throw MountError.nearSun(separationDegrees: distance, limitDegrees: limit) }
+        }
+    }
+
+    /// `checkSun` for the place the mount points at, as of the last position read. Before the first read nothing is
+    /// known about where the mount points (it may be unaligned and report meaningless coordinates), and the move is
+    /// allowed.
+    private func checkSunAtMountPosition() throws {
+        guard let place = position else { return }
+        try checkSun(place, nil, clock.now())
+    }
+
+    /// Switches tracking off when the Sun is up and the mount, idle and tracking, points within
+    /// `MountSettings.sunExclusionDegrees` of it: a GoTo that was accepted at dawn, with the Sun just below the
+    /// horizon, must not keep following the sky while the Sun rises into the field. The cause is recorded in
+    /// `lastError` (as `nearSun`) for the status that `poll` returns. It acts on the transition only: with tracking off
+    /// nothing is checked again, and a failed switch is retried no sooner than `sunWatchSeconds` later. It does nothing
+    /// for a mount that cannot switch tracking.
+    private func stopTrackingNearSun(now: Date) {
+        guard phase == .idle, tracking == true, capabilities?.canSetTracking == true,
+              let place = position else { return }
+        if let last = sunWatched, now.timeIntervalSince(last) < MountController.sunWatchSeconds { return }
+        sunWatched = now
+        do {
+            try checkSun(place, nil, now)
+        } catch let near as MountError {
+            do {
+                try setTracking(false)
+                lastError = near
+            } catch let failure as MountError {
+                lastError = failure
+            } catch {
+                lastError = MountError.transport(detail: "unexpected failure")
+            }
+        } catch {
+            return
         }
     }
 

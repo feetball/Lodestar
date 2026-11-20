@@ -19,6 +19,37 @@ final class PlanPlannerInputsTests: XCTestCase {
         XCTAssertEqual(inputs.pixelPitch, 4.2)
     }
 
+    func testTrailInputsKeepTheLensProjectionAndImageCircleOfTheCamera() {
+        let fisheye = LensSetup(sensor: .fullFrame, focalLengthMillimeters: 8, aperture: 2.8,
+                                projection: .fisheyeEquisolid, imageCircleDiameterMillimeters: 30)
+        let inputs = ToolsTrailInputs(camera: fisheye)
+        XCTAssertEqual(inputs.projection, .fisheyeEquisolid)
+        XCTAssertEqual(inputs.imageCircleDiameter, 30)
+        XCTAssertEqual(inputs.setup, fisheye)
+        let ordinary = ToolsTrailInputs(camera: camera())
+        XCTAssertEqual(ordinary.projection, .rectilinear)
+        XCTAssertNil(ordinary.imageCircleDiameter)
+    }
+
+    func testThePoleFrameIsTheLensFrameHeldJustUnderOneHundredAndEightyDegrees() {
+        // An ordinary lens: the frame itself.
+        let ordinary = ToolsTrailInputs(camera: camera())
+        XCTAssertEqual(ordinary.poleFrame.horizontal, ordinary.setup.fieldOfView.horizontal)
+        XCTAssertEqual(ordinary.poleFrame.vertical, ordinary.setup.fieldOfView.vertical)
+        XCTAssertEqual(ordinary.poleFrame.diagonal, ordinary.setup.fieldOfView.diagonal)
+        // A full-frame fisheye reaches 180 degrees or more on a side, which the pole check cannot draw.
+        let fisheye = LensSetup(sensor: .fullFrame, focalLengthMillimeters: 8, aperture: 2.8,
+                                projection: .fisheyeEquidistant)
+        let inputs = ToolsTrailInputs(camera: fisheye)
+        let frame = inputs.setup.fieldOfView
+        XCTAssertEqual(frame.horizontal, 180)
+        XCTAssertEqual(frame.diagonal, 180)
+        XCTAssertEqual(inputs.poleFrame.horizontal, 179.9)
+        XCTAssertLessThanOrEqual(inputs.poleFrame.vertical, 179.9)
+        XCTAssertEqual(inputs.poleFrame.vertical, min(frame.vertical, 179.9))
+        XCTAssertEqual(inputs.poleFrame.diagonal, frame.diagonal)
+    }
+
     func testTrailInputsKeepAnUnknownPixelPitchUnknown() {
         let inputs = ToolsTrailInputs(camera: camera(pixelPitch: nil))
         XCTAssertNil(inputs.pixelPitch)

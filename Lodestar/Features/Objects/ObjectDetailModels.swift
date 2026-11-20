@@ -47,6 +47,9 @@ struct ObjectDetailCurrent: Sendable {
     /// A comet's or asteroid's distances, elongation, phase, magnitude estimate, warnings and tail; `nil` when its
     /// orbit cannot be evaluated.
     var smallBody: SmallBodyDetail?
+    /// The hour angle and the transits around now; `nil` for a celestial pole and for a body whose orbit cannot be
+    /// evaluated.
+    var meridian: ObjectDetailMeridian?
 }
 
 /// One point of the altitude curve.
@@ -101,6 +104,9 @@ struct ObjectDetailNight: Sendable {
     /// Whether the site's recorded skyline decided `events` and `bestInDarkness`: then a rise is the object clearing
     /// the skyline and a set is it sinking behind it.
     let appliesSkyline: Bool
+    /// With a recorded skyline, the stretches of the dark in which the object is above it and at least
+    /// `ObjectsTonight.minimumAltitude` high; `nil` without a skyline or without darkness.
+    let unobstructed: UnobstructedVisibility?
 
     /// When this night is over and "tonight" means the next one.
     var expiry: Date { twilight.sunrise ?? interval.end }
@@ -126,20 +132,18 @@ struct ObjectDetailEvent: Sendable, Identifiable {
     var id: String { kind.rawValue }
 }
 
-/// How much the Moon is likely to disturb a shot of the object.
+/// Where the Moon is relative to the object. How much it disturbs a shot depends on the user's filter, so the level
+/// is assessed where it is shown (`ObjectMoonGeometry.assess(filter:kind:)`), not stored here.
 struct ObjectDetailMoonConditions: Sendable, Equatable {
-    enum Impact: Sendable {
-        case moonDown, minor, moderate, severe
-    }
-
     /// The instant the conditions were evaluated for.
     let date: Date
     /// Whether `date` is the present moment (otherwise it is the object's best time tonight).
     let isNow: Bool
+    let geometry: ObjectMoonGeometry
+
     /// Angular distance between the object and the Moon, in degrees.
-    let separation: Double
-    let illuminatedFraction: Double
-    let impact: Impact
+    var separation: Double { geometry.separation }
+    var illuminatedFraction: Double { geometry.illuminatedFraction }
 }
 
 /// Everything the detail screen computes for an object and an observer.
@@ -184,6 +188,16 @@ struct ObjectDetailFraming: Sendable, Equatable {
     }
 }
 
+/// How large the disc of the Sun, the Moon or a planet is in the user's frame.
+struct ObjectDetailBodySize: Sendable, Equatable {
+    /// The apparent diameter in degrees.
+    let diameterDegrees: Double
+    /// The diameter in pixels of the image.
+    let pixels: Double
+    /// Whether the pixel pitch was assumed because the lens setup has none.
+    let assumedPixelPitch: Bool
+}
+
 /// How an object fits the user's lens and how long an exposure can be before stars trail.
 struct ObjectDetailPhotography: Sendable {
     /// The frame of the user's camera and lens, in landscape orientation.
@@ -193,4 +207,6 @@ struct ObjectDetailPhotography: Sendable {
     /// `nil` for the Sun and the Moon, for which star trails do not matter.
     let npf: ExposureEstimate?
     let rule500: ExposureEstimate?
+    /// `nil` unless the object is a solar-system body with a known apparent diameter.
+    let bodySize: ObjectDetailBodySize?
 }
