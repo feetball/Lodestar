@@ -32,6 +32,9 @@ struct ObjectSkyPosition: Sendable, Equatable {
     /// For a comet or an asteroid: distances, elongation and warnings now; `nil` for other objects and when its orbit
     /// cannot be evaluated.
     var smallBody: SmallBodyInfo?
+    /// The instant the search for the rising started from, or `nil` when that is not known. A rising found less than
+    /// `ObjectsPositionCalculator.risingReuseAge` ago is kept when the position is worked out again.
+    var risingSearchedAt: Date?
 }
 
 /// Computes sky positions for lists of objects. Pure, so it can run on any thread.
@@ -40,42 +43,81 @@ enum ObjectsPositionCalculator {
     /// all has a rising in the window even when its rising time moves by almost an hour a day, as the Moon's does.
     static let riseSearchWindow: TimeInterval = 25 * 3600
 
+    /// How long a rising found by a search is kept, in seconds. The search costs far more than the position, and
+    /// the rising barely moves meanwhile (the Moon's moves by about 50 minutes a day, which is under a minute in
+    /// five), so the position is worked out again on every pass and the rising only when this has passed.
+    static let risingReuseAge: TimeInterval = 5 * 60
+
+    /// What a search for the next rising of one object found, and the instant it started from.
+    private struct Rising {
+        let nextRise: Date?
+        let neverRises: Bool
+        let noRiseInWindow: Bool
+        let searchedAt: Date
+    }
+
     /// The position of every object in `objects` at `date`, keyed by object identifier. With a `skyline` the
-    /// visibility and the rising times are judged over it.
+    /// visibility and the rising times are judged over it. `known` holds earlier positions for the same observer and
+    /// skyline: an object's rising is taken from there while it is no older than `risingReuseAge` and still ahead,
+    /// and searched for again otherwise.
     static func positions(for objects: [CelestialObject], observer: Observer, skyline: HorizonProfile? = nil,
-                          date: Date) -> [String: ObjectSkyPosition] {
+                          date: Date,
+                          keepingRisingsOf known: [String: ObjectSkyPosition] = [:]) -> [String: ObjectSkyPosition] {
         let frame = SkyFrame(date: date, observer: observer)
-        let window = DateInterval(start: date, duration: riseSearchWindow)
         let visibility = skyline.map(HorizonVisibility.init(profile:))
         var result = [String: ObjectSkyPosition](minimumCapacity: objects.count)
         for object in objects {
             let horizontal = frame.horizontal(of: object, refraction: true)
-            let events: RiseTransitSet
             var isAbove = horizontal.altitude > 0
             if let visibility {
-                events = ObjectsHorizon.riseTransitSet(for: object, visibility: visibility, observer: observer,
-                                                       within: window)
                 isAbove = ObjectsHorizon.isVisible(altitude: horizontal.altitude, azimuth: horizontal.azimuth,
                                                    visibility: visibility)
-            } else {
-                events = RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: window)
             }
-            let staysBelow = events.circumstance == .alwaysDown
-            let isStationary = staysAmongStars(object)
+            let rising = known[object.id].flatMap { keptRising(of: $0, at: date) }
+                ?? searchRising(of: object, observer: observer, visibility: visibility, from: date)
             result[object.id] = ObjectSkyPosition(
                 altitude: horizontal.altitude,
                 azimuth: horizontal.azimuth,
-                nextRise: events.rise,
-                neverRises: staysBelow && isStationary,
-                noRiseInWindow: staysBelow && !isStationary,
+                nextRise: rising.nextRise,
+                neverRises: rising.neverRises,
+                noRiseInWindow: rising.noRiseInWindow,
                 magnitude: object.isSolarSystem ? frame.currentMagnitude(of: object) : nil,
                 computedAt: date,
                 isAboveHorizon: isAbove,
                 isBehindSkyline: visibility != nil && horizontal.altitude > 0 && !isAbove,
                 usesSkyline: visibility != nil,
-                smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) })
+                smallBody: object.smallBody.flatMap { SmallBodyInfo.compute($0, frame: frame) },
+                risingSearchedAt: rising.searchedAt)
         }
         return result
+    }
+
+    /// Searches `riseSearchWindow` from `date` for the next rising of `object`, over the skyline when there is one.
+    private static func searchRising(of object: CelestialObject, observer: Observer, visibility: HorizonVisibility?,
+                                     from date: Date) -> Rising {
+        let window = DateInterval(start: date, duration: riseSearchWindow)
+        let events: RiseTransitSet
+        if let visibility {
+            events = ObjectsHorizon.riseTransitSet(for: object, visibility: visibility, observer: observer,
+                                                   within: window)
+        } else {
+            events = RiseSetCalculator.riseTransitSet(for: object, observer: observer, within: window)
+        }
+        let staysBelow = events.circumstance == .alwaysDown
+        let isStationary = staysAmongStars(object)
+        return Rising(nextRise: events.rise, neverRises: staysBelow && isStationary,
+                      noRiseInWindow: staysBelow && !isStationary, searchedAt: date)
+    }
+
+    /// The rising `position` carries, when it still holds at `date`: found no more than `risingReuseAge` ago, and
+    /// not yet past, since a rising that has happened is no longer the next one.
+    private static func keptRising(of position: ObjectSkyPosition, at date: Date) -> Rising? {
+        guard let searchedAt = position.risingSearchedAt else { return nil }
+        let age = date.timeIntervalSince(searchedAt)
+        guard age >= 0, age <= risingReuseAge else { return nil }
+        if let rise = position.nextRise, rise <= date { return nil }
+        return Rising(nextRise: position.nextRise, neverRises: position.neverRises,
+                      noRiseInWindow: position.noRiseInWindow, searchedAt: searchedAt)
     }
 
     /// Whether the object keeps its place among the stars, so that a rising missing from the search window is missing
@@ -91,7 +133,8 @@ enum ObjectsPositionCalculator {
 /// Keeps the sky positions of the objects on screen up to date for the current observer.
 ///
 /// The Objects list sorts and filters by these positions and shows them in every row. They are computed off the
-/// main actor and refreshed every 30 s while the list is visible.
+/// main actor and refreshed every 30 s while the list is visible. The search for each object's next rising costs far
+/// more than its position, so a rising is kept for a few minutes (`ObjectsPositionCalculator.risingReuseAge`).
 ///
 /// When the list asks for them (the "Hours Visible Tonight" order or filter), the same loop also works out how many
 /// hours tonight each tracked object is above the skyline (`tonight`). That is done once per observer, skyline and
@@ -101,7 +144,8 @@ enum ObjectsPositionCalculator {
 final class ObjectsPositionModel {
     /// How often positions are recomputed while the list is on screen.
     static let refreshInterval: Duration = .seconds(30)
-    /// Positions computed less than this many seconds ago are reused when the tracked objects change.
+    /// Positions computed less than this many seconds ago are reused when the tracked objects change. It is shorter
+    /// than `refreshInterval` on purpose: the rows show the altitude, so every pass works every position out again.
     static let reuseAge: TimeInterval = 25
 
     /// The latest position of each tracked object, keyed by object identifier.
@@ -180,8 +224,10 @@ final class ObjectsPositionModel {
             return date.timeIntervalSince(known.computedAt) > Self.reuseAge
         }
         guard !outdated.isEmpty else { return }
+        let earlier: [String: ObjectSkyPosition] = isNewObserver ? [:] : positions
         let computed = await Task.detached(priority: .utility) {
-            ObjectsPositionCalculator.positions(for: outdated, observer: observer, skyline: skyline, date: date)
+            ObjectsPositionCalculator.positions(for: outdated, observer: observer, skyline: skyline, date: date,
+                                                keepingRisingsOf: earlier)
         }.value
         guard !Task.isCancelled else { return }
         if isNewObserver {
