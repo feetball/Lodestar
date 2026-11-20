@@ -28,6 +28,10 @@ struct SessionLogDraft: Equatable {
     var notes: String
     var isImaged: Bool
 
+    /// The decimals the exposure field shows when an entry is opened. Six keep 1/8000 s (0.000125 s) whole; fewer round
+    /// a short exposure to "0", and that is what Save would then store. Trailing zeros are dropped, so 30 s reads "30".
+    private static let exposureFractionDigits = 6
+
     /// A new entry for `object`: now, the observing site, the camera and lens of Settings, the NPF exposure as the exposure
     /// to start from, and the filter chosen in Settings.
     static func new(for object: CelestialObject, context: ObserverContext?, lens: LensSetup,
@@ -75,7 +79,8 @@ struct SessionLogDraft: Equatable {
         lensAperture = entry.lensAperture
         sensorPixelsX = entry.sensorPixelsX
         sensorPixelsY = entry.sensorPixelsY
-        exposureText = entry.exposureSeconds > 0 ? SettingsNumberText.text(for: entry.exposureSeconds, fractionDigits: 3) : ""
+        exposureText = entry.exposureSeconds > 0
+            ? SettingsNumberText.text(for: entry.exposureSeconds, fractionDigits: Self.exposureFractionDigits) : ""
         isoText = entry.iso > 0 ? String(entry.iso) : ""
         framesText = entry.frameCount > 0 ? String(entry.frameCount) : ""
         filter = entry.filter
